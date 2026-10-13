@@ -124,13 +124,66 @@
         page-break-inside: avoid;
       }
     }
+
+    /* 로그인 관문 배경: 어두운 분석 화면 + 개선되는 재무 흐름 */
+    #auth_gate { background: radial-gradient(ellipse at 20% 0%, #12303a 0%, transparent 55%), linear-gradient(160deg, #070d18 0%, #0b1626 45%, #0a2229 100%); overflow: hidden; }
+    .auth-bg-layer { position: absolute; inset: 0; pointer-events: none; }
+    .auth-bg-layer svg { width: 100%; height: 100%; display: block; }
+    .ab-line { stroke-dasharray: 3200; stroke-dashoffset: 3200; animation: abDraw 3.2s cubic-bezier(.45,.05,.2,1) .2s forwards; }
+    .ab-area { opacity: 0; animation: abFade 1.6s ease 1.6s forwards; }
+    .ab-bar { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0); animation: abGrow .9s cubic-bezier(.2,.7,.2,1) forwards; }
+    .ab-dot { opacity: 0; animation: abFade .4s ease 3.2s forwards; }
+    .ab-pulse { opacity: 0; transform-box: fill-box; transform-origin: center; animation: abPulse 2.4s ease-out 3.4s infinite; }
+    .ab-chip { position: absolute; display: none; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 12px; background: rgba(15, 30, 45, 0.55); border: 1px solid rgba(45, 212, 191, 0.18); backdrop-filter: blur(6px); color: #cbd5e1; font-size: 11px; opacity: 0; animation: abChip 1s ease forwards, abFloat 6s ease-in-out 1s infinite alternate; }
+    .ab-chip span { color: #94a3b8; font-weight: 700; letter-spacing: .02em; }
+    .ab-chip b { color: #f1f5f9; font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .ab-chip b i { color: #64748b; font-style: normal; font-weight: 400; margin: 0 2px; }
+    .ab-chip em { font-style: normal; font-weight: 800; color: #5eead4; }
+    @media (min-width: 900px) { .ab-chip { display: flex; } }
+    #auth_gate > .auth-card { position: relative; box-shadow: 0 30px 80px -20px rgba(0,0,0,.6), 0 0 0 1px rgba(45,212,191,.12); }
+    @keyframes abDraw { to { stroke-dashoffset: 0; } }
+    @keyframes abFade { to { opacity: 1; } }
+    @keyframes abGrow { to { transform: scaleY(1); } }
+    @keyframes abPulse { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(3.2); } }
+    @keyframes abChip { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes abFloat { from { translate: 0 0; } to { translate: 0 -8px; } }
+    @media (prefers-reduced-motion: reduce) {
+      .ab-line { animation: none; stroke-dashoffset: 0; } .ab-area, .ab-dot { animation: none; opacity: 1; }
+      .ab-bar { animation: none; transform: none; } .ab-pulse { display: none; } .ab-chip { animation: none; opacity: 1; }
+    }
   </style>
 </head>
 <body class="min-h-screen text-slate-900 pb-16">
 
   <!-- ================= 로그인 관문 (2단계: 구글 로그인 · 승인 대기 · 차단) ================= -->
-  <div id="auth_gate" class="no-print fixed inset-0 z-[100] bg-slate-50 flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-8 space-y-5 text-center">
+  <div id="auth_gate" class="no-print fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <!-- 배경: 재무 지표가 개선되는 흐름 (순수 SVG, 외부 파일 없음) -->
+    <div class="auth-bg-layer" aria-hidden="true">
+      <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="abGrid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="rgba(148,163,184,0.07)" stroke-width="1"/></pattern>
+          <linearGradient id="abArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3c5" stop-opacity="0.28"/><stop offset="1" stop-color="#169aa8" stop-opacity="0"/></linearGradient>
+          <linearGradient id="abLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#169aa8"/><stop offset="0.6" stop-color="#2dd4bf"/><stop offset="1" stop-color="#a7f3d0"/></linearGradient>
+          <linearGradient id="abBar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2dd4bf" stop-opacity="0.22"/><stop offset="1" stop-color="#169aa8" stop-opacity="0.02"/></linearGradient>
+          <radialGradient id="abGlow" cx="0.78" cy="0.22" r="0.55"><stop offset="0" stop-color="#14b8a6" stop-opacity="0.22"/><stop offset="1" stop-color="#14b8a6" stop-opacity="0"/></radialGradient>
+          <filter id="abBlur"><feGaussianBlur stdDeviation="6"/></filter>
+        </defs>
+        <rect width="1440" height="900" fill="url(#abGrid)"/>
+        <rect width="1440" height="900" fill="url(#abGlow)"/>
+        <g fill="url(#abBar)"><rect class="ab-bar" style="animation-delay:0.00s" x="20" y="840" width="26" height="60" rx="3"/><rect class="ab-bar" style="animation-delay:0.05s" x="67" y="816" width="26" height="84" rx="3"/><rect class="ab-bar" style="animation-delay:0.10s" x="113" y="855" width="26" height="45" rx="3"/><rect class="ab-bar" style="animation-delay:0.15s" x="160" y="828" width="26" height="72" rx="3"/><rect class="ab-bar" style="animation-delay:0.20s" x="207" y="801" width="26" height="99" rx="3"/><rect class="ab-bar" style="animation-delay:0.25s" x="253" y="838" width="26" height="62" rx="3"/><rect class="ab-bar" style="animation-delay:0.30s" x="300" y="808" width="26" height="92" rx="3"/><rect class="ab-bar" style="animation-delay:0.35s" x="347" y="780" width="26" height="120" rx="3"/><rect class="ab-bar" style="animation-delay:0.40s" x="393" y="815" width="26" height="85" rx="3"/><rect class="ab-bar" style="animation-delay:0.45s" x="440" y="783" width="26" height="117" rx="3"/><rect class="ab-bar" style="animation-delay:0.50s" x="487" y="755" width="26" height="145" rx="3"/><rect class="ab-bar" style="animation-delay:0.55s" x="533" y="789" width="26" height="111" rx="3"/><rect class="ab-bar" style="animation-delay:0.60s" x="580" y="755" width="26" height="145" rx="3"/><rect class="ab-bar" style="animation-delay:0.65s" x="627" y="726" width="26" height="174" rx="3"/><rect class="ab-bar" style="animation-delay:0.70s" x="673" y="759" width="26" height="141" rx="3"/><rect class="ab-bar" style="animation-delay:0.75s" x="720" y="724" width="26" height="176" rx="3"/><rect class="ab-bar" style="animation-delay:0.80s" x="767" y="695" width="26" height="205" rx="3"/><rect class="ab-bar" style="animation-delay:0.85s" x="813" y="727" width="26" height="173" rx="3"/><rect class="ab-bar" style="animation-delay:0.90s" x="860" y="691" width="26" height="209" rx="3"/><rect class="ab-bar" style="animation-delay:0.95s" x="907" y="662" width="26" height="238" rx="3"/><rect class="ab-bar" style="animation-delay:1.00s" x="953" y="693" width="26" height="207" rx="3"/><rect class="ab-bar" style="animation-delay:1.05s" x="1000" y="655" width="26" height="245" rx="3"/><rect class="ab-bar" style="animation-delay:1.10s" x="1047" y="626" width="26" height="274" rx="3"/><rect class="ab-bar" style="animation-delay:1.15s" x="1093" y="656" width="26" height="244" rx="3"/><rect class="ab-bar" style="animation-delay:1.20s" x="1140" y="617" width="26" height="283" rx="3"/><rect class="ab-bar" style="animation-delay:1.25s" x="1187" y="588" width="26" height="312" rx="3"/><rect class="ab-bar" style="animation-delay:1.30s" x="1233" y="618" width="26" height="282" rx="3"/><rect class="ab-bar" style="animation-delay:1.35s" x="1280" y="577" width="26" height="323" rx="3"/><rect class="ab-bar" style="animation-delay:1.40s" x="1327" y="548" width="26" height="352" rx="3"/><rect class="ab-bar" style="animation-delay:1.45s" x="1373" y="577" width="26" height="323" rx="3"/></g>
+        <path d="M0,520 C30,520 30,545 60,545 C90,545 90,544 120,544 C150,544 150,530 180,530 C210,530 210,534 240,534 C270,534 270,561 300,561 C330,561 330,583 360,583 C390,583 390,578 420,578 C450,578 450,565 480,565 C510,565 510,574 540,574 C570,574 570,603 600,603 C630,603 630,620 660,620 C690,620 690,612 720,612 C750,612 750,601 780,601 C810,601 810,614 840,614 C870,614 870,643 900,643 C930,643 930,657 960,657 C990,657 990,646 1020,646 C1050,646 1050,637 1080,637 C1110,637 1110,655 1140,655 C1170,655 1170,684 1200,684 C1230,684 1230,692 1260,692 C1290,692 1290,679 1320,679 C1350,679 1350,675 1380,675 C1410,675 1410,696 1440,696" fill="none" stroke="#f59e0b" stroke-opacity="0.28" stroke-width="2" stroke-dasharray="6 8"/>
+        <path class="ab-area" d="M0,772 C30,772 30,795 60,795 C90,795 90,741 120,741 C150,741 150,698 180,698 C210,698 210,719 240,719 C270,719 270,721 300,721 C330,721 330,692 360,692 C390,692 390,716 420,716 C450,716 450,748 480,748 C510,748 510,683 540,683 C570,683 570,590 600,590 C630,590 630,579 660,579 C690,579 690,594 720,594 C750,594 750,553 780,553 C810,553 810,518 840,518 C870,518 870,534 900,534 C930,534 930,517 960,517 C990,517 990,441 1020,441 C1050,441 1050,407 1080,407 C1110,407 1110,429 1140,429 C1170,429 1170,409 1200,409 C1230,409 1230,354 1260,354 C1290,354 1290,347 1320,347 C1350,347 1350,348 1380,348 C1410,348 1410,283 1440,283 L1440,900 L0,900 Z" fill="url(#abArea)"/>
+        <path d="M0,772 C30,772 30,795 60,795 C90,795 90,741 120,741 C150,741 150,698 180,698 C210,698 210,719 240,719 C270,719 270,721 300,721 C330,721 330,692 360,692 C390,692 390,716 420,716 C450,716 450,748 480,748 C510,748 510,683 540,683 C570,683 570,590 600,590 C630,590 630,579 660,579 C690,579 690,594 720,594 C750,594 750,553 780,553 C810,553 810,518 840,518 C870,518 870,534 900,534 C930,534 930,517 960,517 C990,517 990,441 1020,441 C1050,441 1050,407 1080,407 C1110,407 1110,429 1140,429 C1170,429 1170,409 1200,409 C1230,409 1230,354 1260,354 C1290,354 1290,347 1320,347 C1350,347 1350,348 1380,348 C1410,348 1410,283 1440,283" fill="none" stroke="url(#abLine)" stroke-width="10" stroke-opacity="0.35" filter="url(#abBlur)"/>
+        <path class="ab-line" d="M0,772 C30,772 30,795 60,795 C90,795 90,741 120,741 C150,741 150,698 180,698 C210,698 210,719 240,719 C270,719 270,721 300,721 C330,721 330,692 360,692 C390,692 390,716 420,716 C450,716 450,748 480,748 C510,748 510,683 540,683 C570,683 570,590 600,590 C630,590 630,579 660,579 C690,579 690,594 720,594 C750,594 750,553 780,553 C810,553 810,518 840,518 C870,518 870,534 900,534 C930,534 930,517 960,517 C990,517 990,441 1020,441 C1050,441 1050,407 1080,407 C1110,407 1110,429 1140,429 C1170,429 1170,409 1200,409 C1230,409 1230,354 1260,354 C1290,354 1290,347 1320,347 C1350,347 1350,348 1380,348 C1410,348 1410,283 1440,283" fill="none" stroke="url(#abLine)" stroke-width="3" stroke-linecap="round"/>
+        <circle class="ab-dot" cx="1436" cy="283" r="7" fill="#a7f3d0"/>
+        <circle class="ab-pulse" cx="1436" cy="283" r="7" fill="none" stroke="#a7f3d0" stroke-width="2"/>
+      </svg>
+      <div class="ab-chip" style="left:6%;top:14%"><span>부채비율</span><b>218% <i>→</i> 94%</b><em>▼ 124%p</em></div>
+      <div class="ab-chip" style="right:7%;top:30%;animation-delay:.6s"><span>영업이익률</span><b>1.2% <i>→</i> 6.3%</b><em class="up">▲ 5.1%p</em></div>
+      <div class="ab-chip" style="left:9%;bottom:16%;animation-delay:1.2s"><span>이자보상배율</span><b>0.8배 <i>→</i> 3.4배</b><em class="up">▲ 2.6배</em></div>
+      <div class="ab-chip" style="right:12%;bottom:10%;animation-delay:1.8s"><span>월 이자비용</span><b>412만 <i>→</i> 228만원</b><em>▼ 45%</em></div>
+    </div>
+    <div class="auth-card w-full max-w-md bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-5 text-center">
       <div class="w-12 h-12 mx-auto rounded-xl bg-[#169aa8] flex items-center justify-center text-white font-black text-2xl shadow-sm">C</div>
       <div class="space-y-1">
         <h2 class="text-lg font-black text-slate-900">코스텝 경영진단 및 행정지원 연계시스템</h2>
