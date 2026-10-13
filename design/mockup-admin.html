@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리·가입·초대 목업</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#F6F5F1; --card:#fff; --line:#E4E2DB; --line2:#D6D3CA; --text:#0A0B0F; --sub:#66635C; --navy:#0A1F44; --teal:#00A898; --teal-soft:rgba(0,168,152,.09); --gold:#E0A100; --gold-soft:#FFF6D6; --red:#A32D2D; --red-soft:#FCEBEB; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 12px 20px; background: var(--navy); color: #fff; }
+  .bar img { height: 30px; }
+  .bar .t { font-weight: 800; font-size: 13px; opacity: .8; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+  .tabs button { border: 0; border-radius: 9px; padding: 7px 12px; font: inherit; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.7); background: rgba(255,255,255,.06); cursor: pointer; }
+  .tabs button.on { background: #fff; color: var(--navy); }
+  main { max-width: 1120px; margin: 24px auto 80px; padding: 0 16px; }
+  .scr { display: none; } .scr.on { display: block; }
+  h1 { font-size: 22px; font-weight: 900; margin: 0 0 4px; } .lead { color: var(--sub); margin: 0 0 18px; font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .narrow { max-width: 560px; margin: 0 auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label { display: block; font-size: 12px; font-weight: 700; margin: 0 0 5px; }
+  input, select, textarea { width: 100%; border: 1px solid #C9CED8; border-radius: 10px; padding: 9px 11px; font: inherit; font-size: 13px; background: #fff; }
+  textarea { min-height: 64px; resize: vertical; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .seg div { border: 1.5px solid var(--line2); border-radius: 12px; padding: 12px; cursor: pointer; }
+  .seg div.on { border-color: var(--teal); background: var(--teal-soft); }
+  .seg b { display: block; font-size: 13px; } .seg span { font-size: 11px; color: var(--sub); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #C9CED8; background: #fff; border-radius: 10px; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+  .btn.dark { background: var(--text); border-color: var(--text); color: #fff; }
+  .btn.red { color: var(--red); border-color: #F0C2C2; }
+  .btn.sm { padding: 5px 10px; font-size: 11px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .chk { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #33363D; margin-top: 12px; }
+  .chk input { width: auto; margin-top: 2px; }
+  .muted { color: var(--sub); font-size: 12px; }
+  .pill { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 800; }
+  .p-wait { background: var(--gold-soft); color: #8A6200; } .p-ok { background: var(--teal-soft); color: #0f766e; } .p-no { background: #EEECE6; color: var(--sub); } .p-red { background: var(--red-soft); color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; font-weight: 800; color: var(--sub); padding: 8px 10px; border-bottom: 1px solid var(--line); background: #FBFAF7; white-space: nowrap; }
+  td { padding: 10px; border-bottom: 1px solid #EEECE6; vertical-align: middle; }
+  .console { display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
+  .side { display: flex; flex-direction: column; gap: 2px; }
+  .side button { text-align: left; border: 0; background: none; border-radius: 10px; padding: 9px 12px; font: inherit; font-size: 13px; font-weight: 700; color: var(--sub); cursor: pointer; display: flex; justify-content: space-between; }
+  .side button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .side .n { background: var(--gold-soft); color: #8A6200; border-radius: 999px; padding: 0 7px; font-size: 11px; }
+  .pane { display: none; } .pane.on { display: block; }
+  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; } .head h2 { font-size: 16px; font-weight: 900; margin: 0; } .head .sp { margin-left: auto; display: flex; gap: 6px; }
+  .wait { text-align: center; padding: 40px 20px; }
+  .wait .ic { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; background: var(--gold-soft); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .steps3 { display: flex; justify-content: center; gap: 0; margin: 18px 0; }
+  .steps3 div { font-size: 11px; color: var(--sub); padding: 0 14px; position: relative; } .steps3 div.on { color: var(--text); font-weight: 800; }
+  .overlay { background: rgba(10,11,15,.45); border-radius: 16px; padding: 40px 16px; }
+  .dlg { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 24px 60px rgba(0,0,0,.3); }
+  .dlg h3 { margin: 0 0 8px; font-size: 16px; font-weight: 900; }
+  .warn { background: var(--red-soft); color: var(--red); border-radius: 10px; padding: 10px 12px; font-size: 12px; margin: 12px 0; }
+  .note { background: var(--gold-soft); border: 1px solid #E8C34A; border-radius: 10px; padding: 10px 12px; font-size: 12px; margin-bottom: 12px; }
+  .stat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; } .stat b { font-size: 20px; font-weight: 900; display: block; } .stat span { font-size: 11px; color: var(--sub); }
+  .link { font-family: ui-monospace, monospace; font-size: 12px; background: #F6F5F1; border: 1px dashed var(--line2); border-radius: 8px; padding: 6px 8px; }
+  @media (max-width: 820px) { .console { grid-template-columns: 1fr; } .grid2, .seg, .stat { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <img src="../brand/msc-lockup-horizontal-dark-nosub.svg" alt="MSC report">
+  <span class="t">목업 — 관리·가입·초대·퇴출·고객 저장 (예시 자료)</span>
+  <div class="tabs" id="tabs">
+    <button data-s="apply" class="on">① 가입 신청서</button>
+    <button data-s="wait">② 승인 대기</button>
+    <button data-s="admin">③ 펌 관리자 콘솔</button>
+    <button data-s="remove">④ 내보내기</button>
+    <button data-s="clients">⑤ 고객 목록(계정 저장)</button>
+    <button data-s="op">⑥ 운영자 콘솔</button>
+  </div>
+</div>
+<main>
+
+  <!-- ① 가입 신청서 -->
+  <section class="scr on" id="s-apply">
+    <div class="narrow">
+      <h1>가입 신청</h1>
+      <p class="lead">초대를 받지 않은 계정입니다. 신청서를 보내면 관리자가 확인한 뒤 바로 쓸 수 있어요.</p>
+      <div class="card">
+        <div class="muted" style="margin-bottom:12px">로그인 계정 <b style="color:var(--text)">hong@example.com</b></div>
+        <div class="grid2">
+          <div><label>이름</label><input value="홍길동"></div>
+          <div><label>직함</label><input value="경영컨설턴트"></div>
+          <div><label>휴대폰</label><input value="010-1234-5678"></div>
+          <div></div>
+        </div>
+        <label style="margin-top:14px">소속</label>
+        <div class="seg" id="kind">
+          <div class="on" data-k="join"><b>기존 펌에 합류</b><span>펌 관리자가 알려 준 펌 코드로</span></div>
+          <div data-k="new"><b>새 펌 만들기</b><span>내가 펌 관리자가 됩니다 · 운영자 승인</span></div>
+        </div>
+        <div id="k-join" style="margin-top:12px"><label>펌 코드 (6자리)</label><input value="GANA24" style="text-transform:uppercase"><div class="muted" style="margin-top:4px">확인됨: <b>가나경영컨설팅</b> — 이 펌 관리자에게 신청이 갑니다</div></div>
+        <div id="k-new" style="margin-top:12px;display:none" class="grid2"><div><label>펌 상호</label><input placeholder="예: 가나경영컨설팅"></div><div><label>사업자등록번호</label><input placeholder="000-00-00000"></div></div>
+        <label style="margin-top:12px">하고 싶은 말 (선택)</label><textarea placeholder="예: 코스텝 협약 컨설턴트입니다"></textarea>
+        <label class="chk"><input type="checkbox" checked> <span>개인정보(이름·연락처·이메일) 수집·이용에 동의합니다. <a href="#" style="color:var(--teal)">자세히</a></span></label>
+        <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn">로그아웃</button><button class="btn dark" onclick="go('wait')">신청 보내기</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 승인 대기 -->
+  <section class="scr" id="s-wait">
+    <div class="narrow card wait">
+      <div class="ic">⏳</div>
+      <h1>승인을 기다리고 있어요</h1>
+      <p class="lead" style="margin-top:6px">가나경영컨설팅 관리자에게 합류 신청을 보냈습니다. 승인되면 다시 로그인하지 않아도 바로 시작돼요.</p>
+      <div class="steps3"><div class="on">신청 보냄 · 10/14 09:12</div><div>관리자 확인</div><div>시작</div></div>
+      <div class="row" style="justify-content:center"><button class="btn">신청 내용 고치기</button><button class="btn red">신청 취소</button></div>
+      <p class="muted" style="margin-top:16px">거절되면 사유가 이 화면에 표시되고, 7일 뒤 다시 신청할 수 있어요.</p>
+    </div>
+  </section>
+
+  <!-- ③ 펌 관리자 콘솔 -->
+  <section class="scr" id="s-admin">
+    <h1>가나경영컨설팅 관리</h1>
+    <p class="lead">펌 관리자 · 구성원 5명 · 고객 38곳</p>
+    <div class="console">
+      <nav class="side" id="side">
+        <button data-p="members" class="on">구성원</button>
+        <button data-p="invites">초대 <span class="n">2</span></button>
+        <button data-p="joins">합류 신청 <span class="n">1</span></button>
+        <button data-p="cls">고객</button>
+        <button data-p="docs">발행 대장</button>
+        <button data-p="logs">접속 기록</button>
+        <button data-p="org">펌 정보</button>
+      </nav>
+      <div>
+        <div class="card pane on" id="p-members">
+          <div class="head"><h2>구성원</h2><div class="sp"><button class="btn dark sm" onclick="pane('invites')">+ 초대</button></div></div>
+          <table><thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>맡은 고객</th><th>최근 접속</th><th></th></tr></thead><tbody>
+            <tr><td><b>김대표</b></td><td class="muted">kim@example.com</td><td><span class="pill p-ok">펌 관리자</span></td><td>14</td><td class="muted">오늘 08:41</td><td class="muted">나</td></tr>
+            <tr><td><b>홍길동</b></td><td class="muted">hong@example.com</td><td><select style="width:auto;padding:4px 8px"><option>컨설턴트</option><option>펌 관리자</option></select></td><td>12</td><td class="muted">어제 18:02</td><td><button class="btn red sm" onclick="go('remove')">내보내기</button></td></tr>
+            <tr><td><b>이영희</b></td><td class="muted">lee@example.com</td><td><select style="width:auto;padding:4px 8px"><option>컨설턴트</option><option>펌 관리자</option></select></td><td>8</td><td class="muted">10/12</td><td><button class="btn red sm" onclick="go('remove')">내보내기</button></td></tr>
+            <tr><td><b>박민수</b></td><td class="muted">park@example.com</td><td><select style="width:auto;padding:4px 8px"><option>컨설턴트</option></select></td><td>4</td><td class="muted">10/03</td><td><button class="btn red sm" onclick="go('remove')">내보내기</button></td></tr>
+          </tbody></table>
+          <p class="muted" style="margin-top:10px">펌의 마지막 관리자는 강등·내보내기를 할 수 없어요. 서비스 전체 차단은 운영자만 합니다.</p>
+        </div>
+        <div class="card pane" id="p-invites">
+          <div class="head"><h2>초대</h2></div>
+          <div class="grid2" style="grid-template-columns:2fr 1fr auto;align-items:end"><div><label>구글 이메일</label><input placeholder="name@gmail.com"></div><div><label>역할</label><select><option>컨설턴트</option><option>펌 관리자</option></select></div><button class="btn dark">초대 만들기</button></div>
+          <table style="margin-top:14px"><thead><tr><th>이메일</th><th>역할</th><th>상태</th><th>만료</th><th>초대 링크</th><th></th></tr></thead><tbody>
+            <tr><td>choi@example.com</td><td>컨설턴트</td><td><span class="pill p-wait">대기</span></td><td class="muted">10/21</td><td><span class="link">costepmsc-report.com/i/7Kq…</span> <button class="btn sm">복사</button></td><td><button class="btn sm">다시 보내기</button> <button class="btn red sm">취소</button></td></tr>
+            <tr><td>jung@example.com</td><td>컨설턴트</td><td><span class="pill p-no">만료</span></td><td class="muted">10/09</td><td class="muted">—</td><td><button class="btn sm">다시 보내기</button></td></tr>
+            <tr><td>lee@example.com</td><td>컨설턴트</td><td><span class="pill p-ok">수락</span></td><td class="muted">—</td><td class="muted">10/05 수락</td><td></td></tr>
+          </tbody></table>
+          <p class="muted" style="margin-top:10px">메일은 서비스가 대신 보내지 않아요. 「복사」로 링크와 안내 문구를 복사해 직접 보내 주세요. 초대받은 이메일로 로그인하면 바로 소속됩니다.</p>
+        </div>
+        <div class="card pane" id="p-joins">
+          <div class="head"><h2>합류 신청</h2><div class="sp muted">펌 코드 <b style="color:var(--text)">GANA24</b> <button class="btn sm">새 코드</button></div></div>
+          <table><thead><tr><th>신청자</th><th>연락처</th><th>하고 싶은 말</th><th>신청일</th><th></th></tr></thead><tbody>
+            <tr><td><b>최수진</b> <span class="muted">경영컨설턴트</span><br><span class="muted">choi2@example.com</span></td><td>010-****-5678</td><td class="muted">코스텝 협약 컨설턴트입니다</td><td class="muted">10/14</td><td><button class="btn dark sm">승인</button> <button class="btn sm">거절</button></td></tr>
+          </tbody></table>
+        </div>
+        <div class="card pane" id="p-cls">
+          <div class="head"><h2>고객</h2><div class="sp"><input placeholder="상호·사업자번호·대표자" style="width:220px"><button class="btn sm">담당자 한꺼번에 바꾸기</button></div></div>
+          <table><thead><tr><th>상호</th><th>사업자번호</th><th>담당자</th><th>진단</th><th>최근 수정</th><th></th></tr></thead><tbody>
+            <tr><td><b>(주)예시정밀</b></td><td>123-81-*****</td><td><select style="width:auto;padding:4px 8px"><option>홍길동</option><option>이영희</option></select></td><td>2회</td><td class="muted">어제</td><td><button class="btn sm">열기</button> <button class="btn red sm">삭제</button></td></tr>
+            <tr><td><b>예시상사</b></td><td>234-56-*****</td><td><select style="width:auto;padding:4px 8px"><option>이영희</option></select></td><td>1회</td><td class="muted">10/10</td><td><button class="btn sm">열기</button> <button class="btn red sm">삭제</button></td></tr>
+          </tbody></table>
+          <p class="muted" style="margin-top:10px">삭제하면 30일 동안 휴지통에 있다가 완전히 지워져요.</p>
+        </div>
+        <div class="card pane" id="p-docs">
+          <div class="head"><h2>발행 대장</h2><div class="sp"><button class="btn sm">엑셀로 받기</button></div></div>
+          <table><thead><tr><th>문서번호</th><th>고객</th><th>서식</th><th>발행자</th><th>발행일</th></tr></thead><tbody>
+            <tr><td class="link" style="border:0;background:none">GANA-2026-0412</td><td>(주)예시정밀</td><td>서식 1~4 전체</td><td>홍길동</td><td class="muted">10/13</td></tr>
+            <tr><td class="link" style="border:0;background:none">GANA-2026-0411</td><td>예시상사</td><td>서식 2 결과보고서</td><td>이영희</td><td class="muted">10/10</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card pane" id="p-logs">
+          <div class="head"><h2>접속 기록</h2></div>
+          <table><thead><tr><th>때</th><th>누가</th><th>무엇</th><th>대상</th></tr></thead><tbody>
+            <tr><td class="muted">10/14 09:20</td><td>김대표</td><td>구성원 역할 변경</td><td>이영희 → 컨설턴트</td></tr>
+            <tr><td class="muted">10/14 09:12</td><td>최수진</td><td>합류 신청</td><td>가나경영컨설팅</td></tr>
+            <tr><td class="muted">10/13 17:45</td><td>홍길동</td><td>서식 발행</td><td>GANA-2026-0412</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card pane" id="p-org">
+          <div class="head"><h2>펌 정보</h2></div>
+          <div class="grid2"><div><label>상호</label><input value="가나경영컨설팅"></div><div><label>문서번호 접두어</label><input value="GANA"></div><div><label>대표</label><input value="김대표"></div><div><label>대표 전화</label><input value="1577-0000"></div></div>
+          <p class="muted" style="margin-top:10px">로고·직인·주소는 지금 화면과 같음(생략)</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ 내보내기 -->
+  <section class="scr" id="s-remove">
+    <div class="overlay">
+      <div class="dlg">
+        <h3>홍길동님을 가나경영컨설팅에서 내보낼까요?</h3>
+        <p class="muted">내보내면 바로 이 펌의 고객·발행 문서를 볼 수 없게 됩니다. 계정은 남아 있어 나중에 다시 초대할 수 있어요.</p>
+        <label style="margin-top:12px">맡던 고객 12곳을 넘겨받을 사람</label>
+        <select><option>김대표 (펌 관리자)</option><option>이영희</option><option>박민수</option></select>
+        <div class="warn">고객·진단·발행 문서는 펌에 남습니다. 작성자 기록은 그대로 두고 담당자만 바뀌어요.</div>
+        <div class="row" style="justify-content:flex-end"><button class="btn" onclick="go('admin')">그만두기</button><button class="btn dark" style="background:var(--red);border-color:var(--red)">내보내기</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 고객 목록 (계정 저장) -->
+  <section class="scr" id="s-clients">
+    <h1>기존 고객 불러오기</h1>
+    <p class="lead">내 계정에 저장된 고객이에요. 어느 PC에서 로그인해도 같아요.</p>
+    <div class="note">이 PC에 예전 방식으로 저장된 고객이 <b>3곳</b> 있어요. <button class="btn sm dark" style="margin-left:6px">계정으로 올리기</button> <span class="muted">(같은 사업자번호는 건너뜀)</span></div>
+    <div class="card">
+      <div class="row" style="margin-bottom:12px"><input placeholder="상호·사업자번호·대표자로 찾기" style="max-width:320px"><div class="seg" style="grid-template-columns:auto auto;margin-left:auto"><div class="on" style="padding:6px 12px"><b>내 고객</b></div><div style="padding:6px 12px"><b>펌 전체</b></div></div></div>
+      <table><thead><tr><th>상호</th><th>대표자</th><th>사업자번호</th><th>진단</th><th>마지막 발행</th><th>최근 수정</th><th></th></tr></thead><tbody>
+        <tr><td><b>(주)예시정밀</b></td><td>김예시</td><td>123-81-*****</td><td>2회</td><td class="muted">10/13</td><td class="muted">어제 18:02</td><td><button class="btn dark sm">열기</button></td></tr>
+        <tr><td><b>예시식품</b></td><td>박예시</td><td>345-12-*****</td><td>1회</td><td class="muted">—</td><td class="muted">10/11</td><td><button class="btn dark sm">열기</button></td></tr>
+      </tbody></table>
+      <p class="muted" style="margin-top:12px">저장 표시: <span class="pill p-ok">저장됨 09:41</span> · <span class="pill p-wait">저장 중</span> · <span class="pill p-red">연결 끊김 — 이 PC에 임시 보관</span></p>
+    </div>
+  </section>
+
+  <!-- ⑥ 운영자 콘솔 -->
+  <section class="scr" id="s-op">
+    <h1>운영자 콘솔</h1>
+    <p class="lead">MSC report 전체</p>
+    <div class="stat"><div><b>4</b><span>펌</span></div><div><b>17</b><span>사용자</span></div><div><b>2</b><span>처리 기다리는 가입 신청</span></div><div><b>0</b><span>파기 대상 고객</span></div></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="head"><h2>새 펌 신청</h2></div>
+      <table><thead><tr><th>펌</th><th>사업자번호</th><th>신청자</th><th>신청일</th><th></th></tr></thead><tbody>
+        <tr><td><b>다라경영연구소</b></td><td>220-81-***** <span class="pill p-ok">검증식 맞음</span></td><td>정예시 · jung2@example.com</td><td class="muted">10/13</td><td><button class="btn dark sm">승인 (펌 생성)</button> <button class="btn sm">거절</button></td></tr>
+      </tbody></table>
+    </div>
+    <div class="card">
+      <div class="head"><h2>펌</h2></div>
+      <table><thead><tr><th>펌</th><th>관리자</th><th>구성원</th><th>고객</th><th>최근 활동</th><th></th></tr></thead><tbody>
+        <tr><td><b>코스텝</b></td><td>costep 관리자</td><td>6</td><td>52</td><td class="muted">오늘</td><td><button class="btn sm">보기</button></td></tr>
+        <tr><td><b>가나경영컨설팅</b></td><td>김대표</td><td>5</td><td>38</td><td class="muted">오늘</td><td><button class="btn sm">보기</button></td></tr>
+      </tbody></table>
+    </div>
+  </section>
+</main>
+<script>
+  const go = s => { document.querySelectorAll('.scr').forEach(x => x.classList.toggle('on', x.id === 's-' + s)); document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.s === s)); scrollTo(0, 0); };
+  const pane = p => { document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'p-' + p)); document.querySelectorAll('#side button').forEach(b => b.classList.toggle('on', b.dataset.p === p)); go('admin'); };
+  document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (b) go(b.dataset.s); };
+  document.getElementById('side').onclick = e => { const b = e.target.closest('button'); if (b) pane(b.dataset.p); };
+  document.getElementById('kind').onclick = e => { const d = e.target.closest('[data-k]'); if (!d) return; document.querySelectorAll('#kind div').forEach(x => x.classList.toggle('on', x === d)); document.getElementById('k-join').style.display = d.dataset.k === 'join' ? '' : 'none'; document.getElementById('k-new').style.display = d.dataset.k === 'new' ? 'grid' : 'none'; };
+  const q = new URLSearchParams(location.search); if (q.get('s')) go(q.get('s')); if (q.get('p')) pane(q.get('p'));
+</script>
+</body>
+</html>
