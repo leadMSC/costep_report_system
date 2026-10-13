@@ -1,6 +1,6 @@
 // 서류 글자 → 앱 칸 해석기 (부채 서류 2종). 브라우저(pdf.js 글자층)와 node 시험에서 같이 쓴다.
 // 입력: 쪽 순서대로 늘어놓은 글자 줄 배열(쪽 경계는 '<<PAGE>>'). 출력: 앱 대출표에 넣을 후보 행.
-// 원칙: 금액은 앱 단위(만원)로 바꾼다 · 금리는 이 서류들에 없으므로 비워 두고 '확인 필요' 표시
+// 규칙: 금액은 앱 단위(만원)로 바꾼다 · 금리는 이 서류들에 없으므로 비워 두고 '확인 필요' 표시
 //       · 주민등록번호·성명 같은 개인 식별값은 결과에 담지 않는다.
 (function (root) {
   const norm = s => String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
@@ -32,7 +32,7 @@
   function parseLedger(lines) {
     const L = lines.map(norm).filter(l => l && l !== '<<PAGE>>');
     const text = L.join('\n');
-    if (!/거래처원장/.test(text) || !/잔액/.test(text)) return null;
+    if (!/거래처원장/.test(text.replace(/\s+/g, '')) || !/잔액/.test(text)) return null;
     const per = text.match(/(\d{4})\.(\d{2})\.(\d{2})\s*~\s*(\d{4})\.(\d{2})\.(\d{2})/);
     const acc = text.match(/계정과목\s*:\s*\[(\d+)\]\s*(\S+)/);
     const out = { kind: 'debt_ledger', title: '거래처원장(잔액)', unit: '원', asOf: per ? `${per[4]}-${per[5]}-${per[6]}` : '', account: acc ? acc[2] : '', rows: [], total: null };
@@ -173,7 +173,242 @@
     return [];
   }
 
+  // pdf.js 글자 조각(items: {s,x,y,w,h}) → 행[칸...]. 홈택스 PDF는 글자 한 자씩 조각이 나오므로
+  // 같은 줄(높이 차 < 글자 높이의 40%)끼리 모아 x 순으로 잇고, 간격이 글자 높이보다 크면 칸을 나눈다.
+  function itemsToRows(items) {
+    const its = items.filter(i => i.s && i.s.trim()).map(i => ({ ...i, h: i.h || 10 })).sort((a, b) => b.y - a.y || a.x - b.x);
+    const rows = [];
+    for (const it of its) {
+      const r = rows.find(r => Math.abs(r.y - it.y) < Math.max(2, it.h * 0.4));
+      if (r) r.items.push(it); else rows.push({ y: it.y, items: [it] });
+    }
+    rows.sort((a, b) => b.y - a.y);
+    return rows.map(r => {
+      const xs = r.items.sort((a, b) => a.x - b.x);
+      const cells = [];
+      let cur = null, end = 0;
+      for (const it of xs) {
+        const gap = it.x - end;
+        if (!cur || gap > it.h * 1.1) { cur = { t: it.s, x: it.x }; cells.push(cur); }
+        else cur.t += (gap > it.h * 0.25 ? ' ' : '') + it.s;
+        end = it.x + (it.w || it.s.length * it.h * 0.9);
+      }
+      return cells.map(c => norm(c.t)).filter(Boolean);
+    });
+  }
+  // 쪽 배열(각 쪽 items) → 칸 줄 배열('<<PAGE>>' 경계) — 부채 해석기 입력 형식
+  function pagesToCells(pages) {
+    const out = [];
+    pages.forEach(items => { out.push('<<PAGE>>'); itemsToRows(items).forEach(r => r.forEach(c => out.push(c))); });
+    return out;
+  }
+  function pagesToRows(pages) { return pages.map(items => itemsToRows(items)); }
+
+  // ───────── 홈택스·공단 서류: 칸 이름(띄어쓰기 제거) 옆 값 읽기 ─────────
+  const despace = s => String(s || '').replace(/\s+/g, '');
+  // 행[칸...]에서 앞쪽 칸들을 이어 붙인 것이 label 과 맞으면 나머지 칸을 값으로
+  function labelValue(rows, re) {
+    for (const r of rows) for (let k = 1; k < r.length; k++) {
+      if (re.test(despace(r.slice(0, k).join('')))) { const v = (r[k] || '').trim(); if (v) return v; }
+    }
+    return '';
+  }
+  const ymd = s => { const m = String(s).match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/); return m ? m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0') : ''; };
+  const bizNoOf = s => { const m = String(s).match(/(\d{3})-?(\d{2})-?(\d{5})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
+  // 사업자번호 가운데 두 자리 81~88 이면 법인
+  const isCorpNo = b => { const m = /^\d{3}-(\d{2})-/.exec(b || ''); return !!m && +m[1] >= 81 && +m[1] <= 88; };
+  // 국세청 사업자등록번호 검증식(가중치 1,3,7,1,3,7,1,3,5)
+  function bizNoValid(b) {
+    const d = String(b || '').replace(/\D/g, '').split('').map(Number);
+    if (d.length !== 10) return false;
+    const w = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += d[i] * w[i];
+    sum += Math.floor(d[8] * 5 / 10);
+    return (10 - (sum % 10)) % 10 === d[9];
+  }
+  // 앱의 '사업자구분 · 과세유형' 값: 개인 · 일반과세 / 개인 · 간이과세 / 개인 · 면세 / 법인 · 일반과세 / 법인 · 면세
+  function formValue(corp, taxText) {
+    const t = String(taxText || '');
+    if (corp) return /면세/.test(t) ? '법인 · 면세' : '법인 · 일반과세';
+    if (/간이/.test(t)) return '개인 · 간이과세';
+    if (/면세/.test(t)) return '개인 · 면세';
+    return '개인 · 일반과세';
+  }
+  const signed = s => { const t = norm(s).replace(/[,\s]/g, ''); if (/^\(.*\)$/.test(t) || /^△/.test(t)) return -Number(t.replace(/[()△]/g, '')); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
+  const won2baek = v => v === null ? null : Math.round(v / 1e5) / 10;   // 원 → 백만원(소수 1자리)
+  const won2man = v => v === null ? null : Math.round(v / 1e4);         // 원 → 만원
+
+  const DOC_TYPES = [
+    ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
+    ['fs', '표준재무제표증명', t => /표준재무제표증명|표준재무상태표|표준손익계산서/.test(t)],
+    ['vat', '부가가치세 과세표준증명', t => /과세표준증명/.test(t)],
+    ['ins', '4대보험 사업장 가입자명부', t => /사업장가입자명부/.test(t)],
+    ['share', '주주명부', t => /주주명부/.test(t)],
+    ['ledger', '거래처원장(차입금)', t => /거래처원장/.test(t)],
+    ['creditor', '채권자변동정보 조회서', t => /채권자변동/.test(t)],
+    ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
+    ['lease', '임대차계약서', t => /임대차/.test(t)],
+    ['bizreg', '사업자등록증', t => /사업자등록증/.test(t)]
+  ];
+  function classify(rows, fileName) {
+    const t = despace(rows.flat().join(''));
+    for (const [k, title, test] of DOC_TYPES) if (test(t)) return { kind: k, title };
+    const f = despace(fileName || '');
+    for (const [k, title, test] of DOC_TYPES) if (test(f)) return { kind: k, title, byName: true };
+    return { kind: 'unknown', title: '알 수 없는 서류' };
+  }
+
+  function parseBizCert(rows) {
+    const f = {}, meta = {};
+    const name = labelValue(rows, /^상호/); if (name) f.corp_name = name;
+    const tax0 = despace(rows.flat().join('')).match(/\((일반과세자|간이과세자|면세사업자|법인사업자)\)/);
+    const no = bizNoOf(labelValue(rows, /^사업자등록번호$/));
+    if (no) {
+      f.corp_biz_no = no;
+      if (!bizNoValid(no)) meta.corp_biz_no = { conf: 0.3, valid: false, note: '번호 검증식이 맞지 않아요 — 원본 확인' };
+      f.corp_form = formValue(isCorpNo(no) || (tax0 && tax0[1] === '법인사업자'), tax0 && tax0[1]);
+      meta.corp_form = { conf: tax0 ? 0.9 : 0.6 };
+    }
+    const ceo = labelValue(rows, /^대표자성명/); if (ceo) f.corp_ceo = ceo;
+    const addr = labelValue(rows, /^사업장소재지$/); if (addr) f.corp_address = addr;
+    const open = ymd(labelValue(rows, /^개업일$/)); if (open) f.corp_est_date = open;
+    // 업태·종목은 값 줄이 이름 줄 바로 위에 있다
+    const idx = re => rows.findIndex(r => re.test(despace(r.join(''))));
+    const iu = idx(/^업태$/), ij = idx(/^종목$/);
+    const up = iu > 0 ? rows[iu - 1].join(' ') : '', jm = ij > 0 ? rows[ij - 1].join(' ') : '';
+    if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.7 }; }
+    return { fields: f, meta, notes: tax0 ? [tax0[1]] : [] };
+  }
+
+  // 재무제표: "칸이름 | 코드 | 금액" 반복. 두 단 배치라 한 칸에 '금액 다음칸이름'이 붙어 오면 나눈다
+  function fsTokens(rows) {
+    return rows.flat().flatMap(c => c.split(/\s+(?=(?:[IVX]+|\d{1,2}|\(\d+\)|[가-하])\.)|(?<=\d)\s+(?=[^\d\s,(\-△])/)).map(norm).filter(Boolean);
+  }
+  function fsAmount(tokens, re) {
+    for (let i = 0; i < tokens.length; i++) {
+      if (!re.test(despace(tokens[i]))) continue;
+      if (/^\d{2,3}$/.test(tokens[i + 1] || '')) { const v = signed(tokens[i + 2] || ''); return v === null ? 0 : v; }
+    }
+    return null;
+  }
+  function parseFS(rows) {
+    const tk = fsTokens(rows);
+    const all = despace(rows.flat().join(' '));
+    let year = (all.match(/(\d{4})년귀속/) || [])[1];
+    if (!year) { const m = all.match(/\d{4}\.\d{2}\.\d{2}~(\d{4})\.\d{2}\.\d{2}/) || all.match(/(\d{4})년\d{2}월\d{2}일까지/); year = m && m[1]; }
+    let op = fsAmount(tk, /^(?:[IVX]+\.)?영업(?:손익|이익)/);
+    if (op === null) { const loss = fsAmount(tk, /^(?:[IVX]+\.)?영업손실/); if (loss !== null) op = -Math.abs(loss); }
+    const v = {
+      sales: fsAmount(tk, /^(?:[IVX]+\.)?매출액$/),
+      profit: op,
+      debt: fsAmount(tk, /^부채총계/),
+      equity: fsAmount(tk, /^자본총계/),
+      assets: fsAmount(tk, /^자산총계/),
+      interest: fsAmount(tk, /^\d*\.?이자비용$/),
+      loanToCeo: fsAmount(tk, /^(?:\d+\.|[가-하]\.)?(?:주임종단기채권|가지급금)$/)
+    };
+    const f = {};
+    const name = labelValue(rows, /^(?:상호|법인명)$/); if (name) f.corp_name = name;
+    const no = bizNoOf(labelValue(rows, /^사업자등록번호$/)); if (no) f.corp_biz_no = no;
+    const balanced = v.assets !== null && v.debt !== null && v.equity !== null && Math.abs(v.assets - (v.debt + v.equity)) <= Math.abs(v.assets) * 0.01;
+    const unit = (all.match(/단위[:：]?\(?(원|천원|백만원)/) || [])[1] || '원';
+    const mul = unit === '천원' ? 1000 : unit === '백만원' ? 1e6 : 1;
+    if (mul !== 1) Object.keys(v).forEach(k => { if (v[k] !== null) v[k] *= mul; });
+    const notes = [year ? year + '년 결산' : '결산 연도를 찾지 못함'];
+    if (!balanced) notes.push('자산 ≠ 부채+자본 — 확인 필요');
+    return { year: year ? Number(year) : null, wonValues: v, balanced, fields: f, notes };
+  }
+
+  // 부가세 과세표준증명: 기간별(부터·까지·계) → 최근 12개월 월평균 매출(만원)
+  function parseVAT(rows) {
+    const periods = [];
+    rows.forEach(r => {
+      const d = r.filter(c => /^\d{4}\/\d{2}\/\d{2}$/.test(c));
+      if (d.length >= 2) { const i = r.indexOf(d[1]); const total = signed(r[i + 1] || ''); if (total !== null) periods.push({ from: d[0], to: d[1], total }); }
+    });
+    periods.sort((a, b) => (a.to < b.to ? 1 : -1));
+    const months = p => { const a = p.from.split('/').map(Number), b = p.to.split('/').map(Number); return (b[0] - a[0]) * 12 + (b[1] - a[1]) + 1; };
+    let m = 0, sum = 0;
+    for (const p of periods) { if (m >= 12) break; m += months(p); sum += p.total; }
+    const f = {};
+    const meta = {};
+    if (m) { f.smb_monthly_sales = won2man(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
+    const no = bizNoOf(labelValue(rows, /사업자등록번호$/) || ''); if (no) f.corp_biz_no = no;
+    const ceo = labelValue(rows, /^성명\(대표자\)$/); if (ceo) f.corp_ceo = ceo.split(/\s*주민/)[0].trim();
+    return { fields: f, meta, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
+  }
+
+  // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
+  function parseIns(rows) {
+    let total = 0, emp = 0;
+    rows.forEach(r => {
+      if (!/^\d+$/.test(r[0] || '') || !/^\d{6}-\d\*+/.test(r[1] || '')) return;
+      total++;
+      if (/\d{4}\.\d{2}\.\d{2}/.test(r[6] || '')) emp++;
+    });
+    return { fields: total ? { sme_employees: String(emp || total) } : {}, notes: ['가입자 ' + total + '명 · 고용보험 ' + emp + '명'] };
+  }
+
+  // 주주명부: 대표이사 지분율만
+  function parseShare(rows) {
+    for (const r of rows) {
+      const pct = r.find(c => /^\d{1,3}(\.\d+)?%$/.test(c));
+      if (pct && r.some(c => /대표/.test(c))) return { fields: { corp_ceo_share: '대표이사 ' + pct }, notes: [] };
+    }
+    return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
+  }
+
+  // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
+  // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
+  function parseDocument(pages, fileName, forceKind) {
+    const rows = pagesToRows(pages).flat();
+    const chars = rows.flat().join('').length;
+    const auto = classify(rows, fileName);
+    const picked = forceKind && forceKind !== 'unknown' ? DOC_TYPES.find(d => d[0] === forceKind) : null;
+    const c = picked ? { kind: picked[0], title: picked[1] } : auto;
+    const out = { kind: c.kind, title: c.title, fields: {}, debtItems: [], notes: [], status: 'ok' };
+    if (chars < 20) { out.status = 'scan'; out.notes.push('사진으로 된 서류 — 글자 인식(OCR) 다음 단계'); return out; }
+    let r = null;
+    if (c.kind === 'bizcert') r = parseBizCert(rows);
+    else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced }; }
+    else if (c.kind === 'vat') r = parseVAT(rows);
+    else if (c.kind === 'ins') r = parseIns(rows);
+    else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'ledger' || c.kind === 'creditor') {
+      const parsed = parseDebtDocument(pagesToCells(pages));
+      out.debtItems = toDebtItems(parsed);
+      if (parsed && parsed.kind === 'creditor_change') out.notes.push('대표자 개인 대출 ' + parsed.summary.loans + '건 · 연체 이력 ' + parsed.summary.delinquencies + '건(미해제 ' + parsed.summary.unresolved + ')');
+      if (parsed && parsed.kind === 'debt_ledger') out.notes.push('차입금 ' + parsed.rows.length + '건 · 기준일 ' + parsed.asOf);
+      if (!parsed) { out.status = 'skip'; out.notes.push('표를 읽지 못함'); }
+      return out;
+    } else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '종류를 알 수 없음' : '아직 읽는 규칙이 없는 서류'); return out; }
+    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes;
+    return out;
+  }
+
+  // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
+  function fsToFields(fsList) {
+    const list = fsList.filter(x => x && x.year).sort((a, b) => b.year - a.year);
+    if (!list.length) return {};
+    const top = list[0].year, f = {}, src = {}, conf = {};
+    const suf = { 0: '', 1: '_2024', 2: '_2023' };
+    const put = (id, won, x) => { if (won === null || won === undefined) return; f[id] = won2baek(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
+    list.forEach(x => {
+      const k = top - x.year; if (!(k in suf)) return;
+      const v = x.wonValues;
+      put('sme_sales' + suf[k], v.sales, x);
+      put('sme_profit' + suf[k], v.profit, x);
+      put('sme_debt' + suf[k], v.debt, x);
+      put('sme_equity' + suf[k], v.equity, x);
+      if (k === 0 && v.loanToCeo) put('sme_loan_to_ceo', v.loanToCeo, x);
+      if (k === 0 && v.sales) { f._monthlyFromFs = won2man(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
+    });
+    f._fsTopYear = top; f._src = src; f._conf = conf;
+    return f;
+  }
+
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

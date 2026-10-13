@@ -16,9 +16,9 @@ window.SCENARIOS = [
   {
     id: '1-1', name: '사업자 구분별 시행문 수신 표기',
     async run(api) {
-      api.demo(); api.set('corp_form', '개인사업자');
+      api.demo(); api.set('corp_form', '개인 · 일반과세');
       const indiv = api.line(api.render('smb', null).official, '귀하');
-      api.set('corp_form', '법인기업 (주식회사)');
+      api.set('corp_form', '법인 · 일반과세');
       const corp = api.line(api.render('smb', null).official, '귀하');
       const ok = indiv.includes('대표 귀하') && !indiv.includes('대표이사') && corp.includes('대표이사 귀하');
       return { verdict: ok ? 'PASS' : 'FAIL', evidence: ['개인사업자: ' + indiv, '법인: ' + corp] };

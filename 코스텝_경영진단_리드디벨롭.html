@@ -562,6 +562,18 @@
          ========================================================================= -->
     <div id="screen_input" class="space-y-6">
 
+      <!-- 서류 올리기: 종류 상관없이 한꺼번에 → 팝업에서 확인하고 고른 칸만 넣음 -->
+      <div id="docs_card" class="no-print bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+        <div class="dz">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-extrabold text-slate-900">서류가 있으면 여기에 끌어다 놓으세요</div>
+            <div class="text-xs text-slate-500 truncate">사업자등록증명 · 재무제표 · 부가세 · 4대보험 · 주주명부 · 차입금 원장 · 채권자변동 — 종류 상관없이 한꺼번에</div>
+            <div id="docs_last" class="text-xs font-bold text-[#8A6200] mt-1"></div>
+          </div>
+          <button type="button" onclick="openDocsModal()" class="shrink-0 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold cursor-pointer">문서로 자동입력</button>
+        </div>
+      </div>
+
       <!-- 고객 파일 관리: 이 PC 브라우저에만 저장 -->
       <div id="client_bar" class="no-print bg-white rounded-2xl px-4 py-3 border border-slate-200 shadow-xs flex flex-wrap items-center gap-2 text-xs">
         <span class="font-extrabold text-slate-900 mr-1">고객 파일</span>
@@ -694,10 +706,14 @@
             <input type="text" id="corp_name" value="" placeholder="상호명 입력" oninput="syncCompanyData()" class="form-input-control font-extrabold">
           </div>
           <div>
-            <label class="font-bold text-slate-700 block mb-1">사업자 구분</label>
+            <label class="font-bold text-slate-700 block mb-1">사업자구분 · 과세유형</label>
             <select id="corp_form" onchange="syncCompanyData()" class="form-input-control font-bold">
-              <option value="법인기업 (주식회사)" selected>법인기업 (주식회사)</option>
-              <option value="개인사업자">개인사업자</option>
+              <option value="" selected>선택</option>
+              <option value="개인 · 일반과세">개인 · 일반과세</option>
+              <option value="개인 · 간이과세">개인 · 간이과세</option>
+              <option value="개인 · 면세">개인 · 면세</option>
+              <option value="법인 · 일반과세">법인 · 일반과세</option>
+              <option value="법인 · 면세">법인 · 면세</option>
             </select>
           </div>
           <div>
@@ -5111,7 +5127,7 @@
       const typed = (document.getElementById('corp_name')?.value || '').trim();
       if (typed && !confirm('작성 중인 내용을 작성 예시로 덮어씁니다. 계속할까요?\n(필요하면 먼저 [저장]을 눌러 주세요)')) return;
       document.getElementById('corp_name').value = '주식회사 대성정밀기계';
-      const elForm = document.getElementById('corp_form'); if (elForm) elForm.value = '법인기업 (주식회사)';
+      const elForm = document.getElementById('corp_form'); if (elForm) elForm.value = '법인 · 일반과세';
       document.getElementById('corp_biz_no').value = '123-86-78901';
       const elReg = document.getElementById('corp_reg_no'); if (elReg) elReg.value = '134811-0123456';
       document.getElementById('corp_ceo').value = '김대성';
@@ -5225,7 +5241,8 @@
       if (data.reportKey) { window.appState.activeReportKey = data.reportKey; renderReportButtons(); renderReportKeyChips(); }
       formFields().forEach(el => {
         if (!(el.id in data.fields)) return;
-        const v = data.fields[el.id];
+        let v = data.fields[el.id];
+        if (el.id === 'corp_form') v = ({ '법인기업 (주식회사)': '법인 · 일반과세', '개인사업자': '개인 · 일반과세' })[v] || v;
         if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
       });
       window.appState.debtItems = Array.isArray(data.debtItems) ? data.debtItems : [];
@@ -5783,22 +5800,778 @@
       });
     })();
   </script>
+  <!-- ================= 서류 자동입력(팝업): 끌어다 놓기 → 종류 판별(바꿀 수 있음) → 비교표에서 고른 칸만 적용 =================
+       브라우저 안에서만 읽는다. 파일·원문은 팝업이 열려 있는 동안만 메모리에 두고 닫으면 버린다. PDF 도구는 같은 도메인(vendor/pdfjs). -->
+  <style>
+    #docs_card .dz { border: 2px dashed #CBD5E1; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; transition: border-color .15s, background .15s; }
+    #docs_card .dz.over { border-color: #169aa8; background: rgba(0,168,152,.06); }
+    #docs_modal { position: fixed; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center; background: rgba(10,11,15,.45); padding: 16px; }
+    #docs_modal.open { display: flex; }
+    #docs_modal .panel { width: min(920px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: #fff; color: #0A0B0F; border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,.3); overflow: hidden; }
+    #docs_modal .hd { display: flex; align-items: center; padding: 18px 22px 6px; }
+    #docs_modal .hd h4 { font-size: 17px; font-weight: 900; margin: 0; }
+    #docs_modal .hd button { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; font-size: 20px; color: #66635C; cursor: pointer; }
+    #docs_modal .hd button:hover { background: #F1EFE9; }
+    #docs_modal .bd { padding: 6px 22px 12px; overflow-y: auto; flex: 1; }
+    #docs_modal .lock { font-size: 12px; color: #66635C; margin-bottom: 10px; }
+    #docs_modal .dz { border: 2px dashed #D6D3CA; border-radius: 14px; padding: 18px; text-align: center; color: #66635C; font-size: 12px; transition: border-color .15s, background .15s; }
+    #docs_modal .dz.over { border-color: #00A898; background: rgba(0,168,152,.06); }
+    #docs_modal .dz .btn { margin: 8px 4px 6px; }
+    #docs_modal .btn { padding: 8px 14px; border-radius: 10px; border: 1px solid #C9CED8; background: #fff; font-weight: 800; font-size: 12px; cursor: pointer; }
+    #docs_modal .btn.dark { background: #0A0B0F; color: #fff; border-color: #0A0B0F; }
+    #docs_modal .btn:disabled { opacity: .4; cursor: default; }
+    #docs_modal .sup { margin-top: 12px; background: #F6F5F1; border-radius: 12px; padding: 12px 14px; font-size: 12px; line-height: 1.75; }
+    #docs_modal .sup b { font-weight: 800; }
+    #docs_modal .sup span { color: #66635C; }
+    #docs_modal .files { margin-top: 12px; }
+    #docs_modal .files > div { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #EEECE6; font-size: 12px; }
+    #docs_modal .files .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #33363D; }
+    #docs_modal .files select { border: 1px solid #C9CED8; border-radius: 8px; padding: 4px 6px; font-size: 12px; font-weight: 700; }
+    #docs_modal .files .st { white-space: nowrap; font-weight: 700; color: #66635C; }
+    #docs_modal .files .st.ok { color: #0f766e; } #docs_modal .files .st.warn { color: #8A6200; }
+    #docs_modal table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
+    #docs_modal th { text-align: left; font-weight: 800; color: #66635C; background: #F6F5F1; padding: 7px 8px; position: sticky; top: 0; }
+    #docs_modal td { padding: 7px 8px; border-bottom: 1px solid #EEECE6; vertical-align: top; }
+    #docs_modal td.cur { color: #66635C; }
+    #docs_modal td.val b { font-weight: 800; }
+    #docs_modal td.val small { display: block; color: #66635C; margin-top: 2px; }
+    #docs_modal td.val select { border: 1px solid #E8C34A; background: #FFF6D6; border-radius: 6px; padding: 3px 6px; font-weight: 700; max-width: 100%; }
+    #docs_modal .cf { font-weight: 800; white-space: nowrap; } .cf.h { color: #0f766e; } .cf.m { color: #8A6200; } .cf.l { color: #A32D2D; }
+    #docs_modal .why { display: block; color: #8A6200; font-size: 11px; margin-top: 2px; }
+    #docs_modal .ft { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid #EEECE6; }
+    #docs_modal .ft .cnt { margin-right: auto; font-size: 12px; color: #66635C; }
+    #docs_modal #docs_prog { margin-top: 12px; }
+    #docs_modal .pt { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #33363D; margin-bottom: 5px; }
+    #docs_modal .pb { height: 8px; border-radius: 4px; background: #EEECE6; overflow: hidden; }
+    #docs_modal .pb i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00A898, #00E0C6); border-radius: 4px; transition: width .2s; }
+    .doc-filled { background: #FFF6D6 !important; border-color: #E8C34A !important; color: #0A0B0F !important; }
+  </style>
+  <div id="docs_modal" role="dialog" aria-modal="true" aria-labelledby="docs_modal_t">
+    <div class="panel">
+      <div class="hd"><h4 id="docs_modal_t">문서로 자동입력</h4><button type="button" data-x aria-label="닫기">×</button></div>
+      <div class="bd">
+        <div class="lock">파일은 이 기기 안에서만 읽고 저장하지 않아요. 읽은 값은 아래 표에서 고른 칸만 들어갑니다.</div>
+        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf" multiple hidden><br>PDF · 20MB 이하 · 여러 개 한꺼번에</div>
+        <div class="sup" id="docs_sup">
+          <b>읽을 수 있는 서류</b><br>
+          <b>사업자등록증명</b> <span>— 상호 · 사업자등록번호 · 사업자구분·과세유형 · 대표자 · 소재지 · 개업일 · 업태/종목</span><br>
+          <b>표준재무제표증명</b> <span>— 매출액 · 영업이익 · 부채총계 · 자본총계 · 가지급금 (연도별 3개년 칸)</span><br>
+          <b>부가세 과세표준증명</b> <span>— 최근 12개월 월평균 매출</span><br>
+          <b>4대보험 사업장 가입자명부</b> <span>— 상시근로자 수(고용보험 기준, 이름은 읽지 않음)</span><br>
+          <b>주주명부</b> <span>— 대표이사 지분율</span><br>
+          <b>거래처원장(차입금)</b> <span>— 대출표: 기관 · 과목 · 잔액 (금리는 직접)</span><br>
+          <b>채권자변동정보 조회서</b> <span>— 대표자 개인 대출: 기관 · 종류 · 발생금액 · 연체 이력</span><br>
+          <span>사진으로 된 서류(법인등기·사업자등록증 사진·임대차계약서)는 다음 단계(글자 인식)에서 읽습니다.</span>
+        </div>
+        <div id="docs_prog" hidden><div class="pt"><span id="docs_prog_t"></span><span id="docs_prog_n"></span></div><div class="pb"><i id="docs_prog_bar"></i></div></div>
+        <div class="files" id="docs_files"></div>
+        <div id="docs_table"></div>
+      </div>
+      <div class="ft"><span class="cnt" id="docs_cnt">0개 선택</span><button type="button" class="btn" data-x>취소</button><button type="button" class="btn dark" id="docs_apply" disabled>선택 항목 적용</button></div>
+    </div>
+  </div>
+  <script>
+    // 서류 해석기 원본은 tools/doc-parsers.js — 아래 블록은 그 파일과 같아야 한다(doc-parsers-test.js 가 대조)
+// 서류 글자 → 앱 칸 해석기 (부채 서류 2종). 브라우저(pdf.js 글자층)와 node 시험에서 같이 쓴다.
+// 입력: 쪽 순서대로 늘어놓은 글자 줄 배열(쪽 경계는 '<<PAGE>>'). 출력: 앱 대출표에 넣을 후보 행.
+// 규칙: 금액은 앱 단위(만원)로 바꾼다 · 금리는 이 서류들에 없으므로 비워 두고 '확인 필요' 표시
+//       · 주민등록번호·성명 같은 개인 식별값은 결과에 담지 않는다.
+(function (root) {
+  const norm = s => String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const num = s => { const t = norm(s).replace(/[,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
+  const isNum = s => num(s) !== null;
+  // 단위 → 만원 배율
+  const UNIT_TO_MAN = { '원': 1 / 10000, '천원': 1 / 10, '만원': 1, '백만원': 100, '억원': 10000 };
+  const toMan = (v, unit) => v === null ? null : Math.round(v * UNIT_TO_MAN[unit] * 10) / 10;
+
+  // 기관 이름 정리: 약칭 → 정식 이름 (앞에서부터 먼저 맞는 것)
+  const INSTITUTIONS = [
+    [/중진공|중소벤처기업진흥공단|중소기업진흥공단/, '중소벤처기업진흥공단'],
+    [/소진공|소상공인시장진흥공단/, '소상공인시장진흥공단'],
+    [/IBK|기업은행/, 'IBK기업은행'],
+    [/KB|국민/, 'KB국민은행'],
+    [/신한/, '신한은행'], [/우리/, '우리은행'], [/하나/, '하나은행'],
+    [/농협|NH/, 'NH농협은행'], [/수협/, '수협은행'], [/산업은행|KDB/, 'KDB산업은행'],
+    [/새마을/, '새마을금고'], [/신협/, '신협'], [/저축은행/, '저축은행'],
+    [/기보|기술보증/, '기술보증기금'], [/신보|신용보증기금/, '신용보증기금'], [/지역신보|신용보증재단/, '지역신용보증재단']
+  ];
+  const GUARANTEE = [[/\((기보|기술보증기금)\)/, '기술보증기금'], [/\((신보|신용보증기금)\)/, '신용보증기금'], [/\((지역신보|재단)\)/, '지역신용보증재단']];
+  const LOAN_KIND = [[/시설/, '시설자금'], [/중소기업자금/, '중소기업자금'], [/운전|운영/, '운전자금'], [/창업/, '창업자금'], [/정책|중진공|소진공/, '정책자금'], [/구매/, '구매자금'], [/할부/, '할부'], [/신용/, '신용대출'], [/담보/, '담보대출']];
+  const pick = (table, s) => { for (const [re, v] of table) if (re.test(s)) return v; return ''; };
+
+  // 쪽마다 반복되는 머리·꼬리 줄 제거
+  const FOOTER = /^(발급일시|발급번호|페이지)\s*:|^\(단위\s*:|^종합신용정보집중기관|^※/;
+
+  // ───────── 1) 거래처원장(잔액) — 회계 프로그램 출력, 장기·단기차입금 계정 ─────────
+  function parseLedger(lines) {
+    const L = lines.map(norm).filter(l => l && l !== '<<PAGE>>');
+    const text = L.join('\n');
+    if (!/거래처원장/.test(text.replace(/\s+/g, '')) || !/잔액/.test(text)) return null;
+    const per = text.match(/(\d{4})\.(\d{2})\.(\d{2})\s*~\s*(\d{4})\.(\d{2})\.(\d{2})/);
+    const acc = text.match(/계정과목\s*:\s*\[(\d+)\]\s*(\S+)/);
+    const out = { kind: 'debt_ledger', title: '거래처원장(잔액)', unit: '원', asOf: per ? `${per[4]}-${per[5]}-${per[6]}` : '', account: acc ? acc[2] : '', rows: [], total: null };
+    // 거래처 코드 줄: 쉼표 없는 숫자 + 다음 줄이 거래처명(숫자 아님)
+    const isCode = k => /^\d{4,8}$/.test(L[k] || '') && L[k + 1] && !isNum(L[k + 1]);
+    for (let i = 0; i < L.length; i++) {
+      if (/^\[\s*합/.test(L[i])) { // 합계: 뒤따르는 숫자 중 마지막이 잔액 합계
+        const nums = []; for (let j = i + 1; j < L.length && nums.length < 4; j++) { if (isNum(L[j])) nums.push(num(L[j])); else if (!/계\]$/.test(L[j])) break; }
+        if (nums.length) out.total = { balanceWon: nums[nums.length - 1], balanceMan: toMan(nums[nums.length - 1], '원') };
+        break;
+      }
+      if (!isCode(i)) continue;
+      const name = L[i + 1].replace(/^_\s*/, '');
+      const nums = [];
+      let j = i + 2;
+      while (j < L.length && isNum(L[j]) && !isCode(j)) { nums.push(num(L[j])); j++; }
+      if (!nums.length) continue;
+      const eok = name.match(/(\d+(?:\.\d+)?)\s*억/);
+      const start = name.match(/_(\d{4})\.(\d{1,2})/) || name.match(/(\d{4})\.(\d{1,2})$/);
+      const contract = name.match(/\(?(\d{1,4}-\d{3,})\)?/) || name.match(/\((\d{6,})\)/);
+      const guarantor = pick(GUARANTEE, name);
+      out.rows.push({
+        institution: pick(INSTITUTIONS, name.replace(/\((기보|신보|지역신보)\)/g, '')) || '',
+        type: pick(LOAN_KIND, name) || '',
+        balanceMan: toMan(nums[nums.length - 1], '원'),
+        openingMan: nums.length >= 2 ? toMan(nums[0], '원') : null,
+        principalMan: eok ? Number(eok[1]) * 10000 : null,
+        startYm: start ? `${start[1]}-${String(start[2]).padStart(2, '0')}` : '',
+        contractNo: contract ? contract[1] : '',
+        guarantor,
+        rate: null,
+        needs: [...(pick(INSTITUTIONS, name) ? [] : ['기관']), '금리'],
+        source: name
+      });
+      i = j - 1;
+    }
+    return out;
+  }
+
+  // ───────── 2) 채권자변동정보 조회서 — 한국신용정보원, 개인(대표자) 대출 ─────────
+  function parseCreditorChange(lines) {
+    const raw = lines.map(norm);
+    const text = raw.join('\n');
+    if (!/채권자변동정보\s*조회서/.test(text)) return null;
+    const um = text.match(/\(단위\s*:\s*(천원|원|만원|백만원|억원)\)/);
+    const unit = um ? um[1] : '천원';
+    const q = text.match(/조회일자\s*\n?\s*'?(\d{2})\.(\d{2})\.(\d{2})/);
+    const out = { kind: 'creditor_change', title: '채권자변동정보 조회서', unit, asOf: q ? `20${q[1]}-${q[2]}-${q[3]}` : '', loans: [], delinquencies: [] };
+
+    // 쪽 머리(조회서 제목 ~ 표 머리 끝)·꼬리·안내문을 걷어내고 데이터 줄만 남긴다. 성명·주민번호는 여기서 버린다.
+    const data = [];
+    let section = 0, inHead = false;
+    for (let i = 0; i < raw.length; i++) {
+      const l = raw[i];
+      if (!l || l === '<<PAGE>>') continue;
+      if (/^채권자변동정보\s*조회서$/.test(l)) { inHead = true; continue; }
+      if (/연체채권의\s*채권자\s*변동\s*현황/.test(l)) { section = 2; inHead = true; continue; }
+      if (/채무현황|^\d\.\s*채무\s*현황/.test(l) && section < 2) { section = 1; }
+      if (inHead) {
+        if ((section < 2 && l === '금액') || (section === 2 && /완성여부$/.test(l))) { inHead = false; if (!section) section = 1; }
+        continue;
+      }
+      if (FOOTER.test(l) || /^\d\.\s/.test(l)) continue;
+      data.push({ section, l });
+    }
+
+    // 1. 채무 현황: 순번 · 구분 · 대출종류(코드) · 기관명[지점] · 발생일자 · 금액
+    const s1 = data.filter(d => d.section === 1).map(d => d.l);
+    for (let i = 0; i + 5 < s1.length; i++) {
+      if (!/^\d+$/.test(s1[i]) || !/정보$/.test(s1[i + 1] || '')) continue;
+      const kind = s1[i + 2].match(/^(.+?)\s*\((\d{3,4})\)$/);
+      const date = (s1[i + 4] || '').match(/^(\d{4})\.(\d{2})\.(\d{2})\.?$/);
+      if (!kind || !date || !isNum(s1[i + 5])) continue;
+      const inst = s1[i + 3].replace(/\[[^\]]*\]$/, '').trim();
+      out.loans.push({
+        category: s1[i + 1],
+        institution: inst,
+        type: kind[1],
+        typeCode: kind[2],
+        openedAt: `${date[1]}-${date[2]}-${date[3]}`,
+        amountMan: toMan(num(s1[i + 5]), unit),
+        amountBasis: '발생금액',   // 서류의 금액은 대출이 생긴 때의 금액 — 지금 잔액은 따로 확인
+        rate: null,
+        needs: ['잔액', '금리']
+      });
+      i += 5;
+    }
+
+    // 2. 연체채권의 채권자 변동 현황: 기관 · (전화) · 채권구분 · 발생일자 · 원금 · 이자 · 기한이익상실 · 추심위탁 · 채무조정 · 양도 · 양수(양도금액) · 해제사유(해제일자) · 소멸시효
+    const s2 = data.filter(d => d.section === 2).map(d => d.l);
+    const shortDate = s => { const m = String(s).match(/'?(\d{2})\.(\d{2})\.(\d{2})/); return m ? `20${m[1]}-${m[2]}-${m[3]}` : ''; };
+    for (let i = 0; i < s2.length; i++) {
+      if (!/^\d+$/.test(s2[i]) || !s2[i + 1] || isNum(s2[i + 1])) continue;
+      let j = i + 1;
+      const inst = s2[j++];
+      if (/^\(\s*[\d-]+\s*\)$/.test(s2[j] || '')) j++;          // 기관 대표전화
+      const kind = s2[j++];
+      const occurred = shortDate(s2[j++]);
+      if (!occurred || !isNum(s2[j]) || !isNum(s2[j + 1])) continue;
+      const principal = num(s2[j++]), interest = num(s2[j++]);
+      const accel = s2[j++], collect = s2[j++], adjust = s2[j++], transfer = s2[j++];
+      let assignee = s2[j++];
+      if (/^\([\d,]+\)$/.test(s2[j] || '')) assignee += ' ' + s2[j++];
+      let release = s2[j++] || '';
+      let releasedAt = '';
+      if (/^\('?\d{2}\.\d{2}\.\d{2}\.?\)$/.test(s2[j] || '')) releasedAt = shortDate(s2[j++]);
+      const prescription = s2[j++] || '';
+      out.delinquencies.push({
+        institution: inst, type: kind, occurredAt: occurred,
+        principalMan: toMan(principal, unit), interestMan: toMan(interest, unit),
+        accelerated: accel !== '-', collection: collect, adjustment: adjust === '-' ? '' : adjust,
+        transferred: !/미양도/.test(transfer), assignee: assignee === '-' ? '' : assignee,
+        released: release !== '-' && release !== '', releaseReason: release === '-' ? '' : release, releasedAt,
+        prescription: prescription === '-' ? '' : prescription
+      });
+      i = j - 1;
+    }
+    out.summary = {
+      loans: out.loans.length,
+      loansTotalMan: Math.round(out.loans.reduce((a, r) => a + (r.amountMan || 0), 0) * 10) / 10,
+      delinquencies: out.delinquencies.length,
+      unresolved: out.delinquencies.filter(d => !d.released).length
+    };
+    return out;
+  }
+
+  // 앱 대출표(debtItems) 형태로: 기관 · 과목 · 잔액(만원) · 금리 · 월이자 · 상환방법
+  function toDebtItems(parsed) {
+    if (!parsed) return [];
+    if (parsed.kind === 'debt_ledger') return parsed.rows.map(r => ({
+      institution: r.institution || r.source, type: [r.type, r.guarantor && `${r.guarantor} 보증`].filter(Boolean).join(' · '),
+      balance: r.balanceMan, rate: '', monthlyInterest: '', payback: r.startYm ? `${r.startYm} 실행` : '', _needs: r.needs, _from: '거래처원장'
+    }));
+    if (parsed.kind === 'creditor_change') return parsed.loans.map(r => ({
+      institution: r.institution, type: `대표자 개인 · ${r.type}`, balance: r.amountMan, rate: '', monthlyInterest: '',
+      payback: `${r.openedAt} 발생`, _needs: r.needs, _from: '채권자변동정보(발생금액)'
+    }));
+    return [];
+  }
+
+  // pdf.js 글자 조각(items: {s,x,y,w,h}) → 행[칸...]. 홈택스 PDF는 글자 한 자씩 조각이 나오므로
+  // 같은 줄(높이 차 < 글자 높이의 40%)끼리 모아 x 순으로 잇고, 간격이 글자 높이보다 크면 칸을 나눈다.
+  function itemsToRows(items) {
+    const its = items.filter(i => i.s && i.s.trim()).map(i => ({ ...i, h: i.h || 10 })).sort((a, b) => b.y - a.y || a.x - b.x);
+    const rows = [];
+    for (const it of its) {
+      const r = rows.find(r => Math.abs(r.y - it.y) < Math.max(2, it.h * 0.4));
+      if (r) r.items.push(it); else rows.push({ y: it.y, items: [it] });
+    }
+    rows.sort((a, b) => b.y - a.y);
+    return rows.map(r => {
+      const xs = r.items.sort((a, b) => a.x - b.x);
+      const cells = [];
+      let cur = null, end = 0;
+      for (const it of xs) {
+        const gap = it.x - end;
+        if (!cur || gap > it.h * 1.1) { cur = { t: it.s, x: it.x }; cells.push(cur); }
+        else cur.t += (gap > it.h * 0.25 ? ' ' : '') + it.s;
+        end = it.x + (it.w || it.s.length * it.h * 0.9);
+      }
+      return cells.map(c => norm(c.t)).filter(Boolean);
+    });
+  }
+  // 쪽 배열(각 쪽 items) → 칸 줄 배열('<<PAGE>>' 경계) — 부채 해석기 입력 형식
+  function pagesToCells(pages) {
+    const out = [];
+    pages.forEach(items => { out.push('<<PAGE>>'); itemsToRows(items).forEach(r => r.forEach(c => out.push(c))); });
+    return out;
+  }
+  function pagesToRows(pages) { return pages.map(items => itemsToRows(items)); }
+
+  // ───────── 홈택스·공단 서류: 칸 이름(띄어쓰기 제거) 옆 값 읽기 ─────────
+  const despace = s => String(s || '').replace(/\s+/g, '');
+  // 행[칸...]에서 앞쪽 칸들을 이어 붙인 것이 label 과 맞으면 나머지 칸을 값으로
+  function labelValue(rows, re) {
+    for (const r of rows) for (let k = 1; k < r.length; k++) {
+      if (re.test(despace(r.slice(0, k).join('')))) { const v = (r[k] || '').trim(); if (v) return v; }
+    }
+    return '';
+  }
+  const ymd = s => { const m = String(s).match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/); return m ? m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0') : ''; };
+  const bizNoOf = s => { const m = String(s).match(/(\d{3})-?(\d{2})-?(\d{5})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
+  // 사업자번호 가운데 두 자리 81~88 이면 법인
+  const isCorpNo = b => { const m = /^\d{3}-(\d{2})-/.exec(b || ''); return !!m && +m[1] >= 81 && +m[1] <= 88; };
+  // 국세청 사업자등록번호 검증식(가중치 1,3,7,1,3,7,1,3,5)
+  function bizNoValid(b) {
+    const d = String(b || '').replace(/\D/g, '').split('').map(Number);
+    if (d.length !== 10) return false;
+    const w = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += d[i] * w[i];
+    sum += Math.floor(d[8] * 5 / 10);
+    return (10 - (sum % 10)) % 10 === d[9];
+  }
+  // 앱의 '사업자구분 · 과세유형' 값: 개인 · 일반과세 / 개인 · 간이과세 / 개인 · 면세 / 법인 · 일반과세 / 법인 · 면세
+  function formValue(corp, taxText) {
+    const t = String(taxText || '');
+    if (corp) return /면세/.test(t) ? '법인 · 면세' : '법인 · 일반과세';
+    if (/간이/.test(t)) return '개인 · 간이과세';
+    if (/면세/.test(t)) return '개인 · 면세';
+    return '개인 · 일반과세';
+  }
+  const signed = s => { const t = norm(s).replace(/[,\s]/g, ''); if (/^\(.*\)$/.test(t) || /^△/.test(t)) return -Number(t.replace(/[()△]/g, '')); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
+  const won2baek = v => v === null ? null : Math.round(v / 1e5) / 10;   // 원 → 백만원(소수 1자리)
+  const won2man = v => v === null ? null : Math.round(v / 1e4);         // 원 → 만원
+
+  const DOC_TYPES = [
+    ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
+    ['fs', '표준재무제표증명', t => /표준재무제표증명|표준재무상태표|표준손익계산서/.test(t)],
+    ['vat', '부가가치세 과세표준증명', t => /과세표준증명/.test(t)],
+    ['ins', '4대보험 사업장 가입자명부', t => /사업장가입자명부/.test(t)],
+    ['share', '주주명부', t => /주주명부/.test(t)],
+    ['ledger', '거래처원장(차입금)', t => /거래처원장/.test(t)],
+    ['creditor', '채권자변동정보 조회서', t => /채권자변동/.test(t)],
+    ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
+    ['lease', '임대차계약서', t => /임대차/.test(t)],
+    ['bizreg', '사업자등록증', t => /사업자등록증/.test(t)]
+  ];
+  function classify(rows, fileName) {
+    const t = despace(rows.flat().join(''));
+    for (const [k, title, test] of DOC_TYPES) if (test(t)) return { kind: k, title };
+    const f = despace(fileName || '');
+    for (const [k, title, test] of DOC_TYPES) if (test(f)) return { kind: k, title, byName: true };
+    return { kind: 'unknown', title: '알 수 없는 서류' };
+  }
+
+  function parseBizCert(rows) {
+    const f = {}, meta = {};
+    const name = labelValue(rows, /^상호/); if (name) f.corp_name = name;
+    const tax0 = despace(rows.flat().join('')).match(/\((일반과세자|간이과세자|면세사업자|법인사업자)\)/);
+    const no = bizNoOf(labelValue(rows, /^사업자등록번호$/));
+    if (no) {
+      f.corp_biz_no = no;
+      if (!bizNoValid(no)) meta.corp_biz_no = { conf: 0.3, valid: false, note: '번호 검증식이 맞지 않아요 — 원본 확인' };
+      f.corp_form = formValue(isCorpNo(no) || (tax0 && tax0[1] === '법인사업자'), tax0 && tax0[1]);
+      meta.corp_form = { conf: tax0 ? 0.9 : 0.6 };
+    }
+    const ceo = labelValue(rows, /^대표자성명/); if (ceo) f.corp_ceo = ceo;
+    const addr = labelValue(rows, /^사업장소재지$/); if (addr) f.corp_address = addr;
+    const open = ymd(labelValue(rows, /^개업일$/)); if (open) f.corp_est_date = open;
+    // 업태·종목은 값 줄이 이름 줄 바로 위에 있다
+    const idx = re => rows.findIndex(r => re.test(despace(r.join(''))));
+    const iu = idx(/^업태$/), ij = idx(/^종목$/);
+    const up = iu > 0 ? rows[iu - 1].join(' ') : '', jm = ij > 0 ? rows[ij - 1].join(' ') : '';
+    if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.7 }; }
+    return { fields: f, meta, notes: tax0 ? [tax0[1]] : [] };
+  }
+
+  // 재무제표: "칸이름 | 코드 | 금액" 반복. 두 단 배치라 한 칸에 '금액 다음칸이름'이 붙어 오면 나눈다
+  function fsTokens(rows) {
+    return rows.flat().flatMap(c => c.split(/\s+(?=(?:[IVX]+|\d{1,2}|\(\d+\)|[가-하])\.)|(?<=\d)\s+(?=[^\d\s,(\-△])/)).map(norm).filter(Boolean);
+  }
+  function fsAmount(tokens, re) {
+    for (let i = 0; i < tokens.length; i++) {
+      if (!re.test(despace(tokens[i]))) continue;
+      if (/^\d{2,3}$/.test(tokens[i + 1] || '')) { const v = signed(tokens[i + 2] || ''); return v === null ? 0 : v; }
+    }
+    return null;
+  }
+  function parseFS(rows) {
+    const tk = fsTokens(rows);
+    const all = despace(rows.flat().join(' '));
+    let year = (all.match(/(\d{4})년귀속/) || [])[1];
+    if (!year) { const m = all.match(/\d{4}\.\d{2}\.\d{2}~(\d{4})\.\d{2}\.\d{2}/) || all.match(/(\d{4})년\d{2}월\d{2}일까지/); year = m && m[1]; }
+    let op = fsAmount(tk, /^(?:[IVX]+\.)?영업(?:손익|이익)/);
+    if (op === null) { const loss = fsAmount(tk, /^(?:[IVX]+\.)?영업손실/); if (loss !== null) op = -Math.abs(loss); }
+    const v = {
+      sales: fsAmount(tk, /^(?:[IVX]+\.)?매출액$/),
+      profit: op,
+      debt: fsAmount(tk, /^부채총계/),
+      equity: fsAmount(tk, /^자본총계/),
+      assets: fsAmount(tk, /^자산총계/),
+      interest: fsAmount(tk, /^\d*\.?이자비용$/),
+      loanToCeo: fsAmount(tk, /^(?:\d+\.|[가-하]\.)?(?:주임종단기채권|가지급금)$/)
+    };
+    const f = {};
+    const name = labelValue(rows, /^(?:상호|법인명)$/); if (name) f.corp_name = name;
+    const no = bizNoOf(labelValue(rows, /^사업자등록번호$/)); if (no) f.corp_biz_no = no;
+    const balanced = v.assets !== null && v.debt !== null && v.equity !== null && Math.abs(v.assets - (v.debt + v.equity)) <= Math.abs(v.assets) * 0.01;
+    const unit = (all.match(/단위[:：]?\(?(원|천원|백만원)/) || [])[1] || '원';
+    const mul = unit === '천원' ? 1000 : unit === '백만원' ? 1e6 : 1;
+    if (mul !== 1) Object.keys(v).forEach(k => { if (v[k] !== null) v[k] *= mul; });
+    const notes = [year ? year + '년 결산' : '결산 연도를 찾지 못함'];
+    if (!balanced) notes.push('자산 ≠ 부채+자본 — 확인 필요');
+    return { year: year ? Number(year) : null, wonValues: v, balanced, fields: f, notes };
+  }
+
+  // 부가세 과세표준증명: 기간별(부터·까지·계) → 최근 12개월 월평균 매출(만원)
+  function parseVAT(rows) {
+    const periods = [];
+    rows.forEach(r => {
+      const d = r.filter(c => /^\d{4}\/\d{2}\/\d{2}$/.test(c));
+      if (d.length >= 2) { const i = r.indexOf(d[1]); const total = signed(r[i + 1] || ''); if (total !== null) periods.push({ from: d[0], to: d[1], total }); }
+    });
+    periods.sort((a, b) => (a.to < b.to ? 1 : -1));
+    const months = p => { const a = p.from.split('/').map(Number), b = p.to.split('/').map(Number); return (b[0] - a[0]) * 12 + (b[1] - a[1]) + 1; };
+    let m = 0, sum = 0;
+    for (const p of periods) { if (m >= 12) break; m += months(p); sum += p.total; }
+    const f = {};
+    const meta = {};
+    if (m) { f.smb_monthly_sales = won2man(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
+    const no = bizNoOf(labelValue(rows, /사업자등록번호$/) || ''); if (no) f.corp_biz_no = no;
+    const ceo = labelValue(rows, /^성명\(대표자\)$/); if (ceo) f.corp_ceo = ceo.split(/\s*주민/)[0].trim();
+    return { fields: f, meta, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
+  }
+
+  // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
+  function parseIns(rows) {
+    let total = 0, emp = 0;
+    rows.forEach(r => {
+      if (!/^\d+$/.test(r[0] || '') || !/^\d{6}-\d\*+/.test(r[1] || '')) return;
+      total++;
+      if (/\d{4}\.\d{2}\.\d{2}/.test(r[6] || '')) emp++;
+    });
+    return { fields: total ? { sme_employees: String(emp || total) } : {}, notes: ['가입자 ' + total + '명 · 고용보험 ' + emp + '명'] };
+  }
+
+  // 주주명부: 대표이사 지분율만
+  function parseShare(rows) {
+    for (const r of rows) {
+      const pct = r.find(c => /^\d{1,3}(\.\d+)?%$/.test(c));
+      if (pct && r.some(c => /대표/.test(c))) return { fields: { corp_ceo_share: '대표이사 ' + pct }, notes: [] };
+    }
+    return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
+  }
+
+  // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
+  // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
+  function parseDocument(pages, fileName, forceKind) {
+    const rows = pagesToRows(pages).flat();
+    const chars = rows.flat().join('').length;
+    const auto = classify(rows, fileName);
+    const picked = forceKind && forceKind !== 'unknown' ? DOC_TYPES.find(d => d[0] === forceKind) : null;
+    const c = picked ? { kind: picked[0], title: picked[1] } : auto;
+    const out = { kind: c.kind, title: c.title, fields: {}, debtItems: [], notes: [], status: 'ok' };
+    if (chars < 20) { out.status = 'scan'; out.notes.push('사진으로 된 서류 — 글자 인식(OCR) 다음 단계'); return out; }
+    let r = null;
+    if (c.kind === 'bizcert') r = parseBizCert(rows);
+    else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced }; }
+    else if (c.kind === 'vat') r = parseVAT(rows);
+    else if (c.kind === 'ins') r = parseIns(rows);
+    else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'ledger' || c.kind === 'creditor') {
+      const parsed = parseDebtDocument(pagesToCells(pages));
+      out.debtItems = toDebtItems(parsed);
+      if (parsed && parsed.kind === 'creditor_change') out.notes.push('대표자 개인 대출 ' + parsed.summary.loans + '건 · 연체 이력 ' + parsed.summary.delinquencies + '건(미해제 ' + parsed.summary.unresolved + ')');
+      if (parsed && parsed.kind === 'debt_ledger') out.notes.push('차입금 ' + parsed.rows.length + '건 · 기준일 ' + parsed.asOf);
+      if (!parsed) { out.status = 'skip'; out.notes.push('표를 읽지 못함'); }
+      return out;
+    } else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '종류를 알 수 없음' : '아직 읽는 규칙이 없는 서류'); return out; }
+    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes;
+    return out;
+  }
+
+  // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
+  function fsToFields(fsList) {
+    const list = fsList.filter(x => x && x.year).sort((a, b) => b.year - a.year);
+    if (!list.length) return {};
+    const top = list[0].year, f = {}, src = {}, conf = {};
+    const suf = { 0: '', 1: '_2024', 2: '_2023' };
+    const put = (id, won, x) => { if (won === null || won === undefined) return; f[id] = won2baek(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
+    list.forEach(x => {
+      const k = top - x.year; if (!(k in suf)) return;
+      const v = x.wonValues;
+      put('sme_sales' + suf[k], v.sales, x);
+      put('sme_profit' + suf[k], v.profit, x);
+      put('sme_debt' + suf[k], v.debt, x);
+      put('sme_equity' + suf[k], v.equity, x);
+      if (k === 0 && v.loanToCeo) put('sme_loan_to_ceo', v.loanToCeo, x);
+      if (k === 0 && v.sales) { f._monthlyFromFs = won2man(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
+    });
+    f._fsTopYear = top; f._src = src; f._conf = conf;
+    return f;
+  }
+
+  function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+  </script>
+  <script>
+    (function () {
+      // PDF 읽기 도구는 같은 도메인에서만 받는다(외부 CDN 금지 — 핸드오프 §2)
+      const PDFJS = 'vendor/pdfjs/pdf.min.js', PDFJS_WORKER = 'vendor/pdfjs/pdf.worker.min.js';
+      let pdfReady = null;
+      function loadPdfJs() {
+        if (pdfReady) return pdfReady;
+        pdfReady = new Promise((ok, no) => {
+          const s = document.createElement('script');
+          s.src = PDFJS;
+          s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; ok(window.pdfjsLib); };
+          s.onerror = () => { pdfReady = null; no(new Error('PDF 읽기 도구를 불러오지 못했어요.')); };
+          document.head.appendChild(s);
+        });
+        return pdfReady;
+      }
+      async function readPdf(file, onPage) {
+        const lib = await loadPdfJs();
+        const task = lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+        const doc = await task.promise;
+        const pages = [];
+        const last = Math.min(doc.numPages, 10);
+        for (let p = 1; p <= last; p++) {
+          if (onPage) onPage(p, last);
+          const tc = await (await doc.getPage(p)).getTextContent();
+          pages.push(tc.items.filter(i => i.str && i.str.trim()).map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5], w: i.width, h: i.height })));
+        }
+        await task.destroy();
+        return pages;
+      }
+
+      const P = () => window.MSCDocParsers;
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const LABEL = {
+        corp_name: '상호', corp_biz_no: '사업자등록번호', corp_form: '사업자구분 · 과세유형', corp_ceo: '대표자 성명',
+        corp_address: '본점 / 주사업장 소재지', corp_est_date: '개업일', corp_biz_type: '주요 업태 및 주생산품', corp_ceo_share: '주주현황 (대표 지분)',
+        sme_sales: '매출액', sme_profit: '영업이익', sme_debt: '부채총계', sme_equity: '자본총계',
+        sme_loan_to_ceo: '대표자 가지급금', sme_employees: '상시근로자 수', smb_monthly_sales: '월평균 매출'
+      };
+      const UNIT = { sme: '백만원', smb_monthly_sales: '만원' };
+      const ORDER = ['corp_name', 'corp_biz_no', 'corp_form', 'corp_ceo', 'corp_address', 'corp_est_date', 'corp_biz_type', 'corp_ceo_share', 'sme_employees', 'smb_monthly_sales'];
+      const fmt = n => Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+
+      let files = [];   // {name, pages, res, kind}  — 팝업이 열려 있는 동안만
+      let rows = [];    // 비교표 행
+
+      function labelOf(id, year) {
+        const base = LABEL[id.replace(/_20\d\d$/, '')] || id;
+        return year ? `${base} (${year}년)` : base;
+      }
+      function curValue(id) {
+        const el = document.getElementById(id);
+        if (!el) return '';
+        if (el.tagName === 'SELECT') { const def = [...el.options].find(o => o.defaultSelected); return el.value && el.value !== (def ? def.value : '') ? el.options[el.selectedIndex].text : (el.value && !def ? el.value : ''); }
+        return String(el.value || '').trim();
+      }
+      const same = (a, b) => String(a).replace(/[,\s]/g, '') === String(b).replace(/[,\s]/g, '');
+
+      // 후보 모으기 → 같은 칸끼리 묶기(값이 다르면 충돌)
+      function buildRows() {
+        const cands = [];
+        const fsList = [];
+        files.forEach(f => {
+          const r = f.res; if (!r || r.status !== 'ok') return;
+          Object.entries(r.fields || {}).forEach(([id, v]) => {
+            if (v === '' || v === null || v === undefined) return;
+            const m = (r.meta || {})[id] || {};
+            cands.push({ id, value: String(v), conf: m.conf ?? 0.9, valid: m.valid !== false, note: m.note || '', src: m.src, file: f.name });
+          });
+          if (r.fs) fsList.push(Object.assign({ file: f.name }, r.fs));
+          (r.debtItems || []).forEach((d, i) => cands.push({ id: '_debt:' + f.name + ':' + i, debt: d, value: `${d.institution} · ${d.type} · ${fmt(d.balance)}만원`, conf: 0.8, valid: true, note: d._from === '채권자변동정보(발생금액)' ? '발생 당시 금액 — 지금 잔액 확인 필요' : '금리는 직접 입력', file: f.name }));
+        });
+        if (fsList.length) {
+          const fx = P().fsToFields(fsList);
+          const yearOf = id => { const k = /_2024$/.test(id) ? 1 : /_2023$/.test(id) ? 2 : 0; return fx._fsTopYear - k; };
+          Object.entries(fx).forEach(([id, v]) => {
+            if (id.startsWith('_')) return;
+            cands.push({ id, value: String(v), conf: fx._conf[id] ?? 0.9, valid: true, src: fx._src[id], year: yearOf(id), file: fsList.map(x => x.file).join(', '), note: (fx._conf[id] ?? 1) < 0.5 ? '자산 ≠ 부채+자본 — 원본 확인' : '' });
+          });
+          if (fx._monthlyFromFs && !cands.some(c => c.id === 'smb_monthly_sales')) cands.push({ id: 'smb_monthly_sales', value: String(fx._monthlyFromFs), conf: 0.6, valid: true, src: Math.round(fx._src._monthlyFromFs), note: '재무제표 연매출 ÷ 12', file: fsList[0].file });
+        }
+        const by = new Map();
+        cands.forEach(c => {
+          const g = by.get(c.id) || { id: c.id, opts: [] };
+          const hit = g.opts.find(o => same(o.value, c.value));
+          if (hit) { hit.files.add(c.file); hit.conf = Math.max(hit.conf, c.conf); } else g.opts.push(Object.assign({}, c, { files: new Set([c.file]) }));
+          by.set(c.id, g);
+        });
+        rows = [...by.values()].map(g => {
+          g.opts.sort((a, b) => (b.valid - a.valid) || (b.conf - a.conf));
+          g.pick = 0;
+          return checkState(g);
+        });
+        const rank = id => { const i = ORDER.indexOf(id); return i >= 0 ? i : id.startsWith('sme_') ? 50 : id.startsWith('_debt') ? 90 : 60; };
+        rows.sort((a, b) => rank(a.id) - rank(b.id) || (b.opts[0].year || 0) - (a.opts[0].year || 0));
+      }
+      // 기본 체크: 지금 칸이 비어 있고 검증을 통과하면 체크. 값이 있으면 해제하고 이유 표시
+      function checkState(g) {
+        const o = g.opts[g.pick];
+        if (g.id.startsWith('_debt')) {
+          const cur = window.appState.debtItems || [];
+          const dup = cur.some(c => c.institution === o.debt.institution && Number(c.balance) === Number(o.debt.balance));
+          g.cur = ''; g.checked = !dup; g.why = dup ? '대출표에 이미 있어요' : '';
+          return g;
+        }
+        g.cur = curValue(g.id);
+        if (!o.valid) { g.checked = false; g.why = o.note || '검증 실패 — 원본 확인'; }
+        else if (!g.cur) { g.checked = true; g.why = ''; }
+        else if (same(g.cur, displayRaw(g.id, o.value))) { g.checked = false; g.why = '지금 값과 같아요'; }
+        else { g.checked = false; g.why = '지금 값이 있어 기본으로 안 덮어요'; }
+        if (g.opts.length > 1) g.why = (g.why ? g.why + ' · ' : '') + '서류마다 값이 달라요 — 골라 주세요';
+        return g;
+      }
+      const displayRaw = (id, v) => { const el = document.getElementById(id); return el && el.tagName === 'SELECT' ? ([...el.options].find(x => x.value === v)?.text || v) : v; };
+      function showVal(g, o) {
+        const unit = g.id.startsWith('sme_') && g.id !== 'sme_employees' ? '백만원' : g.id === 'smb_monthly_sales' ? '만원' : g.id === 'sme_employees' ? '명' : '';
+        const main = unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
+        const raw = o.src !== undefined && o.src !== null ? `원문 ${fmt(Math.round(o.src))}원${g.id === 'smb_monthly_sales' ? '/월' : ''}` : '';
+        return { main, raw };
+      }
+      const cfTag = c => c >= 0.8 ? '<span class="cf h">높음</span>' : c >= 0.5 ? '<span class="cf m">보통</span>' : '<span class="cf l">낮음</span>';
+
+      function render() {
+        const kinds = P().DOC_TYPES;
+        document.getElementById('docs_sup').style.display = files.length ? 'none' : '';
+        document.getElementById('docs_files').innerHTML = files.map((f, i) => {
+          const r = f.res;
+          const st = !r ? '<span class="st">읽는 중…</span>' : r.status === 'ok' ? `<span class="st ok">읽음${r.notes && r.notes.length ? ' · ' + esc(r.notes.join(' · ')) : ''}</span>`
+            : r.status === 'scan' ? '<span class="st warn">사진 서류 — 다음 단계(글자 인식)</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
+          const sel = `<select data-i="${i}" aria-label="서류 종류">${kinds.map(([k, t]) => `<option value="${k}" ${r && r.kind === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="unknown" ${!r || r.kind === 'unknown' ? 'selected' : ''}>어떤 서류인지 골라 주세요</option></select>`;
+          return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${f.pages ? sel : ''}${st}</div>`;
+        }).join('');
+        const t = document.getElementById('docs_table');
+        if (!rows.length) { t.innerHTML = files.length && files.every(f => f.res) ? '<div class="sup">채울 수 있는 값을 찾지 못했어요. 서류 종류가 맞는지 확인해 주세요.</div>' : ''; }
+        else {
+          t.innerHTML = `<table><thead><tr><th style="width:26px"></th><th>항목</th><th>지금 값</th><th>읽은 값</th><th>정확도</th></tr></thead><tbody>${rows.map((g, i) => {
+            const o = g.opts[g.pick], v = showVal(g, o);
+            const val = g.opts.length > 1
+              ? `<select data-pick="${i}">${g.opts.map((x, k) => `<option value="${k}" ${k === g.pick ? 'selected' : ''}>${esc(showVal(g, x).main)} (${esc([...x.files].join(', '))})</option>`).join('')}</select>`
+              : `<b>${esc(v.main)}</b>`;
+            const label = g.id.startsWith('_debt') ? '대출표에 추가' : labelOf(g.id, o.year);
+            return `<tr><td><input type="checkbox" data-chk="${i}" ${g.checked ? 'checked' : ''}></td><td>${esc(label)}</td><td class="cur">${esc(g.cur || '—')}</td>
+              <td class="val">${val}${v.raw ? `<small>${esc(v.raw)}</small>` : ''}${o.note && !g.why.includes(o.note) ? `<small>${esc(o.note)}</small>` : ''}${g.why ? `<span class="why">${esc(g.why)}</span>` : ''}</td><td>${cfTag(o.conf)}</td></tr>`;
+          }).join('')}</tbody></table>`;
+        }
+        const n = rows.filter(g => g.checked).length;
+        document.getElementById('docs_cnt').textContent = `${n}개 선택`;
+        document.getElementById('docs_apply').disabled = !n;
+      }
+
+      // 진행: 받은 파일 전체 중 몇 번째, 그 파일의 몇 쪽째
+      let queued = 0, finished = 0;
+      function progress(name, page, pages) {
+        const box = document.getElementById('docs_prog');
+        if (finished >= queued) { box.hidden = true; return; }
+        box.hidden = false;
+        const part = pages ? (page - 1) / pages : 0;
+        document.getElementById('docs_prog_t').textContent = '읽는 중 · ' + name + (pages ? ` (${page}/${pages}쪽)` : '');
+        document.getElementById('docs_prog_n').textContent = `${finished}/${queued}`;
+        document.getElementById('docs_prog_bar').style.width = Math.round((finished + part) / queued * 100) + '%';
+      }
+      async function addFiles(list) {
+        const todo = [...list].slice(0, 30);
+        queued += todo.length;
+        for (const file of todo) {
+          const f = { name: file.name, pages: null, res: null };
+          files.push(f); render(); progress(file.name, 0, 0);
+          try {
+            if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { f.res = { status: 'skip', notes: ['PDF만 읽어요(사진은 다음 단계)'] }; continue; }
+            if (file.size > 20 * 1024 * 1024) { f.res = { status: 'skip', notes: ['20MB 넘는 파일'] }; continue; }
+            f.pages = await readPdf(file, (p, n) => progress(file.name, p, n));
+            f.res = P().parseDocument(f.pages, file.name);
+          } catch (e) { f.res = { status: 'skip', notes: ['이 파일은 읽지 못했어요'] }; }
+          finally { finished++; buildRows(); render(); progress(file.name, 0, 0); }
+        }
+      }
+
+      function apply() {
+        let n = 0;
+        rows.filter(g => g.checked).forEach(g => {
+          const o = g.opts[g.pick];
+          if (g.id.startsWith('_debt')) {
+            (window.appState.debtItems = window.appState.debtItems || []).push({ institution: o.debt.institution, type: o.debt.type, balance: o.debt.balance, rate: '', monthlyInterest: '', payback: o.debt.payback });
+            n++; return;
+          }
+          const el = document.getElementById(g.id); if (!el) return;
+          el.value = o.value;
+          if (/formatNumberInput/.test(el.getAttribute('oninput') || '') && typeof formatNumberInput === 'function') formatNumberInput(el);
+          el.classList.add('doc-filled'); n++;
+        });
+        if (typeof renderDebtTable === 'function') renderDebtTable();
+        calcSmbMetrics(); calcDebtTotals(); syncCompanyData();
+        document.getElementById('screen_input').dispatchEvent(new Event('change', { bubbles: true }));
+        const done = files.filter(f => f.res && f.res.status === 'ok').length;
+        const s = document.getElementById('docs_last');
+        if (s) s.textContent = `서류 ${done}건에서 ${n}칸을 넣었어요(노란 칸).`;
+        close();
+      }
+
+      function open(list) {
+        document.getElementById('docs_modal').classList.add('open');
+        if (list && list.length) addFiles(list);
+      }
+      function close() {
+        document.getElementById('docs_modal').classList.remove('open');
+        files = []; rows = []; queued = 0; finished = 0;   // 원문·파일은 닫을 때 버린다
+        document.getElementById('docs_prog').hidden = true;
+        render();
+      }
+      window.openDocsModal = open;
+      window.mscHandleDocFiles = list => { open(); return addFiles(list); };
+      window.mscResetDocs = () => { const s = document.getElementById('docs_last'); if (s) s.textContent = ''; };
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const m = document.getElementById('docs_modal');
+        m.addEventListener('click', e => {
+          if (e.target === m || e.target.closest('[data-x]')) close();
+          const c = e.target.closest('[data-chk]'); if (c) { rows[c.dataset.chk].checked = c.checked; render(); }
+        });
+        m.addEventListener('change', e => {
+          const s = e.target.closest('select[data-i]');
+          if (s) { const f = files[s.dataset.i]; f.res = P().parseDocument(f.pages, f.name, s.value); buildRows(); render(); }
+          const pk = e.target.closest('select[data-pick]');
+          if (pk) { const g = rows[pk.dataset.pick]; g.pick = Number(pk.value); checkState(g); render(); }
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && m.classList.contains('open')) close(); });
+        document.getElementById('docs_apply').addEventListener('click', apply);
+        const mp = document.getElementById('docs_mpick');
+        document.getElementById('docs_mpick_btn').addEventListener('click', () => mp.click());
+        mp.addEventListener('change', () => { addFiles(mp.files); mp.value = ''; });
+        const bindDrop = (el, onFiles) => {
+          ['dragenter', 'dragover'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.add('over'); }));
+          ['dragleave', 'drop'].forEach(t => el.addEventListener(t, e => { e.preventDefault(); el.classList.remove('over'); }));
+          el.addEventListener('drop', e => onFiles(e.dataTransfer.files));
+        };
+        bindDrop(document.getElementById('docs_mdrop'), addFiles);
+        const card = document.querySelector('#docs_card .dz');
+        if (card) bindDrop(card, list => open(list));
+        // 손으로 고치면 노란 표시를 뗀다
+        document.getElementById('screen_input').addEventListener('input', e => e.target.classList && e.target.classList.remove('doc-filled'));
+      });
+    })();
+  </script>
+
   <!-- ================= 3단 보기: 스텝 | 입력 | 출력 미리보기 (?view=3d) ================= -->
   <style>
-    #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 200px) minmax(0, 1fr) var(--l3c, 44%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
+    #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 200px) minmax(0, 1fr) var(--l3c, 50%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
     #l3.hidden { display: none; }
     /* 3단 보기에서는 맨 위 머리글을 쓰지 않는다 — 로고는 사이드바, 계정은 왼쪽 아래, 지원사업은 미리보기 전환 */
     body.l3-on > header.no-print { display: none !important; }
-    #l3_brand { display: flex; align-items: center; height: 28px; margin: 2px 8px 22px; }
-    #l3_brand img { max-height: 26px; max-width: 150px; object-fit: contain; }
-    #l3_brand .chip { background: #fff; border-radius: 8px; padding: 4px 8px; display: inline-flex; }
-    #l3_brand b { font-size: 14px; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #l3_brand { display: flex; align-items: center; gap: 10px; margin: 2px 6px 22px; }
+    #l3_brand .mk { width: 32px; height: 32px; flex: none; }
+    #l3_brand .wm { display: flex; flex-direction: column; line-height: 1.05; font-size: 17px; font-weight: 500; color: #fff; letter-spacing: -.01em; white-space: nowrap; }
+    #l3_brand .wm b { font-weight: 900; letter-spacing: .02em; }
+    #l3_brand .wm small { font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: .04em; margin-top: 4px; }
     #l3 .l3-mode { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; gap: 2px; }
     #l3 .l3-mode button { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; color: var(--t-text-3, #66635C); cursor: pointer; white-space: nowrap; }
     #l3 .l3-mode button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     #l3_radar { flex: 1; overflow-y: auto; padding: 16px; }
     #l3_preview.radar #l3_stage, #l3_preview.radar .l3-sheets, #l3_preview.radar .l3-print { display: none !important; }
     #l3_preview:not(.radar) #l3_radar { display: none; }
+    /* 고객사 정보: 선택 → 새 고객(서류+기본정보) / 기존(불러오기+기본정보) */
+    #l3 .l3-step[data-cust=""] > :not(#l3_cchoice) { display: none !important; }
+    #l3 .l3-step[data-cust="new"] > #client_bar { display: none !important; }
+    #l3 .l3-step[data-cust="old"] > #docs_card { display: none !important; }
+    #l3 .l3-step[data-cust=""] .l3-seg, #l3 .l3-step:not([data-cust=""]) .l3-ask { display: none; }
+    #l3 .l3-ask { text-align: center; }
+    #l3 .l3-ask .q { font-size: 20px; font-weight: 900; color: var(--t-text, #0A0B0F); margin-bottom: 18px; }
+    #l3 .l3-ask .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 620px; margin: 0 auto; }
+    #l3 .l3-ask button { display: flex; flex-direction: column; gap: 6px; padding: 26px 18px; border-radius: 16px; background: var(--t-surface, #fff); border: 1.5px solid var(--t-line-2, #D6D3CA); cursor: pointer; text-align: center; }
+    #l3 .l3-ask button:hover { border-color: var(--t-accent-text, #00A898); box-shadow: 0 0 0 3px var(--t-accent-soft, rgba(0,168,152,.1)); }
+    #l3 .l3-ask b { font-size: 16px; font-weight: 900; color: var(--t-text, #0A0B0F); }
+    #l3 .l3-ask span { font-size: 12px; color: var(--t-text-3, #66635C); }
+    #l3 .l3-seg { display: inline-flex; align-self: flex-start; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; gap: 2px; }
+    #l3 .l3-seg button { padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 800; color: var(--t-text-3, #66635C); cursor: pointer; }
+    #l3 .l3-seg button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    #l3 .l3-step[data-cust] { gap: 12px; }
+    #l3 #docs_card { padding: 14px 18px !important; }
+    /* 3단 보기 입력 칸: 폭에 맞춰 열 수 자동(좁으면 2~3열) */
+    #l3 .l3-step .lg\:grid-cols-4, #l3 .l3-step .lg\:grid-cols-3 { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)) !important; gap: 8px 10px !important; }
+    #l3 #screen_input > .l3-step { padding: 14px 18px; }
+    #l3 #screen_input > .l3-step > div[class*="p-5"] { padding: 14px 16px !important; }
+    #l3 .l3-step .form-input-control { padding-top: 6px; padding-bottom: 6px; }
+    #l3 .l3-step label.block { margin-bottom: 2px; }
+    #l3 .l3-step span.text-\[11px\].font-medium { display: none; }
     /* 고객 불러오기 줄 (고객사 정보 스텝 맨 위) */
     #l3 #client_bar { gap: 8px; }
     #l3 #client_bar details { position: relative; }
@@ -5806,7 +6579,7 @@
     #l3 #client_bar summary::-webkit-details-marker { display: none; }
     #l3 #client_bar .more { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; min-width: 180px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); }
     #l3 #client_bar .more > * { text-align: left; border: 0 !important; }
-    @media (max-width: 1180px) { #l3_brand b { display: none; } }
+    @media (max-width: 1180px) { #l3_brand .wm { display: none; } }
     body.l3-on { overflow: hidden; }
     #l3_steps { background: var(--t-panel, #0A1F44); color: var(--t-panel-text, #fff); padding: 18px 12px; overflow-y: auto; }
     #l3_steps ol { list-style: none; margin: 0; padding: 0; position: relative; }
@@ -5818,7 +6591,12 @@
     #l3_steps li.done .n { background: var(--t-accent-text, #00A898); border-color: var(--t-accent-text, #00A898); }
     #l3_steps li.now { background: rgba(255,255,255,.1); color: #fff; font-weight: 800; }
     #l3_steps li.now .n { background: #fff; color: var(--t-panel, #0A1F44); border-color: #fff; }
-    #l3_input { overflow-y: auto; scroll-snap-type: y proximity; position: relative; }
+    #l3_input { overflow-y: auto; position: relative; }
+    #l3_nav { position: fixed; z-index: 44; display: flex; flex-direction: column; gap: 8px; }
+    #l3_nav button { width: 40px; height: 40px; border-radius: 50%; background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); border: 1px solid var(--t-line-2, #D6D3CA); box-shadow: 0 4px 14px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    #l3_nav button:hover { border-color: var(--t-accent-text, #00A898); color: var(--t-accent-text, #00A898); }
+    #l3_nav button:disabled { opacity: .35; cursor: default; }
+    @media print { #l3_nav { display: none !important; } }
     #l3_steps { display: flex; flex-direction: column; }
     #l3_acct { margin-top: auto; position: relative; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
     #l3_acct .av { width: 32px; height: 32px; border-radius: 50%; background: var(--t-accent-text, #00A898); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; flex: none; }
@@ -5866,7 +6644,7 @@
       if (new URLSearchParams(location.search).get('view') !== '3d') return;
       const STEPS = [
         ['내 정보', ['l3_me']],
-        ['고객사 정보', ['client_bar', ':basic']],
+        ['고객사 정보', ['l3_cchoice', 'client_bar', 'docs_card', ':basic']],
         ['진단 대상', ['case_card', ':tier']],
         ['거래처·인증', [':trade']],
         ['대출', [':debt']],
@@ -5900,6 +6678,15 @@
           '<div><h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 mb-3 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span><span>나</span></h3>' +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="l3_me_person">' + fld('mobile', '휴대폰', '010-0000-0000') + fld('email', '메일', 'name@example.com') + '</div></div>';
         scr.insertBefore(meCard, scr.firstChild);
+
+        // 고객사 정보 첫 화면: 기존 고객 불러오기 / 새 고객 작성 중 하나를 고른다
+        const choice = document.createElement('div');
+        choice.id = 'l3_cchoice';
+        choice.innerHTML = '<div class="l3-ask"><div class="q">어떤 고객을 작성할까요?</div><div class="opts">' +
+          '<button type="button" data-c="new"><b>새 고객 작성</b><span>서류를 올리면 빈칸을 알아서 채웁니다</span></button>' +
+          '<button type="button" data-c="old"><b>기존 고객 불러오기</b><span>이 PC에 저장한 고객을 다시 엽니다</span></button></div></div>' +
+          '<div class="l3-seg"><button type="button" data-c="new">새 고객 작성</button><button type="button" data-c="old">기존 고객 불러오기</button></div>';
+        scr.insertBefore(choice, scr.firstChild);
         // 원본의 '자문 수행 담당자'(이름·직함) 칸을 여기로 옮긴다 — 서식이 읽는 id 는 그대로
         const cons = document.getElementById('consultant_name');
         if (cons) { const w = cons.parentNode; w.querySelector('label').textContent = '이름·직함'; meCard.querySelector('#l3_me_person').prepend(w); }
@@ -6000,6 +6787,7 @@
         // 고객 불러오기 줄: 자주 쓰는 것(불러오기·새 고객·저장)만 보이고 나머지는 더보기
         const cbar = document.getElementById('client_bar');
         cbar.querySelector('span.font-extrabold').textContent = '기존 고객 불러오기';
+        [...cbar.querySelectorAll('button')].filter(b => /새 고객/.test(b.textContent)).forEach(b => b.remove());
         const more = document.createElement('details');
         more.innerHTML = '<summary>더보기</summary><div class="more"></div>';
         const moreBox = more.querySelector('.more');
@@ -6013,13 +6801,36 @@
         cbar.insertBefore(more, document.getElementById('client_status'));
         document.addEventListener('click', e => { if (!e.target.closest('#client_bar details')) more.open = false; });
 
+        // 고객사 정보: 새 고객이면 서류 올리기 + 기본 정보, 기존이면 불러오기 줄 + 기본 정보
+        const custStep = choice.closest('.l3-step');
+        function setCust(mode, init) {
+          custStep.dataset.cust = mode || '';
+          choice.querySelectorAll('.l3-seg button').forEach(b => b.classList.toggle('on', b.dataset.c === mode));
+          if (!init) layout();   // 처음 한 번은 화면 배치 함수가 준비되기 전이라 건너뜀
+        }
+        choice.addEventListener('click', e => {
+          const b = e.target.closest('button[data-c]'); if (!b) return;
+          if (b.dataset.c === 'new') {
+            const had = (document.getElementById('corp_name').value || '').trim();
+            if (custStep.dataset.cust !== 'new' || had) {
+              newClient();
+              if ((document.getElementById('corp_name').value || '').trim() && had) return;   // 비우기 취소
+              if (window.mscResetDocs) mscResetDocs();
+            }
+            setCust('new');
+          } else { setCust('old'); setTimeout(() => document.getElementById('client_select').focus(), 50); }
+        });
+        // 이미 작성 중인 내용이 있으면(새로고침 등) 그 상태로 이어서
+        setCust((document.getElementById('corp_name').value || '').trim() ? 'new' : '', true);
+        document.getElementById('client_select').addEventListener('change', () => { if (document.getElementById('client_select').value) setCust('old'); });
+
         // 사이드바 로고: 내 펌 로고가 있으면 그것, 없으면 CoStep
+        // 서비스 로고(MSC report)는 고정 — 펌 로고는 서식·내 정보에서만 쓴다. 아래에 powered by COSTEP
         function renderBrand() {
-          const b = getBrand(), el = document.getElementById('l3_brand');
-          const costep = document.getElementById('brand_logo_dark');
-          if (b.logo) el.innerHTML = '<span class="chip"><img src="' + b.logo + '" alt=""></span>';
-          else if (costep) el.innerHTML = '<img src="' + costep.src + '" alt="CoStep">';
-          else el.innerHTML = '<b>' + escapeHtml(b.name) + '</b>';
+          document.getElementById('l3_brand').innerHTML =
+            '<svg class="mk" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="url(#mscg)"/><defs><linearGradient id="mscg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00A898"/><stop offset="1" stop-color="#00E0C6"/></linearGradient></defs>' +
+            '<rect x="7" y="17" width="4" height="8" rx="1" fill="#0A1F44"/><rect x="14" y="12" width="4" height="13" rx="1" fill="#0A1F44"/><rect x="21" y="7" width="4" height="18" rx="1" fill="#FFC300"/></svg>' +
+            '<span class="wm"><b>MSC</b> report<small>powered by COSTEP</small></span>';
         }
 
         const ol = document.querySelector('#l3_steps ol');
@@ -6035,6 +6846,42 @@
           [...ol.children].forEach((li, i) => { li.className = i < cur ? 'done' : i === cur ? 'now' : ''; li.querySelector('.n').textContent = i < cur ? String.fromCharCode(10003) : i + 1; });
         }
         box.addEventListener('scroll', () => requestAnimationFrame(markStep));
+
+        // (현재 스텝은 24px 여유로 판단 — 부드러운 이동 뒤 소수점 오차 흡수)
+        // 휠 한 번 = 스텝 하나. 스텝이 화면보다 길면 그 안에서는 평소처럼 굴리다가 끝에 닿으면 다음 스텝
+        let paging = false;
+        const curIdx = () => { const y = box.scrollTop + 24; let c = 0; secs.forEach((s, i) => { if (s.offsetTop <= y) c = i; }); return c; };
+        function goStep(i) {
+          i = Math.max(0, Math.min(secs.length - 1, i));
+          paging = true;
+          box.scrollTo({ top: secs[i].offsetTop, behavior: 'smooth' });
+          setTimeout(() => { paging = false; }, 650);
+        }
+        box.addEventListener('wheel', e => {
+          if (e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+          if (e.target.closest('select, textarea, .more, #client_bar details[open]')) return;
+          const dir = e.deltaY > 0 ? 1 : -1, i = curIdx(), s = secs[i];
+          const top = s.offsetTop, bottom = top + s.offsetHeight, viewTop = box.scrollTop, viewBottom = viewTop + box.clientHeight;
+          if (dir > 0 && bottom - viewBottom > 4) return;     // 긴 스텝: 아직 아래가 남음
+          if (dir < 0 && viewTop - top > 4) return;           // 긴 스텝: 아직 위가 남음
+          e.preventDefault();
+          if (!paging) goStep(i + dir);
+        }, { passive: false });
+        const nav = document.createElement('div');
+        nav.id = 'l3_nav'; nav.className = 'no-print';
+        nav.innerHTML = '<button type="button" data-d="-1" aria-label="이전 스텝" title="이전 스텝"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>' +
+          '<button type="button" data-d="1" aria-label="다음 스텝" title="다음 스텝"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>';
+        document.body.appendChild(nav);
+        nav.addEventListener('click', e => { const b = e.target.closest('button'); if (b) goStep(curIdx() + Number(b.dataset.d)); });
+        function placeNav() {
+          const r = box.getBoundingClientRect();
+          nav.style.left = (r.right - 64) + 'px'; nav.style.top = (r.bottom - 112) + 'px';
+          nav.style.display = shell.classList.contains('hidden') ? 'none' : '';
+          const i = curIdx();
+          nav.children[0].disabled = i === 0 && box.scrollTop < 4;
+          nav.children[1].disabled = i === secs.length - 1;
+        }
+        box.addEventListener('scroll', () => requestAnimationFrame(placeNav));
 
         // 왼쪽 아래 계정 상자: 이름·메일 + 톱니바퀴(내 정보 수정·관리·테마·로그아웃)
         function renderAcct() {
@@ -6096,7 +6943,7 @@
               const W = shell.clientWidth;
               if (g.dataset.k === '0') size.a = Math.round(Math.max(64, Math.min(360, ev.clientX)));
               else size.c = Math.round(Math.max(300, Math.min(W * 0.7, W - ev.clientX)));
-              applySize(size); placeGuts(); fit();
+              applySize(size); placeGuts(); placeNav(); fit();
             };
             const up = () => { g.removeEventListener('pointermove', move); g.classList.remove('drag'); document.body.classList.remove('l3-dragging'); try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (e) { /* 저장 불가 */ } layout(); };
             g.addEventListener('pointermove', move); g.addEventListener('pointerup', up, { once: true });
@@ -6105,7 +6952,7 @@
         });
         function layout() {
           shell.style.top = '0px';
-          placeGuts();
+          placeGuts(); placeNav();
           box.style.setProperty('--l3h', box.clientHeight + 'px');
           fit(); markStep();
         }

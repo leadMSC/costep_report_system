@@ -36,3 +36,11 @@ ok('대출표 변환', () => {
   const c = P.toDebtItems(C); assert.ok(c[0].type.startsWith('대표자 개인'));
 });
 console.log(`\n${n}개 통과`);
+
+// 앱(HTML) 안에 넣은 해석기가 tools/doc-parsers.js 와 같은지
+ok('앱 내장본 = 원본', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', '코스텝_경영진단_리드디벨롭.html'), 'utf8');
+  const src = fs.readFileSync(path.join(__dirname, 'doc-parsers.js'), 'utf8');
+  assert.ok(html.includes(src.trim()), 'HTML 안 해석기가 원본과 다릅니다 — 원본을 고친 뒤 HTML 에 다시 넣으세요');
+});
+console.log(`${n}개 통과(대조 포함)`);
