@@ -59,7 +59,7 @@
   /* 3단 */
   .wrap { max-width: 1440px; margin: 0 auto; padding: 12px 20px 60px; display: grid; grid-template-columns: 230px minmax(0,1fr) 280px; gap: 14px; }
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
-  .steps { padding: 10px; position: sticky; top: 150px; align-self: start; }
+  .steps { padding: 10px; position: sticky; top: 76px; align-self: start; }
   .step { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 9px 8px; border-radius: 10px; border: 0; background: transparent; width: 100%; text-align: left; color: var(--text-2); }
   .step:hover { background: var(--surface-3); }
   .step.on { background: var(--teal-soft); color: var(--text); }
@@ -100,7 +100,7 @@
   .confirmbox { margin-top: 12px; border: 1px solid var(--teal-ink); background: var(--teal-soft); border-radius: 12px; padding: 12px; }
   .confirmbox .line { display: flex; gap: 8px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
   .nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
-  .docs { padding: 14px; position: sticky; top: 150px; align-self: start; }
+  .docs { padding: 14px; position: sticky; top: 76px; align-self: start; }
   .drop { border: 2px dashed var(--line-2); border-radius: 14px; padding: 18px 12px; text-align: center; color: var(--text-3); background: var(--surface-2); }
   .drop.hover { border-color: var(--teal-ink); color: var(--teal-ink); background: var(--teal-soft); }
   .doc { display: grid; grid-template-columns: 18px 1fr; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 12px; }
@@ -155,12 +155,9 @@
       <div><label>진단일</label><b class="num">2026-10-13</b></div>
       <div><label>협약</label><span class="pill">2026 경영지원 컨설팅 ▾</span></div>
       <div><label>상담목적 = 보고서 분야 (최대 2)</label><span class="chips" id="cb_purpose"></span></div>
-      <div><label>작성자</label><b>홍길동</b></div>
       <div class="spacer"></div>
-      <span style="color:var(--text-3)">자동 저장 10:42</span>
       <button class="btn gold" onclick="openUpload()">서류 올리기</button>
     </div>
-    <div class="ready" id="ready"></div>
   </div>
   <div class="wrap">
     <nav class="panel steps" id="steps"></nav>
@@ -221,10 +218,10 @@
     corp: { client: '(주)한빛정밀 · 123-81-45678', round: '1회차', purpose: ['재무·자금', '성장전략'], corp: '(주)한빛정밀', ceo: '김대성', form: '법인', birth: '1979-05-12', open: '2016-04-01', addr: '경기 화성시 동탄기흥로 27', staff: '18', sales: '2,850', size: '소·중기업(추천: 인원 18명 · 소/중은 4단계 매출로 확정)' }
   };
   const PROFILE = { firm: '코스텝', prefix: 'COSTEP', reviewer: '대표 박○○ · 검토 이○○ 수석컨설턴트', program: '2026 경영지원 컨설팅', name: '홍길동', phone: '010-1234-5678', mail: 'hong@example.com (로그인 메일)' };
-  let preset = 'smb', cur = 2;
+  let preset = 'smb', cur = 0;
   // 단계 정의: sections = [구획 종류, 제목, 칸 목록]. 칸 = [라벨, 형식, 태그(불/준/가), 서류, 필수?, 민감?, 값키]
   const STEPS = [
-    { n: 0, name: '작성자 (펌·컨설턴트)', sub: '계정당 처음 한 번', goal: '서식 머리글·발신·서명·문서번호에 내 펌과 내 이름이 찍힙니다. 다음 로그인부터 자동으로 불러옵니다.', uses: ['서식1 머리글·발신', '서식1~4 서명·직인', '문서번호'], docs: [['로고·직인 이미지', 'done']], profile: true },
+    { n: 0, name: '작성자 정보', sub: '계정당 처음 한 번', goal: '서식 머리글·발신·서명·문서번호에 내 펌과 내 이름이 찍힙니다. 다음 로그인부터 자동으로 불러옵니다.', uses: ['서식1 머리글·발신', '서식1~4 서명·직인', '문서번호'], docs: [['로고·직인 이미지', 'done']], profile: true },
     { n: 1, name: '대표자', sub: '불변 → 경력 → 연락·신용 → 의향', goal: '서식2·4의 대표자 란, 지원 요건(나이), 사업계획 수행 인력의 근거가 채워집니다.', uses: ['서식2 대표자', '서식4 대표자', '지원 요건'], docs: [['D01 사업자등록증명', 'done'], ['D03 법인등기(법인)', 'none'], ['D20 신용점수 화면(동의 후)', 'none']],
       sections: [
         ['a', 'A 확인 (변하지 않는 정보)', [['대표자 성명', 'text', '준', 'D01', 1, 0, 'ceo'], ['생년월일 (만 나이 자동)', 'date', '불', 'D01', 0, 0, 'birth'], ['공동대표', 'chips:없음,있음', '준', 'D03'], ['여성 대표', 'chips:예,아니오,응답 안 함', '불', '']]],
@@ -277,9 +274,9 @@
   function renderSteps() {
     const html = STEPS.map(s => {
       const p = PROG[s.n];
-      return `<button class="step ${s.n === cur ? 'on' : ''}" onclick="go(${s.n})"><span class="no_">${s.n}</span><span><b>${s.name}</b><small>${s.sub}</small></span><span class="tri">${p.map(v => `<i class="dot ${dotCls(v)}"></i>`).join('')}</span></button>`;
+      return `<button class="step ${s.n === cur ? 'on' : ''}" onclick="go(${s.n})"><span class="no_">${s.n + 1}</span><span><b>${s.name}</b></span><span></span></button>`;
     }).join('');
-    document.getElementById('steps').innerHTML = html + `<div class="foot">필수 3/5 · 확인 대기 2 · 나중에 1<br>●●● = 과거·현재·미래 완료<br>진행 차단: 0 내 이름 · G 상호 · 2→3 진단 틀</div>`;
+    document.getElementById('steps').innerHTML = html;
   }
   function fieldHtml(f) {
     const [label, type, vol, doc, req, sens, key] = f;
@@ -294,20 +291,18 @@
     } else {
       input = `<input class="in ${fromDoc ? 'docv' : ''}" type="${type === 'date' ? 'date' : 'text'}" value="${val}" placeholder="${type === 'num' ? '숫자' : ''}">`;
     }
-    return `<div class="f ${label.length > 26 ? 'wide' : ''}"><div class="lab">${label}<span class="tag">${vol}</span>${doc ? `<span class="tag dtag">${doc}</span>` : ''}${req ? '<span class="tag req">필수</span>' : ''}${sens ? '<span class="tag sens">민감</span>' : ''}</div>${input}${fromDoc ? `<span class="src">서류값 · ${doc} p1 · 확인 전</span>` : ''}<div class="mini"><button>모름</button><button>해당 없음</button><button>나중에</button></div></div>`;
+    return `<div class="f ${label.length > 26 ? 'wide' : ''}"><div class="lab">${label}</div>${input}</div>`;
   }
   function renderMain() {
     const s = STEPS[cur];
     let body = '';
     if (s.profile) {
-      body = `<div class="sec t-a"><h3><em>펌</em>소속 펌 · 펌 관리자만 편집</h3><div class="grid">
-        ${fieldHtml(['펌 상호', 'text', '불', '', 1, 0, 'firm'])}${fieldHtml(['문서번호 접두어', 'text', '불', '', 1, 0, 'prefix'])}
-        ${fieldHtml(['대표 · 검토자(결재란)', 'text', '준', '', 0, 0, 'reviewer'])}${fieldHtml(['올해 협약·사업명 기본값', 'text', '가', '', 0, 0, 'program'])}</div>
-        <p style="color:var(--text-3)">로고·직인: 관리 → 펌 정보에서 등록됨 ✓</p></div>
-        <div class="sec t-now"><h3><em>내 정보</em>계정에 저장 · 다음 로그인 때 자동</h3><div class="grid">
-        ${fieldHtml(['이름', 'text', '불', '', 1, 0, 'name'])}${fieldHtml(['직함', 'chips:경영컨설턴트,수석컨설턴트,대표', '준', ''])}
-        ${fieldHtml(['전화 (서식1 발신란)', 'text', '준', '', 0, 0, 'phone'])}${fieldHtml(['메일 (기본: 로그인 메일)', 'text', '준', '', 0, 0, 'mail'])}</div></div>
-        <div class="confirmbox"><b>미리보기</b><div class="line">서식1 머리글: [CoStep 로고] 코스텝 · 주소 · 전화 · 홈페이지</div><div class="line">발신: 코스텝 자문 총괄 홍길동 · 결재란: 대표 / 검토자 · 서명란: 로고 + 직인</div></div>`;
+      const inp = (l, v) => `<div class="f"><div class="lab">${l}</div><input class="in" value="${v}"></div>`;
+      body = `<div class="sec"><h3>소속 펌</h3>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><div style="width:160px;height:64px;border:2px dashed var(--line-2);border-radius:12px;display:flex;align-items:center;justify-content:center;background:#fff"><img src="logo/costep-logo-horizontal-color.svg" style="max-height:44px;max-width:140px" alt="펌 로고"></div><span style="color:var(--text-3)">로고 (눌러서 바꾸기)</span></div>
+        <div class="grid">${inp('상호', '코스텝')}${inp('문서번호 접두어', 'COSTEP')}${inp('대표', '박○○')}</div></div>
+        <div class="sec"><h3>내 정보</h3><div class="grid">${inp('이름', '홍길동')}${inp('직함', '경영컨설턴트')}${inp('전화', '010-1234-5678')}${inp('메일', 'hong@example.com')}</div></div>
+        <div class="nav"><span></span><button class="btn primary" onclick="go(1)">저장</button></div>`;
     } else if (s.check) {
       body = `<div class="sec t-a"><h3><em>분야</em>발행할 분야 확정</h3><div class="chips">${PURPOSE[preset].map(p => `<button class="chip ${PRESET[preset].purpose.includes(p) ? 'on' : ''}">${p}</button>`).join('')}</div></div>
         <div class="sec t-now"><h3><em>점검</em>누르면 해당 칸으로 이동</h3><table><thead><tr><th>항목</th><th>상태</th><th>위치</th></tr></thead><tbody>
@@ -330,7 +325,7 @@
       if (s.frame) body += `<div class="confirmbox"><b>진단 틀 확정</b> (확정해야 3단계로 넘어갑니다)<div class="line">업종: <span class="chip on">${preset === 'smb' ? '음식점·식품제조' : '제조업'}</span> 업태 '${preset === 'smb' ? '음식점업' : '제조'}'로 추천 <button class="btn">확인</button></div><div class="line">규모: <span class="chip on">${PRESET[preset].size}</span> <button class="btn">확인</button></div></div>`;
       body += `<div class="nav"><button class="btn" onclick="go(${Math.max(0, cur - 1)})">← 이전</button><button class="btn">변경 없음 확인</button><button class="btn primary" onclick="go(${Math.min(7, cur + 1)})">다음 →</button></div>`;
     }
-    document.getElementById('main').innerHTML = `<div style="color:var(--text-3);font-weight:700;font-size:12px">${s.n}단계</div><h2>${s.name}</h2><p class="goal">${s.goal}</p><div class="uses">${s.uses.map(u => `<span>쓰임: ${u}</span>`).join('')}</div>${body}`;
+    document.getElementById('main').innerHTML = `<h2 style="margin-bottom:6px">${s.name}</h2>${body}`;
   }
   function renderDocs() {
     const s = STEPS[cur];
@@ -346,9 +341,14 @@
     document.getElementById('cb_round').innerText = P.round;
     document.getElementById('cb_purpose').innerHTML = PURPOSE[preset].map(p => `<button class="chip ${P.purpose.includes(p) ? 'on' : ''}">${p}</button>`).join('');
     const ready = P.purpose.map(p => `<span class="r">${p} × 서식1 <i class="dot ${cur >= 5 ? 'ok' : 'no'}"></i> · 서식2 <i class="dot ${cur >= 6 ? 'ok' : 'half'}"></i> · 서식3 <i class="dot ok"></i> · 서식4 <i class="dot no"></i></span>`).join('');
-    document.getElementById('ready').innerHTML = `<span style="color:var(--text-3);font-weight:700">출력 준비도</span>${ready}<span class="r">지원사업 연계 <i class="dot half"></i></span>`;
   }
-  function render() { renderSteps(); renderMain(); renderDocs(); renderCase(); }
+  function render() {
+    renderSteps(); renderMain(); renderDocs(); renderCase();
+    const first = cur === 0;
+    document.querySelector('.casebar').style.display = first ? 'none' : '';
+    document.getElementById('docs').style.display = first ? 'none' : '';
+    document.querySelector('.wrap').style.gridTemplateColumns = first ? '230px minmax(0,1fr)' : '';
+  }
   function go(n) { cur = n; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function setPreset(p) { preset = p; document.getElementById('p_smb').classList.toggle('on', p === 'smb'); document.getElementById('p_corp').classList.toggle('on', p === 'corp'); render(); }
   function setView(v) { document.getElementById('view_new').style.display = v === 'new' ? '' : 'none'; document.getElementById('view_cur').style.display = v === 'cur' ? '' : 'none'; document.getElementById('v_new').classList.toggle('on', v === 'new'); document.getElementById('v_cur').classList.toggle('on', v === 'cur'); }

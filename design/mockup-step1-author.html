@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>작성자 정보</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #F6F5F1; --card: #FFFFFF; --line: #E4E2DB; --text: #0A0B0F; --sub: #66635C; --accent: #0A0B0F; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--card); }
+  header img { height: 28px; }
+  main { max-width: 640px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 24px; font-weight: 900; margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+  h2 { font-size: 15px; font-weight: 700; margin: 0 0 16px; }
+  .logo-box { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .logo-drop { width: 160px; height: 64px; border: 2px dashed #D6D3CA; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--sub); font-size: 13px; cursor: pointer; }
+  .logo-drop img { max-height: 44px; max-width: 140px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  input { width: 100%; border: 1px solid #C9CED8; border-radius: 10px; padding: 11px 12px; font: inherit; font-size: 14px; background: #fff; }
+  input:focus { outline: none; border-color: #00A898; box-shadow: 0 0 0 3px rgba(0,168,152,.2); }
+  button.save { width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><img src="logo/costep-logo-horizontal-color.svg" alt="로고"></header>
+<main>
+  <h1>작성자 정보</h1>
+
+  <div class="card">
+    <h2>소속 펌</h2>
+    <div class="logo-box">
+      <div class="logo-drop"><img src="logo/costep-logo-horizontal-color.svg" alt="펌 로고"></div>
+      <span style="color:var(--sub);font-size:13px">로고 (눌러서 바꾸기)</span>
+    </div>
+    <div class="grid">
+      <div><label>상호</label><input value="코스텝"></div>
+      <div><label>문서번호 접두어</label><input value="COSTEP"></div>
+      <div><label>대표</label><input value="박○○"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>내 정보</h2>
+    <div class="grid">
+      <div><label>이름</label><input value="홍길동"></div>
+      <div><label>직함</label><input value="경영컨설턴트"></div>
+      <div><label>전화</label><input value="010-1234-5678"></div>
+      <div><label>메일</label><input value="hong@example.com"></div>
+    </div>
+  </div>
+
+  <button class="save">저장</button>
+</main>
+</body>
+</html>
