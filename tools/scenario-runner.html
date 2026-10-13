@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>리드디벨롭 시나리오 검증기</title>
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; margin: 16px; color: #0f172a; background: #f8fafc; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p.note { font-size: 12px; color: #475569; margin: 0 0 12px; }
+    table { border-collapse: collapse; width: 100%; background: #fff; font-size: 12px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; text-align: left; }
+    th { background: #f1f5f9; }
+    .PASS { color: #047857; font-weight: 700; } .FAIL { color: #b91c1c; font-weight: 700; } .WARN { color: #b45309; font-weight: 700; }
+    #summary { font-weight: 700; margin: 8px 0; }
+    iframe { width: 1300px; height: 900px; border: 1px solid #94a3b8; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>리드디벨롭 시나리오 검증기</h1>
+  <p class="note">개발본을 아래 창에 열고, 시나리오마다 새로 불러와 샘플을 넣은 뒤 실제 화면 결과로 판정합니다. 인쇄 창·알림은 띄우지 않습니다.</p>
+  <div id="summary">실행 중…</div>
+  <table><thead><tr><th>ID</th><th>시나리오</th><th>판정</th><th>근거</th></tr></thead><tbody id="rows"></tbody></table>
+  <iframe id="app" src="about:blank"></iframe>
+
+  <script src="scenarios.js"></script>
+  <script>
+    const APP_URL = '../코스텝_경영진단_리드디벨롭.html';
+    const frame = document.getElementById('app');
+    const BAD = /undefined|NaN|\[SMB_|-점/;
+
+    function loadApp(keepStorage) {
+      // 시나리오마다 깨끗한 상태에서 시작 (자동 저장된 작성 내용·고객 목록 지우기)
+      if (!keepStorage) { try { localStorage.removeItem('COSTEP_DRAFT_V1'); localStorage.removeItem('COSTEP_CLIENTS_V1'); } catch (e) {} }
+      return new Promise(resolve => {
+        frame.onload = () => { stub(frame.contentWindow); resolve(); };
+        frame.src = APP_URL + '?t=' + Date.now();
+      });
+    }
+    function stub(w) {
+      w.alert = () => {}; w.print = () => {}; w.confirm = () => true;
+      w.HTMLAnchorElement.prototype.click = function () {};
+    }
+
+    function makeApi() {
+      const w = frame.contentWindow, doc = w.document;
+      const el = id => doc.getElementById(id);
+      const fire = node => { ['input', 'change'].forEach(t => node.dispatchEvent(new w.Event(t, { bubbles: true }))); };
+      const sheetText = id => (el(id) ? el(id).innerText : '');
+      const overflowing = () => [...doc.querySelectorAll('#active_report_render_area .a4-page-card')]
+        .filter(c => !c.classList.contains('a4-multi') && w.a4PrintHeight(c) > w.A4_PRINT_LIMIT_PX)
+        .map(c => `${c.id}(+${Math.round(w.a4PrintHeight(c) - w.A4_PRINT_LIMIT_PX)}px)`);
+      const reportKeys = track => w.eval(`Object.keys(COSTEP_REPORTS_DB['${track}'])`);
+      const snapshot = () => ({
+        official: sheetText('print_target_official'), report: sheetText('print_target_report'),
+        guide: sheetText('print_target_guide'), bplan: sheetText('print_target_bplan'), overflow: overflowing()
+      });
+      const api = {
+        w, doc,
+        set(id, v) { const n = el(id); if (!n) throw new Error('입력칸 없음: ' + id); n.value = v; fire(n); },
+        val: id => (el(id) ? el(id).value : ''),
+        text: id => (el(id) ? el(id).innerText : ''),
+        call: (fn, ...args) => w[fn](...args),
+        demo() { w.loadDemoData(); },
+        fresh() {
+          doc.querySelectorAll('#section_smb_input input[type=text], #section_smb_input input[type=number]').forEach(n => { n.value = ''; });
+          w.calcSmbMetrics();
+        },
+        setDebts(items) { w.appState.debtItems = items; w.renderDebtTable(); },
+        render(track, key) {
+          w.setBizTrack(track); w.switchMainScreen('reports');
+          if (key) w.selectSubReport(key);
+          return snapshot();
+        },
+        sweep(tracks, inds) {
+          const issues = [];
+          for (const ind of inds) for (const t of tracks) {
+            w.setIndustryTrack(ind); w.setBizTrack(t); w.switchMainScreen('reports');
+            for (const k of reportKeys(t)) {
+              w.selectSubReport(k);
+              const s = snapshot();
+              if (s.overflow.length) issues.push(`${t}/${ind}/${k}: 넘침 ${s.overflow.join(', ')}`);
+              for (const [name, txt] of Object.entries(s)) {
+                if (name !== 'overflow' && BAD.test(txt)) issues.push(`${t}/${ind}/${k}/${name}: "${txt.match(BAD)[0]}" 출력`);
+              }
+            }
+          }
+          return issues;
+        },
+        line(text, kw) { const l = text.split('\n').find(x => x.includes(kw)); return l ? l.trim().slice(0, 120) : `("${kw}" 줄 없음)`; },
+        captureDoc(fn) {
+          let captured = null;
+          const OrigBlob = w.Blob;
+          w.Blob = function (parts) { captured = parts.join(''); return new OrigBlob(parts); };
+          try { fn(); } finally { w.Blob = OrigBlob; }
+          return captured;
+        },
+        async reload() { await loadApp(true); Object.assign(api, makeApi()); }
+      };
+      return api;
+    }
+
+    async function main() {
+      const results = [];
+      for (const sc of window.SCENARIOS) {
+        await loadApp();
+        let r;
+        try { r = await sc.run(makeApi()); }
+        catch (e) { r = { verdict: 'FAIL', evidence: ['실행 오류: ' + e.message] }; }
+        results.push({ id: sc.id, name: sc.name, ...r });
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${sc.id}</td><td></td><td class="${r.verdict}">${r.verdict}</td><td></td>`;
+        tr.children[1].textContent = sc.name;
+        tr.children[3].textContent = r.evidence.join('\n');
+        tr.children[3].style.whiteSpace = 'pre-line';
+        document.getElementById('rows').appendChild(tr);
+      }
+      const count = v => results.filter(r => r.verdict === v).length;
+      document.getElementById('summary').textContent = `완료: PASS ${count('PASS')} · WARN ${count('WARN')} · FAIL ${count('FAIL')} (총 ${results.length})`;
+      window.__results = results;
+    }
+    main();
+  </script>
+</body>
+</html>

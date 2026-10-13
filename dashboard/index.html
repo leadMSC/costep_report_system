@@ -1,0 +1,482 @@
+<style>
+  /* Layout: 요약 숫자 → 결함 → 고객 PDF → 검증 → 로드맵 → 요청 → 준비 사항, 한 줄 카드 그리드가 좁으면 1열로 */
+  .cx { max-width: 72rem; margin-inline: auto; display: grid; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+  .cx-head { display: grid; gap: var(--cds-gap-sm); padding-top: var(--cds-pad-sm); }
+  .cx-eyebrow { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); letter-spacing: .04em; }
+  .cx-title { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.15; margin: 0; text-wrap: balance; }
+  .cx-take { font-size: var(--cds-font-size-heading); color: var(--color-fg); margin: 0; max-width: 46rem; line-height: 1.5; }
+  .cx-take b { color: var(--cx-accent, var(--color-ok)); font-weight: 600; }
+  .cx-asof { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cx-asof a { color: inherit; }
+
+  .cx-kpis { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+  .cx-kpi { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-xs); align-content: start; position: relative; overflow: hidden; }
+  .cx-kpi::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--cx-accent, var(--color-ok)); opacity: .85; }
+  .cx-kpi-label { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cx-kpi-num { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2.4rem; line-height: 1.05; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+  .cx-kpi-num .cx-of { font-size: 1.15rem; color: var(--color-fg-muted); }
+  .cx-kpi-num .cx-arrow { font-size: 1.2rem; color: var(--color-fg-muted); }
+  .cx-kpi-num .cx-strike { color: var(--color-bad); text-decoration: line-through; text-decoration-thickness: 2px; font-size: 1.6rem; }
+  .cx-kpi-note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.45; }
+
+  .cx-sec { display: grid; gap: var(--cds-gap-md); }
+  .cx-sec-head { display: grid; gap: .2rem; }
+  .cx-sec-head h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
+  .cx-sec-head p { margin: 0; font-size: var(--cds-font-size-body); color: var(--color-fg-muted); }
+  .cx-grid { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+  .cx-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-sm); align-content: start; min-width: 0; }
+  .cx-card h3 { margin: 0; font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+  .cx-card .cx-note { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cx-chart { position: relative; min-height: 12rem; }
+
+  .cx-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .1rem .55rem; border-radius: 999px; font-size: var(--cds-font-size-caption); white-space: nowrap; border: 1px solid currentColor; }
+  .cx-pill::before { content: ""; width: .4rem; height: .4rem; border-radius: 50%; background: currentColor; }
+  .cx-ok { color: var(--color-ok); } .cx-warn { color: var(--color-warn); } .cx-bad { color: var(--color-bad); } .cx-muted { color: var(--color-fg-muted); }
+
+  .cx-tabs { display: flex; gap: var(--cds-gap-xs); flex-wrap: wrap; }
+  .cx-tab { font: inherit; font-size: var(--cds-font-size-caption); padding: .3rem .75rem; border-radius: 999px; border: 1px solid var(--color-border-line); background: transparent; color: var(--color-fg-muted); cursor: pointer; }
+  .cx-tab[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+  .cx-tab:focus-visible { outline: 2px solid var(--cx-accent, var(--color-ok)); outline-offset: 2px; }
+  .cx-tablewrap { overflow-x: auto; max-height: 30rem; overflow-y: auto; }
+  .cx-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-body); }
+  .cx-table th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); padding: .5rem .6rem; border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+  .cx-table td { padding: .55rem .6rem; border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .cx-table td:first-child { color: var(--color-fg-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cx-table tr[hidden] { display: none; }
+
+  .cx-matrix { display: grid; grid-template-columns: minmax(5.5rem, auto) repeat(3, minmax(0, 1fr)); gap: 6px; font-size: var(--cds-font-size-caption); }
+  .cx-matrix .cx-mh { color: var(--color-fg-muted); padding: .2rem .3rem; align-self: end; }
+  .cx-cell { border-radius: 8px; padding: .55rem .6rem; border: 1px solid var(--color-border-line); display: grid; gap: .1rem; }
+  .cx-cell b { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+  .cx-cell.cx-cell-ok { background: color-mix(in srgb, var(--color-ok) 9%, transparent); }
+  .cx-cell.cx-cell-two { background: color-mix(in srgb, var(--color-warn) 11%, transparent); }
+
+  .cx-chips { display: grid; gap: var(--cds-gap-sm); grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }
+  .cx-chip { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: .6rem .75rem; display: grid; gap: .35rem; background: var(--color-panel); }
+  .cx-chip-top { display: flex; justify-content: space-between; gap: .5rem; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cx-chip-name { font-size: var(--cds-font-size-body); }
+  .cx-chip-flow { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+
+  .cx-road { display: grid; gap: 0; }
+  .cx-stage { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: var(--cds-gap-md); }
+  .cx-rail { display: grid; justify-items: center; grid-template-rows: auto 1fr; }
+  .cx-dot { width: 2.2rem; height: 2.2rem; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-anthropic-serif); font-size: 1.05rem; border: 2px solid var(--color-border-line); color: var(--color-fg-muted); background: var(--color-bg); }
+  .cx-stage.cx-active .cx-dot { border-color: var(--cx-accent, var(--color-ok)); color: var(--cx-accent, var(--color-ok)); }
+  .cx-line { width: 2px; background: var(--color-border-line); min-height: 1.5rem; }
+  .cx-stage-body { padding-bottom: var(--cds-pad-lg); display: grid; gap: .45rem; min-width: 0; }
+  .cx-stage-top { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .cx-stage-top h3 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .cx-stage-body p { margin: 0; color: var(--color-fg-muted); font-size: var(--cds-font-size-body); line-height: 1.5; }
+  .cx-bar { height: 8px; border-radius: 999px; background: var(--cds-chart-grid); overflow: hidden; max-width: 28rem; }
+  .cx-bar span { display: block; height: 100%; border-radius: 999px; background: var(--cx-accent, var(--color-ok)); }
+  .cx-gate { display: flex; gap: .5rem; align-items: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .cx-gate i { width: .7rem; height: .7rem; transform: rotate(45deg); border: 1.5px solid var(--color-warn); display: inline-block; flex: none; }
+
+  .cx-req { display: grid; gap: var(--cds-gap-sm); grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); }
+  .cx-req .cx-card { gap: .5rem; }
+  .cx-req-no { font-family: var(--font-anthropic-serif); font-size: 1.6rem; color: var(--cx-accent, var(--color-ok)); line-height: 1; }
+  .cx-req-top { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+  .cx-req p { margin: 0; font-size: var(--cds-font-size-body); color: var(--color-fg-muted); line-height: 1.5; }
+  .cx-req h3 { font-size: var(--cds-font-size-body); }
+
+  .cx-todo { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+  .cx-todo ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+  .cx-todo li { display: grid; grid-template-columns: 1.1rem minmax(0, 1fr) auto; gap: .55rem; align-items: start; font-size: var(--cds-font-size-body); line-height: 1.45; }
+  .cx-box { width: 1rem; height: 1rem; border: 1.5px solid var(--color-border-line); border-radius: 4px; margin-top: .15rem; }
+  .cx-stage-tag { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; }
+
+  .cx-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); max-width: 16rem; z-index: 2; }
+  .cx-tip .cx-tip-h { color: var(--cds-text-secondary); margin-bottom: .15rem; }
+  .cx-fail { display: flex; align-items: center; justify-content: center; gap: .4rem; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); min-height: inherit; }
+  .cx-fail::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+  [data-dash-source-state=empty] { color: transparent; }
+  [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+  @media (prefers-reduced-motion: no-preference) {
+    .cx-bar span { animation: cx-grow var(--cds-dur-slow) var(--cds-ease-out); transform-origin: left; }
+    @keyframes cx-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  }
+</style>
+
+<div class="cx">
+  <header class="cx-head" id="top">
+    <div class="cx-eyebrow">코스텝 원페이지 경영진단 시스템 · 개선 현황 보고</div>
+    <h1 class="cx-title">코스텝 경영진단 개선 현황</h1>
+    <p class="cx-take" id="takeaway"><span class="dash-skeleton">&nbsp;</span></p>
+    <div class="cx-asof">원본 파일은 그대로 두고 개발본에서 고친 결과입니다 · 숫자의 원본은 <a href="https://docs.google.com/spreadsheets/d/1UaD5dEWwA5Iy3ifw4z7cJKSD8VsGLXDP64P9U7HFhVY/edit" target="_blank" rel="noopener">구글 시트</a>이며 매일 반영됩니다</div>
+  </header>
+
+  <section class="cx-kpis" id="kpis" aria-label="요약">
+    <div class="cx-kpi">
+      <div class="cx-kpi-label">찾아서 고친 결함</div>
+      <div class="cx-kpi-num"><span data-source="kpi_defects" data-field="고침" data-row="0" class="dash-skeleton">—</span><span class="cx-of">/ <span data-source="kpi_defects" data-field="전체" data-row="0">—</span>건</span></div>
+      <div class="cx-kpi-note">남은 결함: <span id="kpi-left">—</span></div>
+    </div>
+    <div class="cx-kpi">
+      <div class="cx-kpi-label">서식 24장 일괄 PDF 쪽수</div>
+      <div class="cx-kpi-num"><span class="cx-strike" data-source="pdf_compare" data-field="원본" data-where="경우=일괄 출력 24장">—</span><span class="cx-arrow">→</span><span data-source="pdf_compare" data-field="개발본" data-where="경우=일괄 출력 24장" class="dash-skeleton">—</span><span class="cx-of">쪽</span></div>
+      <div class="cx-kpi-note">원본은 서식마다 직인·서명이 다음 쪽으로 밀려 잘렸습니다</div>
+    </div>
+    <div class="cx-kpi">
+      <div class="cx-kpi-label">PDF 저장 점검에서 빠진 글자</div>
+      <div class="cx-kpi-num"><span data-source="kpi_pdf" data-field="빠진글자" data-row="0" class="dash-skeleton">—</span><span class="cx-of">자</span></div>
+      <div class="cx-kpi-note"><span data-source="kpi_pdf" data-field="점검" data-row="0">—</span>건 점검, 서식 <span data-source="kpi_pdf" data-field="서식" data-row="0">—</span>장 · 가로 잘림 <span data-source="kpi_pdf" data-field="가로잘림" data-row="0">—</span>건</div>
+    </div>
+    <div class="cx-kpi">
+      <div class="cx-kpi-label">검증 시나리오 통과</div>
+      <div class="cx-kpi-num"><span data-source="kpi_scen" data-field="지금통과" data-row="0" class="dash-skeleton">—</span><span class="cx-of">/ <span data-source="kpi_scen" data-field="전체" data-row="0">—</span></span></div>
+      <div class="cx-kpi-note">처음에는 <span data-source="kpi_scen" data-field="처음통과" data-row="0">—</span>개만 통과했습니다</div>
+    </div>
+  </section>
+
+  <section class="cx-sec" id="defects">
+    <div class="cx-sec-head"><h2>무엇을 고쳤나</h2><p>샘플을 넣어 실제 화면과 PDF로 확인한 결함입니다. 고객 문서에 그대로 드러나던 것부터 정리했습니다.</p></div>
+    <div class="cx-grid">
+      <div class="cx-card" id="card-kind">
+        <h3>결함 종류별</h3>
+        <p class="cx-note">막대 길이 = 결함 수 · 진한 부분이 고친 결함</p>
+        <div class="cx-chart" id="chart-kind" data-source="defects_by_kind"></div>
+      </div>
+      <div class="cx-card" id="card-impact">
+        <h3>고객 영향별</h3>
+        <p class="cx-note">고객이 받는 문서나 입력 결과에 미치는 정도</p>
+        <div class="cx-chart" id="chart-impact" data-source="defects_by_impact"></div>
+      </div>
+    </div>
+    <div class="cx-card" id="card-defects">
+      <div class="cx-req-top"><h3>결함 목록</h3>
+        <div class="cx-tabs" role="group" aria-label="목록 보기">
+          <button class="cx-tab" type="button" data-f="all" aria-pressed="true">전체</button>
+          <button class="cx-tab" type="button" data-f="left" aria-pressed="false">남은 것</button>
+          <button class="cx-tab" type="button" data-f="high" aria-pressed="false">고객 영향 높음</button>
+        </div>
+      </div>
+      <div class="cx-tablewrap">
+        <table class="cx-table" id="tbl-defects" data-source="defects" data-row-key="id">
+          <thead><tr><th data-field="id">번호</th><th data-field="결함">결함</th><th data-field="분류">종류</th><th data-field="고객영향">고객 영향</th><th data-field="상태">상태</th><th data-field="버전">반영</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="cx-sec" id="pdf">
+    <div class="cx-sec-head"><h2>고객이 받는 PDF</h2><p>서식은 PDF로 저장해 고객에게 보냅니다. 인쇄 창의 "PDF로 저장"과 같은 엔진으로 만들어, 화면의 글자가 PDF에 빠짐없이 들어갔는지 대조했습니다.</p></div>
+    <div class="cx-grid">
+      <div class="cx-card" id="card-pages">
+        <h3>원본과 개발본의 PDF 쪽수</h3>
+        <p class="cx-note">빨간 점 = 원본, 진한 점 = 개발본, 세로선 = 맞는 쪽수</p>
+        <div class="cx-chart" id="chart-pages" data-source="pdf_compare"></div>
+      </div>
+      <div class="cx-card" id="card-matrix">
+        <h3>자료 4종 × 규모 3종 PDF 점검</h3>
+        <p class="cx-note">칸마다 서식 24장을 PDF로 저장한 쪽수 · 노란 칸은 내용이 길어 일부 서식이 2쪽으로 정상 이어진 경우</p>
+        <div class="cx-matrix" id="matrix" data-source="pdf_checks"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cx-sec" id="scenarios">
+    <div class="cx-sec-head"><h2>검증 시나리오</h2><p>현장에서 생길 만한 입력을 12가지로 만들어 처음과 지금을 비교했습니다.</p></div>
+    <div class="cx-chips" id="chips" data-source="scenarios"></div>
+  </section>
+
+  <section class="cx-sec" id="roadmap">
+    <div class="cx-sec-head"><h2>진행 로드맵</h2><p>기반을 먼저 다지고, 계정·인증키가 준비되면 서비스로 넓힙니다. 마름모는 다음 단계로 가기 전에 준비할 것입니다.</p></div>
+    <div class="cx-card"><div class="cx-road" id="road" data-source="roadmap"></div></div>
+  </section>
+
+  <section class="cx-sec" id="requests">
+    <div class="cx-sec-head"><h2>코스텝 요청 5건</h2><p>요청마다 어떻게 만들지와 몇 단계에서 반영되는지입니다.</p></div>
+    <div class="cx-req" id="req" data-source="requests"></div>
+  </section>
+
+  <section class="cx-sec" id="todo">
+    <div class="cx-sec-head"><h2>준비와 결정 사항</h2><p>계정과 인증키는 운영자가 만들고 운영하며, 코스텝에는 관리자 권한을 함께 드립니다. 코스텝은 오른쪽 항목만 정해 주시면 됩니다.</p></div>
+    <div class="cx-todo" id="todo-lists" data-source="actions">
+      <div class="cx-card"><h3>운영자 준비</h3><ul id="todo-op"></ul></div>
+      <div class="cx-card"><h3>코스텝 결정</h3><ul id="todo-cs"></ul></div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // 구글 시트(get_values) 응답을 표 형태로: 첫 줄 = 열 이름, 숫자처럼 보이는 칸은 숫자로
+  ['defects', 'scenarios', 'pdf_compare', 'pdf_checks', 'roadmap', 'requests', 'actions'].forEach((id) => {
+    dash.loader(id, {
+      description: '구글 시트 탭의 첫 줄을 열 이름으로 삼아 행으로 바꾸고, 숫자 칸은 숫자로 읽음',
+      fn: ({ answer }) => {
+        const body = typeof answer === 'string' ? JSON.parse(answer) : answer;
+        if (!body || !Array.isArray(body.values)) throw new Error('시트 응답에 values 가 없습니다');
+        const [head, ...rest] = body.values;
+        const rows = rest.filter((r) => r.some((c) => String(c ?? '').trim() !== '')).map((r) => Object.fromEntries(head.map((h, i) => {
+          const v = r[i] ?? '';
+          return [h, /^-?\d+(\.\d+)?$/.test(String(v).trim()) ? Number(v) : v];
+        })));
+        return { columns: head, rows };
+      },
+    });
+  });
+</script>
+<script>
+  dash.calc('kpi_defects', {
+    title: '결함 수정 현황',
+    description: '결함 목록에서 상태가 고침인 수와 전체 수.',
+    inputs: ['defects'],
+    fn: (defects) => [{ 고침: defects.filter((d) => d.상태 === '고침').length, 남음: defects.filter((d) => d.상태 !== '고침').length, 전체: defects.length }],
+  });
+  dash.calc('defects_by_kind', {
+    title: '종류별 결함 수',
+    description: '결함 목록을 종류별로 묶어 고침과 남음을 센 것.',
+    inputs: ['defects'],
+    fn: (defects) => [...new Set(defects.map((d) => d.분류))].map((k) => ({ 분류: k, 고침: defects.filter((d) => d.분류 === k && d.상태 === '고침').length, 남음: defects.filter((d) => d.분류 === k && d.상태 !== '고침').length })),
+  });
+  dash.calc('defects_by_impact', {
+    title: '고객 영향별 결함 수',
+    description: '결함 목록을 고객 영향(높음·중간·낮음)별로 묶어 고침과 남음을 센 것.',
+    inputs: ['defects'],
+    fn: (defects) => ['높음', '중간', '낮음'].map((k) => ({ 분류: k, 고침: defects.filter((d) => d.고객영향 === k && d.상태 === '고침').length, 남음: defects.filter((d) => d.고객영향 === k && d.상태 !== '고침').length })),
+  });
+  dash.calc('kpi_pdf', {
+    title: 'PDF 점검 합계',
+    description: 'PDF 저장 점검의 건수, 서식 장수, 빠진 글자와 가로 잘림 합계.',
+    inputs: ['pdf_checks'],
+    fn: (pdf_checks) => [{ 점검: pdf_checks.length, 서식: pdf_checks.reduce((s, r) => s + Number(r.서식), 0), 빠진글자: pdf_checks.reduce((s, r) => s + Number(r.빠진글자), 0), 가로잘림: pdf_checks.reduce((s, r) => s + Number(r.가로잘림), 0) }],
+  });
+  dash.calc('kpi_scen', {
+    title: '시나리오 통과 수',
+    description: '검증 시나리오 중 처음과 지금 통과한 수.',
+    inputs: ['scenarios'],
+    fn: (scenarios) => [{ 처음통과: scenarios.filter((s) => s.처음 === '통과').length, 지금통과: scenarios.filter((s) => s.지금 === '통과').length, 전체: scenarios.length }],
+  });
+</script>
+
+<script>
+  (() => {
+    const root = document.querySelector('.cx');
+    const ok = (id) => dash.data(id).status === 'ok';
+    const rows = (id) => (ok(id) ? dash.data(id).data : []);
+    const fail = (el, id) => {
+      const st = dash.data(id).status;
+      if (st === 'error' || st === 'connect' || st === 'declined') { el.replaceChildren(); const f = document.createElement('div'); f.className = 'cx-fail'; f.textContent = 'Failed to load'; el.append(f); return true; }
+      return false;
+    };
+    const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+    const pill = (text) => { const cls = /고침|통과|정상/.test(text) ? 'cx-ok' : /남음|결함/.test(text) ? 'cx-bad' : /확인|진행|2쪽/.test(text) ? 'cx-warn' : 'cx-muted'; return el('span', 'cx-pill ' + cls, text); };
+    const fill = (sel) => document.querySelectorAll(sel).forEach((n) => n.classList.remove('dash-skeleton'));
+
+    // 강조색: 대시보드 첫 계열색
+    root.style.setProperty('--cx-accent', dash.colors[0]);
+
+    // 공용 툴팁
+    const tipOf = (box) => { let t = box.querySelector('.cx-tip'); if (!t) { t = el('div', 'cx-tip'); t.hidden = true; box.append(t); } return t; };
+    const showTip = (box, ev, head, line) => {
+      const t = tipOf(box); t.replaceChildren(el('div', 'cx-tip-h', head), el('div', '', line)); t.hidden = false;
+      const r = box.getBoundingClientRect(); const x = ev.clientX - r.left + 12; const y = ev.clientY - r.top + 12;
+      t.style.left = Math.min(x, r.width - t.offsetWidth - 4) + 'px'; t.style.top = y + 'px';
+    };
+    const hideTip = (box) => { const t = box.querySelector('.cx-tip'); if (t) t.hidden = true; };
+
+    // 가로 누적 막대 (고침 / 남음)
+    function stacked(box, data, id) {
+      box.replaceChildren();
+      if (fail(box, id) || !data.length) return;
+      const W = box.clientWidth || 320, rowH = 34, padT = 4;
+      const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${data.length * rowH + padT + 18}`);
+      const meas = svg.append('text').attr('font-size', 12).text('입력→보고서 연결');
+      const left = Math.min(Math.max(...data.map((d) => { meas.text(d.분류); return meas.node().getComputedTextLength(); })) + 12, W * .45);
+      meas.remove();
+      const max = d3.max(data, (d) => d.고침 + d.남음) || 1;
+      const x = d3.scaleLinear([0, max], [left, W - 28]);
+      data.forEach((d, i) => {
+        const y = padT + i * rowH;
+        const g = svg.append('g');
+        g.append('text').attr('x', left - 10).attr('y', y + 15).attr('text-anchor', 'end').attr('font-size', 12).attr('fill', 'var(--color-fg)').text(d.분류);
+        g.append('rect').attr('x', left).attr('y', y + 4).attr('height', 16).attr('rx', 4).attr('width', Math.max(0, x(d.고침 + d.남음) - left)).attr('fill', 'var(--color-bad)').attr('opacity', d.남음 ? .85 : 0);
+        g.append('rect').attr('x', left).attr('y', y + 4).attr('height', 16).attr('rx', 4).attr('width', Math.max(0, x(d.고침) - left)).style('fill', dash.colors[0]);
+        g.append('text').attr('x', x(d.고침 + d.남음) + 6).attr('y', y + 16).attr('font-size', 12).attr('fill', 'var(--color-fg-muted)').text(d.고침 + d.남음);
+        g.append('rect').attr('x', 0).attr('y', y).attr('width', W).attr('height', rowH).attr('fill', 'transparent')
+          .on('mousemove', (ev) => showTip(box, ev, d.분류, `고침 ${d.고침}건 · 남음 ${d.남음}건`)).on('mouseleave', () => hideTip(box));
+      });
+      const legend = svg.append('g').attr('transform', `translate(${left},${data.length * rowH + padT + 12})`);
+      legend.append('rect').attr('width', 10).attr('height', 10).attr('y', -9).attr('rx', 2).style('fill', dash.colors[0]);
+      legend.append('text').attr('x', 15).attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text('고침');
+      legend.append('rect').attr('x', 52).attr('width', 10).attr('height', 10).attr('y', -9).attr('rx', 2).attr('fill', 'var(--color-bad)');
+      legend.append('text').attr('x', 67).attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text('남음');
+    }
+
+    // 원본 → 개발본 쪽수 (점 두 개와 맞는 쪽수 선)
+    function dumbbell(box) {
+      const id = 'pdf_compare';
+      box.replaceChildren();
+      if (fail(box, id)) return;
+      const data = rows(id).map((r) => ({ ...r, 원본: Number(r.원본), 개발본: Number(r.개발본), 기대: Number(r.기대) }));
+      if (!data.length) return;
+      const W = box.clientWidth || 320, rowH = 54, top = 8;
+      const H = top + data.length * rowH + 26;
+      const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+      const max = d3.max(data, (d) => Math.max(d.원본, d.개발본));
+      const x = d3.scaleLog([1, max * 1.15], [16, W - 24]);
+      const ticks = [1, 2, 4, 8, 24, 48].filter((t) => t <= max * 1.15);
+      svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', (t) => x(t)).attr('x2', (t) => x(t)).attr('y1', top).attr('y2', H - 22).attr('stroke', 'var(--cds-chart-grid)');
+      svg.append('g').selectAll('text').data(ticks).join('text').attr('x', (t) => x(t)).attr('y', H - 6).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((t) => t + '쪽');
+      data.forEach((d, i) => {
+        const y = top + i * rowH;
+        const g = svg.append('g');
+        g.append('text').attr('x', 16).attr('y', y + 13).attr('font-size', 12).attr('fill', 'var(--color-fg)').text(d.경우);
+        const cy = y + 32;
+        g.append('line').attr('x1', x(d.기대)).attr('x2', x(d.기대)).attr('y1', cy - 11).attr('y2', cy + 11).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-width', 2);
+        g.append('line').attr('x1', x(Math.min(d.원본, d.개발본))).attr('x2', x(Math.max(d.원본, d.개발본))).attr('y1', cy).attr('y2', cy).attr('stroke', 'var(--cds-chart-axis)').attr('stroke-width', 2).attr('stroke-linecap', 'round');
+        g.append('circle').attr('cx', x(d.원본)).attr('cy', cy).attr('r', 6).attr('fill', 'var(--color-bad)');
+        g.append('circle').attr('cx', x(d.개발본)).attr('cy', cy).attr('r', d.원본 === d.개발본 ? 4 : 6).style('fill', dash.colors[0]);
+        g.append('rect').attr('x', 0).attr('y', y).attr('width', W).attr('height', rowH).attr('fill', 'transparent')
+          .on('mousemove', (ev) => showTip(box, ev, d.경우, `원본 ${d.원본}쪽 → 개발본 ${d.개발본}쪽 (맞는 쪽수 ${d.기대}쪽). ${d.설명}`)).on('mouseleave', () => hideTip(box));
+      });
+    }
+
+    function matrix(box) {
+      const id = 'pdf_checks';
+      box.replaceChildren();
+      if (fail(box, id)) return;
+      const data = rows(id);
+      if (!data.length) return;
+      const scales = ['소상공인', '소기업', '중기업'];
+      box.append(el('div', 'cx-mh', ''));
+      scales.forEach((s) => box.append(el('div', 'cx-mh', s)));
+      ['작성 예시', '긴 문장', '대출 10건', '빈 입력'].forEach((kind) => {
+        box.append(el('div', 'cx-mh', kind));
+        scales.forEach((s) => {
+          const r = data.find((d) => d.자료 === kind && d.규모 === s);
+          const c = el('div', 'cx-cell');
+          if (r) {
+            const two = Number(r.PDF쪽) > Number(r.서식);
+            const clean = Number(r.빠진글자) === 0 && Number(r.가로잘림) === 0;
+            c.classList.add(two ? 'cx-cell-two' : 'cx-cell-ok');
+            const b = el('b', '', Number(r.PDF쪽) + '쪽');
+            const note = el('span', clean ? 'cx-ok' : 'cx-bad', clean ? '잘림 없음' : '잘림 ' + (Number(r.빠진글자) + Number(r.가로잘림)));
+            c.append(b, note);
+          }
+          box.append(c);
+        });
+      });
+    }
+
+    function chips(box) {
+      const id = 'scenarios';
+      box.replaceChildren();
+      if (fail(box, id)) return;
+      rows(id).forEach((s) => {
+        const c = el('div', 'cx-chip');
+        const top = el('div', 'cx-chip-top'); top.append(el('span', '', '시나리오 ' + s.id));
+        const flow = el('div', 'cx-chip-flow'); flow.append(pill(s.처음), el('span', 'cx-muted', '→'), pill(s.지금));
+        c.append(top, el('div', 'cx-chip-name', s.시나리오), flow);
+        box.append(c);
+      });
+    }
+
+    function road(box) {
+      const id = 'roadmap';
+      box.replaceChildren();
+      if (fail(box, id)) return;
+      const data = rows(id);
+      data.forEach((r, i) => {
+        const st = el('div', 'cx-stage' + (r.상태 === '진행 중' ? ' cx-active' : ''));
+        const rail = el('div', 'cx-rail'); rail.append(el('div', 'cx-dot', String(r.단계)));
+        if (i < data.length - 1) rail.append(el('div', 'cx-line'));
+        const body = el('div', 'cx-stage-body');
+        const top = el('div', 'cx-stage-top'); top.append(el('h3', '', r.이름), pill(r.상태), el('span', 'cx-stage-tag', `${r.완료} / ${r.전체} 완료`));
+        const bar = el('div', 'cx-bar'); const fillBar = el('span'); fillBar.style.width = (Number(r.전체) ? (Number(r.완료) / Number(r.전체)) * 100 : 0) + '%'; bar.append(fillBar);
+        body.append(top, el('p', '', r.내용), bar);
+        if (r.관문) { const g = el('div', 'cx-gate'); g.append(el('i'), el('span', '', r.관문)); body.append(g); }
+        st.append(rail, body);
+        box.append(st);
+      });
+    }
+
+    function requests(box) {
+      const id = 'requests';
+      box.replaceChildren();
+      if (fail(box, id)) return;
+      rows(id).forEach((r) => {
+        const c = el('div', 'cx-card');
+        const top = el('div', 'cx-req-top'); top.append(el('span', 'cx-req-no', '[' + r.번호 + ']'), el('span', 'cx-stage-tag', r.단계 + '단계에서 반영'));
+        const st = el('div', ''); st.append(pill(r.상태));
+        c.append(top, el('h3', '', r.요청), el('p', '', r.대응), st);
+        box.append(c);
+      });
+    }
+
+    function todo() {
+      const id = 'actions';
+      const op = document.getElementById('todo-op'), cs = document.getElementById('todo-cs');
+      op.replaceChildren(); cs.replaceChildren();
+      if (fail(op, id)) return;
+      rows(id).forEach((a) => {
+        const li = el('li'); li.append(el('span', 'cx-box'), el('span', '', a.항목), el('span', 'cx-stage-tag', a.단계 + '단계 전'));
+        (a.담당 === '코스텝' ? cs : op).append(li);
+      });
+    }
+
+    // 결함 표
+    let filter = 'all';
+    const tbody = document.querySelector('#tbl-defects tbody');
+    function table() {
+      tbody.replaceChildren();
+      rows('defects').forEach((d) => {
+        const tr = document.createElement('tr');
+        const imp = el('span', 'cx-pill ' + (d.고객영향 === '높음' ? 'cx-bad' : d.고객영향 === '중간' ? 'cx-warn' : 'cx-muted'), d.고객영향);
+        const cells = [el('td', '', d.id), el('td', '', d.결함), el('td', 'cx-muted', d.분류)];
+        const ti = el('td'); ti.append(imp); const ts = el('td'); ts.append(pill(d.상태));
+        cells.push(ti, ts, el('td', 'cx-muted', d.버전));
+        tr.append(...cells);
+        tr.hidden = (filter === 'left' && d.상태 === '고침') || (filter === 'high' && d.고객영향 !== '높음');
+        tbody.append(tr);
+      });
+    }
+    document.querySelectorAll('.cx-tab').forEach((b) => b.addEventListener('click', () => {
+      filter = b.dataset.f;
+      document.querySelectorAll('.cx-tab').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      table();
+    }));
+
+    function kpis() {
+      const k = dash.data('kpi_defects').data?.[0];
+      const fmt = d3.format(',');
+      const setv = (sel, v) => document.querySelectorAll(sel).forEach((n) => { n.textContent = v == null ? '—' : fmt(v); });
+      setv('[data-source="kpi_defects"][data-field="고침"]', k?.고침);
+      setv('[data-source="kpi_defects"][data-field="전체"]', k?.전체);
+      const left = rows('defects').filter((d) => d.상태 !== '고침').map((d) => d.결함);
+      document.getElementById('kpi-left').textContent = left.length ? left.join(', ') : '없음';
+      const comp = rows('pdf_compare').find((r) => r.경우 === '일괄 출력 24장');
+      setv('[data-source="pdf_compare"][data-field="원본"]', comp ? Number(comp.원본) : null);
+      setv('[data-source="pdf_compare"][data-field="개발본"]', comp ? Number(comp.개발본) : null);
+      const p = dash.data('kpi_pdf').data?.[0];
+      ['점검', '서식', '빠진글자', '가로잘림'].forEach((f) => setv(`[data-source="kpi_pdf"][data-field="${f}"]`, p?.[f]));
+      const s = dash.data('kpi_scen').data?.[0];
+      ['처음통과', '지금통과', '전체'].forEach((f) => setv(`[data-source="kpi_scen"][data-field="${f}"]`, s?.[f]));
+
+      const stage = rows('roadmap').find((r) => r.상태 === '진행 중');
+      const take = document.getElementById('takeaway');
+      if (k && p && s && comp) {
+        take.replaceChildren(
+          '찾은 결함 ', el('b', '', fmt(k.전체) + '건 중 ' + fmt(k.고침) + '건'), '을 고쳤고, 고객에게 보내는 PDF에서 ',
+          el('b', '', '잘리는 글자는 ' + fmt(p.빠진글자) + '자'), '입니다.',
+          ...(stage ? [' 지금은 ', el('b', '', `${stage.단계}단계 「${stage.이름}」`), ` 작업 ${fmt(stage.전체)}개 중 ${fmt(stage.완료)}개를 마쳤습니다.`] : [])
+        );
+        fill('.dash-skeleton');
+      }
+    }
+
+    dash.onData(() => {
+      kpis();
+      table();
+      stacked(document.getElementById('chart-kind'), dash.data('defects_by_kind').data || [], 'defects');
+      stacked(document.getElementById('chart-impact'), dash.data('defects_by_impact').data || [], 'defects');
+      dumbbell(document.getElementById('chart-pages'));
+      matrix(document.getElementById('matrix'));
+      chips(document.getElementById('chips'));
+      road(document.getElementById('road'));
+      requests(document.getElementById('req'));
+      todo();
+    });
+  })();
+</script>

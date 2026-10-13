@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>print-check</title></head>
+<body>
+<script>
+  // PDF 저장 점검용: 개발본을 그대로 불러와 지정한 상태로 만든 뒤, 헤드리스 Chrome 으로 PDF 를 만든다.
+  // 화면에 그려진 서식 글자(인쇄 제외 요소 빼고)를 <script type="text/x-expected"> 에 넣어 두면
+  // tools/pdf_check.py 가 --dump-dom 결과와 PDF 글자를 대조해 잘린 글자를 찾는다.
+  // 사용: print-check.html?case=batch|single&track=smb|small|sme&data=demo|long|debt10|empty&ind=mfg&key=manage&sheet=report&src=dev|orig
+  (async () => {
+    const qs = new URLSearchParams(location.search);
+    const src = qs.get('src') === 'orig' ? '../tests/_orig_copy.html' : '../코스텝_경영진단_리드디벨롭.html';
+    const html = await (await fetch(src)).text();
+    const cfg = {
+      kase: qs.get('case') || 'batch', track: qs.get('track') || 'smb', data: qs.get('data') || 'demo',
+      ind: qs.get('ind') || 'mfg', key: qs.get('key') || '', sheet: qs.get('sheet') || 'report'
+    };
+    const setup = `
+      <script>
+        window.alert = () => {}; window.print = () => {}; window.confirm = () => true;
+        try { localStorage.removeItem('COSTEP_DRAFT_V1'); localStorage.removeItem('COSTEP_CLIENTS_V1'); } catch (e) {}
+        const CFG = ${JSON.stringify(cfg)};
+        const setVal = (id, v) => { const el = document.getElementById(id); if (!el) return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+        document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
+          if (CFG.data !== 'empty') loadDemoData();
+          if (CFG.data === 'long') {
+            const plan = '구형 설비 노후화로 불량률이 높아 납기 지연이 반복되고 원자재 단가 상승으로 채산성이 악화되고 있습니다. '.repeat(10).slice(0, 500);
+            setVal('corp_name', '주식회사 대한민국정밀기계부품제조및첨단소재연구개발센터글로벌');
+            setVal('corp_address', '경기도 화성시 동탄첨단산업1로 27 동탄테크노밸리 지식산업센터 A동 15층 1501호 1502호 1503호 (영천동, 금강펜테리움 IX타워)');
+            setVal('corp_clients', '현대자동차 1차 협력사 3곳(55%), 삼성중공업(25%), 한화에어로스페이스(10%), 기타 중소 조립업체 12곳(10%)');
+            ['bp_problem','bp_solution','bp_market','bp_budget','bp_team','bp_outcome'].forEach(id => setVal(id, plan));
+          }
+          if (CFG.data === 'debt10') {
+            appState.debtItems = Array.from({ length: 10 }, (_, i) => ({ institution: '금융기관' + (i + 1), type: i % 3 === 0 ? '고금리 설비할부' : '운전자금', balance: 1000 + i * 500, rate: 3.5 + i * 0.6, monthlyInterest: 0, payback: '원리금균등 (36개월)' }));
+            appState.debtItems.forEach(d => { d.monthlyInterest = Math.round(d.balance * d.rate / 100 / 12); });
+            renderDebtTable();
+          }
+          setIndustryTrack(CFG.ind); setBizTrack(CFG.track); switchMainScreen('reports');
+          if (CFG.kase === 'single') {
+            if (CFG.key) selectSubReport(CFG.key);
+            selectDocumentSheet(CFG.sheet);
+            const id = { official: 'print_target_official', report: 'print_target_report', guide: 'print_target_guide', bplan: 'print_target_bplan' }[CFG.sheet];
+            window.setTimeout = () => 0;   // 인쇄 후 화면 복원 막기 (PDF 는 이 상태로 찍힘)
+            printSingleSheet(id);
+          } else {
+            selectDocumentSheet('all'); printAllReportsBatch(); window.renderActiveReport = () => {};
+          }
+          // 화면에 그려진 서식 글자 수집 (인쇄 제외 요소 빼고)
+          const lines = [];
+          document.querySelectorAll('#active_report_render_area .a4-page-card').forEach(card => {
+            [...card.children].filter(c => !c.classList.contains('no-print')).forEach(c => lines.push(c.innerText));
+          });
+          // 인쇄 폭(A4 186mm, 여백 0)에서 가로로 넘쳐 잘리는 표 찾기
+          const probe = document.createElement('style');
+          probe.textContent = '.a4-page-card{width:186mm!important;padding:0!important;max-height:none!important}';
+          document.head.appendChild(probe);
+          const hclip = [...document.querySelectorAll('#active_report_render_area .a4-page-card .overflow-x-auto')]
+            .filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.closest('.a4-page-card').id + '(+' + (el.scrollWidth - el.clientWidth) + 'px)');
+          probe.remove();
+          const tag = document.createElement('script');
+          tag.type = 'text/x-expected'; tag.id = 'expected';
+          tag.textContent = JSON.stringify({ cards: document.querySelectorAll('#active_report_render_area .a4-page-card').length, text: lines.join('\\n'), hclip });
+          document.body.appendChild(tag);
+          document.title = 'ready';
+        }, 300));
+      <\/script>`;
+    document.open();
+    document.write(html.replace('</head>', setup + '</head>'));
+    document.close();
+  })();
+</script>
+</body>
+</html>
