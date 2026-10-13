@@ -10,22 +10,31 @@ BASE = 'http://127.0.0.1:5180/tools/print-check.html'
 OUT = os.path.join(tempfile.gettempdir(), 'leaddev-pdfcheck')
 os.makedirs(OUT, exist_ok=True)
 src = 'orig' if '--src' in sys.argv and 'orig' in sys.argv else 'dev'
+l3 = '--l3' in sys.argv   # 3단 보기(기본 화면)에서 인쇄해도 같은지
 
 def chrome(args):
-    return subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--no-pdf-header-footer',
-                           '--virtual-time-budget=20000', '--user-data-dir=' + os.path.join(OUT, 'profile')] + args,
-                          capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180)
+    # --l3: 3단 보기는 폭 900px 이상에서만 켜지므로 창을 넓히고, 배치 작업이 더 있어 시간 한도도 늘린다
+    extra = ['--window-size=1600,900', '--virtual-time-budget=45000'] if l3 else ['--virtual-time-budget=20000']
+    # 실행마다 새 크롬 작업 폴더 — 같은 폴더를 이어 쓰면 앞 실행이 남긴 잠금 때문에 가끔 페이지를 다 못 읽는다
+    prof = tempfile.mkdtemp(prefix='pc-', dir=OUT)
+    try:
+        return subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--no-pdf-header-footer',
+                               '--user-data-dir=' + prof] + extra + args,
+                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=180)
+    finally:
+        import shutil
+        shutil.rmtree(prof, ignore_errors=True)
 
 norm = lambda t: re.sub(r'\s+', '', t)
 
 def check(params, label):
-    url = BASE + '?' + '&'.join(f'{k}={v}' for k, v in {**params, 'src': src}.items())
+    url = BASE + '?' + '&'.join(f'{k}={v}' for k, v in {**params, 'src': src, **({'l3': 1} if l3 else {})}.items())
     dom = chrome(['--dump-dom', url]).stdout
     m = re.search(r'<script type="text/x-expected" id="expected">(.*?)</script>', dom, re.S)
     if not m:
         return f'{label}: 기대 글자 수집 실패'
     exp = json.loads(m.group(1))
-    pdf = os.path.join(OUT, f'{src}-{label}.pdf')
+    pdf = os.path.join(OUT, f'{src}{"-l3" if l3 else ""}-{label}.pdf')
     chrome([f'--print-to-pdf={pdf}', url])
     reader = PdfReader(pdf)
     pages = len(reader.pages)

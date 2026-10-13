@@ -59,6 +59,20 @@ ok('임대차: 금액(₩ 오독)·월세·주거 판별', () => {
   assert.ok(r.notes.some(x => /보증금 3,000만원$/.test(x)));
   assert.ok(r.notes.some(x => /월세 120만원/.test(x)));
 });
+ok('지식재산권 등록증: 번호 앞자리로 권리 판별·8칸', () => {
+  const t = ['발급번호 :1-1-2020-000000000', '사표드로즈', '등        록         제 40-1234567 호', 'Registration Number',
+    '출원번호              제 40-2019-0012345 호                              Cd', '출원 일           2019년 03월 04일', '동록일           2020년 05월 06일',
+    '상표권자', '주식회사 예시상사(110111-*******)', '지정상품 및 구분', '제 9 류 등 3 개류', '시험스캐너등 12건          | 비행'].join('\n');
+  const r = P.parseTextDocument(t, 'x.png');
+  assert.strictEqual(r.kind, 'ip');
+  const it = r.ipItems[0];
+  assert.strictEqual(it.kind, '상표'); assert.strictEqual(it.regNo, '40-1234567'); assert.strictEqual(it.appNo, '40-2019-0012345');
+  assert.strictEqual(it.appDate, '2019-03-04'); assert.strictEqual(it.regDate, '2020-05-06'); assert.strictEqual(it.applicant, '주식회사 예시상사');
+  assert.ok(/시험스캐너등 12건/.test(it.title));
+  const p = P.parseTextDocument(['특허증', '특        허         제 10-7654321 호', '출원번호              제 10-2018-0099999 호', '출원 일           2018년 01월 02일',
+    '등록일           2019년 02월 03일', '발명 의 명 칭 Title of the Invention', '시험용 측정 장치', '특허권자', '주식회사 예시상사(110111-*******)', '발명자', '홍길동(800101-*******)'].join('\n'), 'y.png').ipItems[0];
+  assert.strictEqual(p.kind, '특허'); assert.strictEqual(p.title, '시험용 측정 장치'); assert.strictEqual(p.inventor, '홍길동');
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

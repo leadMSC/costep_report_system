@@ -17,7 +17,7 @@
     };
     const setup = `
       <script>
-        window.alert = () => {}; window.print = () => {}; window.confirm = () => true; window.__MSC_CLASSIC__ = true;
+        window.alert = () => {}; window.print = () => {}; window.confirm = () => true; window.__MSC_CLASSIC__ = ${JSON.stringify(qs.get('l3') !== '1')};   // l3=1 이면 3단 보기로 인쇄 점검
         try { localStorage.removeItem('COSTEP_DRAFT_V1'); localStorage.removeItem('COSTEP_CLIENTS_V1'); } catch (e) {}
         const CFG = ${JSON.stringify(cfg)};
         const setVal = (id, v) => { const el = document.getElementById(id); if (!el) return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };

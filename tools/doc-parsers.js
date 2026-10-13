@@ -247,6 +247,7 @@
     ['share', '주주명부', t => /주주명부/.test(t)],
     ['ledger', '거래처원장(차입금)', t => /거래처원장/.test(t)],
     ['creditor', '채권자변동정보 조회서', t => /채권자변동/.test(t)],
+    ['ip', '지식재산권 등록증', t => /특허증|실용신안등록증|디자인등록증|상표등록증/.test(t) || (/출원번호/.test(t) && /[등동]록일/.test(t))],
     ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
     ['lease', '임대차계약서', t => /임대차/.test(t)],
     ['idcard', '신분증', t => /주민등록증|운전면허증|신분증/.test(t)],
@@ -286,6 +287,8 @@
   function fsTokens(rows) {
     return rows.flat().flatMap(c => c.split(/\s+(?=(?:[IVX]+|\d{1,2}|\(\d+\)|[가-하])\.)|(?<=\d)\s+(?=[^\d\s,(\-△])/)).map(norm).filter(Boolean);
   }
+  // 과목 이름 앞 번호(Ⅰ. · (1) · 1. · 가.)와 뒤 계산식 괄호는 무시하고 이름이 '맞게 시작'할 때만
+  const fsLabel = name => new RegExp('^(?:[IVXⅠ-Ⅻ]+\\.|\\(\\d+\\)|\\d+\\.|[가-하]\\.)?(?:' + name + ')(?:\\(.*\\))?$');
   function fsAmount(tokens, re) {
     for (let i = 0; i < tokens.length; i++) {
       if (!re.test(despace(tokens[i]))) continue;
@@ -307,8 +310,21 @@
       equity: fsAmount(tk, /^자본총계/),
       assets: fsAmount(tk, /^자산총계/),
       interest: fsAmount(tk, /^\d*\.?이자비용$/),
-      loanToCeo: fsAmount(tk, /^(?:\d+\.|[가-하]\.)?(?:주임종단기채권|가지급금)$/)
+      loanToCeo: fsAmount(tk, /^(?:\d+\.|[가-하]\.)?(?:주임종단기채권|가지급금)$/),
+      // 주요 재무지표(재무제표 분석 엑셀과 같은 항목)
+      net: fsAmount(tk, fsLabel('당기순(?:이익|손익)')),
+      capital: fsAmount(tk, fsLabel('자본금')),
+      stLoan: fsAmount(tk, fsLabel('단기차입금')),
+      ltLoan: fsAmount(tk, fsLabel('장기차입금')),
+      quick: fsAmount(tk, fsLabel('당좌자산')),
+      curLiab: fsAmount(tk, fsLabel('유동부채')),
+      intInc: fsAmount(tk, fsLabel('이자수익')),
+      ar: fsAmount(tk, fsLabel('매출채권|외상매출금')),
+      inv: fsAmount(tk, fsLabel('재고자산')),
+      ap: fsAmount(tk, fsLabel('매입채무|외상매입금')),
+      unpaid: fsAmount(tk, fsLabel('미지급금'))
     };
+    if (v.net === null) { const loss = fsAmount(tk, fsLabel('당기순손실')); if (loss !== null) v.net = -Math.abs(loss); }
     const f = {};
     const name = labelValue(rows, /^(?:상호|법인명)$/); if (name) f.corp_name = name;
     const no = bizNoOf(labelValue(rows, /^사업자등록번호$/)); if (no) f.corp_biz_no = no;
@@ -338,12 +354,14 @@
     const months = p => { const a = p.from.split('/').map(Number), b = p.to.split('/').map(Number); return (b[0] - a[0]) * 12 + (b[1] - a[1]) + 1; };
     let m = 0, sum = 0;
     for (const p of periods) { if (m >= 12) break; m += months(p); sum += p.total; }
+    const yearTotals = {};
+    periods.forEach(p => { const y = +p.from.slice(0, 4); yearTotals[y] = (yearTotals[y] || 0) + p.total; });
     const f = {};
     const meta = {};
     if (m) { f.smb_monthly_sales = won2man(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
     const no = bizNoOf(labelValue(rows, /사업자등록번호$/) || ''); if (no) f.corp_biz_no = no;
     const ceo = labelValue(rows, /^성명\(대표자\)$/); if (ceo) f.corp_ceo = ceo.split(/\s*주민/)[0].trim();
-    return { fields: f, meta, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
+    return { fields: f, meta, yearTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
   }
 
   // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
@@ -456,6 +474,7 @@
     const out = { kind: c.kind, title: c.title, fields: {}, meta: {}, debtItems: [], notes: [], status: 'ok', ocr: true };
     if (despace(text).length < 15) { out.status = 'skip'; out.notes.push('글자를 거의 읽지 못했어요 — 더 밝고 반듯한 사진으로'); return out; }
     let r = null;
+    if (c.kind === 'ip') { const ip = parseIP(text); out.ipItems = [ip.item]; out.notes = ip.notes; return out; }
     if (c.kind === 'idcard') r = parseIdCard(text);
     else if (c.kind === 'lease') r = parseLease(text);
     else if (c.kind === 'bizcert' || c.kind === 'bizreg') r = parseBizCert(rows);
@@ -478,6 +497,52 @@
     return rgba;
   }
 
+  // ───────── 지식재산권 등록증(특허·실용신안·디자인·상표) — 대부분 스캔본이라 글자 인식 글로 읽는다 ─────────
+  // 권리 종류는 제목(OCR 이 자주 깨짐) 대신 번호 앞 두 자리로: 10 특허 · 20 실용신안 · 30 디자인 · 40 상표 (특허청 번호 체계)
+  const IP_KIND = { 10: '특허', 20: '실용신안', 30: '디자인', 40: '상표' };
+  function parseIP(text) {
+    const t = redact(text);
+    const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const valOf = l => String(l || '').split(/\s{4,}/)[0].trim();   // 값 줄의 오른쪽 잡음(네 칸 이상 띄운 뒤)은 버림
+    const flat = lines.join('\n');
+    const one = re => { const m = flat.match(re); return m ? m : null; };
+    const ymdOf = s => { const m = String(s || '').match(/(\d{4,5})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/); return m ? m[1].slice(-4) + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0') : ''; };
+    const app = one(/출\s*원\s*번\s*호\s*제?\s*(\d{2})\s*-\s*(\d{4})\s*-\s*(\d{7})/);
+    // 등록번호: '제 10-2102213 호' 꼴(7자리) — 출원번호(가운데 연도 4자리)와 구별
+    const reg = one(/제\s*(\d{2})\s*-\s*(\d{7})\s*호/);
+    const appDateLine = lines.find(l => /출\s*원\s*일/.test(l) && /년/.test(l)) || '';
+    const regDateLine = lines.find(l => /[등동]\s*록\s*일/.test(l) && /년/.test(l)) || '';   // OCR 이 '등록일'을 '동록일'로 읽기도 함
+    const code = +(app ? app[1] : reg ? reg[1] : 0);
+    let kind = IP_KIND[code] || '';
+    if (!kind) kind = /특허증/.test(flat) ? '특허' : /실용신안/.test(flat) ? '실용신안' : /디자인/.test(flat) ? '디자인' : /상표/.test(flat) ? '상표' : '';
+    // 라벨 다음 줄 값(영문 안내 줄은 건너뜀)
+    const after = re => {
+      const i = lines.findIndex(l => re.test(l.replace(/\s/g, '')));
+      if (i < 0) return '';
+      for (let k = i + 1; k < Math.min(lines.length, i + 4); k++) { const v = valOf(lines[k]); if (/[가-힣0-9]/.test(v) && !/^[A-Za-z\s.,'()]+$/.test(v)) return v; }
+      return '';
+    };
+    let title = after(/발명의명칭|고안의명칭|디자인의대상이되는물품|대상이되는물품/);
+    if (kind === '상표') {
+      const goods = valOf(lines.find(l => /\d+\s*건/.test(l) && !/발급/.test(l)) || '');
+      const cls = (flat.match(/제?\s*(\d{1,2})\s*류(?:\s*등\s*(\d+)\s*개\s*류)?/) || []);
+      title = [goods.replace(/\s*[|│].*$/, ''), cls[1] ? `제${cls[1]}류${cls[2] ? ` 등 ${cls[2]}개류` : ''}` : ''].filter(Boolean).join(' · ');
+    }
+    // 권리자(출원인): 회사 이름 줄 — '주식회사 OO(번호…)' 에서 괄호 앞까지
+    const ownerLine = valOf(lines.find(l => /(주식회사|\(주\)|㈜|유한회사|재단법인|사단법인)/.test(l))) || after(/특허권자|실용신안권자|디자인권자|상표권자|권리자/);
+    const nameOf = l => String(l || '').replace(/[(（].*$/, '').replace(/^[^가-힣A-Za-z㈜(]+/, '').trim();
+    const inventorRaw = after(/발명자|고안자|창작자/);
+    const inventor = /등록사항란|원부/.test(inventorRaw) ? '(등록원부 참조)' : nameOf(inventorRaw);
+    const item = {
+      kind, title: title.replace(/[|│].*$/, '').trim(),
+      appNo: app ? `${app[1]}-${app[2]}-${app[3]}` : '', appDate: ymdOf(appDateLine),
+      applicant: nameOf(ownerLine), inventor: kind === '상표' ? '' : inventor,
+      regNo: reg ? `${reg[1]}-${reg[2]}` : '', regDate: ymdOf(regDateLine)
+    };
+    const filled = Object.values(item).filter(Boolean).length;
+    return { item, notes: [kind ? kind + ' 등록증' : '지식재산권 등록증', `${filled}/8칸 읽음`] };
+  }
+
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
   // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
   function parseDocument(pages, fileName, forceKind) {
@@ -494,6 +559,7 @@
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = [ip.item]; out.notes = ip.notes; return out; }
     else if (c.kind === 'ledger' || c.kind === 'creditor') {
       const parsed = parseDebtDocument(pagesToCells(pages));
       out.debtItems = toDebtItems(parsed);
@@ -503,6 +569,7 @@
       return out;
     } else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '종류를 알 수 없음' : '아직 읽는 규칙이 없는 서류'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes;
+    if (r.yearTotals) out.vatYears = r.yearTotals;
     return out;
   }
 
@@ -520,7 +587,11 @@
       put('sme_profit' + suf[k], v.profit, x);
       put('sme_debt' + suf[k], v.debt, x);
       put('sme_equity' + suf[k], v.equity, x);
-      if (k === 0 && v.loanToCeo) put('sme_loan_to_ceo', v.loanToCeo, x);
+      // 주요 재무지표 입력 칸(백만원)
+      [['sme_assets', 'assets'], ['sme_net', 'net'], ['sme_capital', 'capital'], ['sme_st_loan', 'stLoan'], ['sme_lt_loan', 'ltLoan'],
+        ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
+        ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
+      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
       if (k === 0 && v.sales) { f._monthlyFromFs = won2man(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;
@@ -528,6 +599,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
