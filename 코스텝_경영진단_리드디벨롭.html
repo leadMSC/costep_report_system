@@ -577,6 +577,32 @@
         <span id="client_status" class="ml-auto text-slate-500">작성 내용은 이 PC 브라우저에 자동 저장됩니다</span>
       </div>
 
+      <!-- 진단 건 정보: 서식1 머리(시행일자·경유·관련 협약)와 상담 분야(보고서 종류). 비우면 기본 문구 -->
+      <div id="case_card" class="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
+          <span>진단 건 정보</span>
+        </h3>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1.5 text-xs">상담 분야 (만들 보고서)</label>
+          <div id="report_key_chips" class="flex flex-wrap gap-1.5 text-xs"></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">시행일자</label>
+            <input type="date" id="doc_date" value="" onchange="syncCompanyData()" class="form-input-control font-mono">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">경유 (참조 부서)</label>
+            <input type="text" id="doc_via" value="" placeholder="경영관리 및 자금 담당 부서장" oninput="syncCompanyData()" class="form-input-control">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="font-bold text-slate-700 block mb-1">관련 근거·협약명</label>
+            <input type="text" id="doc_agreement" value="" placeholder="중소기업진흥법 제46조 및 2026년도 기업 맞춤형 경영컨설팅 자문 협약" oninput="syncCompanyData()" class="form-input-control">
+          </div>
+        </div>
+      </div>
+
       <!-- Card 1: Target Tier & 10 Industries Selector -->
       <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-700 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
@@ -3065,6 +3091,7 @@
       calcSmbMetrics();
       calcDebtTotals();
       renderReportButtons();
+      renderReportKeyChips();
       renderActiveReport();
       const timeTxt = document.getElementById("bizinfo_sync_time_text");
       if (timeTxt) timeTxt.innerText = getCatalogCheckedText();
@@ -3510,10 +3537,22 @@
       }).join('');
     }
     window.renderReportButtons = renderReportButtons;
+    // 입력부 '상담 분야' 칩 — 고르면 그 분야 보고서로 바뀐다 (규모에 따라 6종)
+    function renderReportKeyChips() {
+      const box = document.getElementById('report_key_chips');
+      if (!box) return;
+      const track = window.appState.bizTrack || 'smb';
+      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const keys = Object.keys(db);
+      const active = keys.includes(window.appState.activeReportKey) ? window.appState.activeReportKey : keys[0];
+      box.innerHTML = keys.map(k => `<button type="button" onclick="selectSubReport('${k}')" class="px-3 py-1.5 rounded-full border font-bold cursor-pointer transition-all ${k === active ? 'bg-[#169aa8] border-[#169aa8] text-white' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}">${escapeHtml(db[k].tabTitle.replace(/^[0-9]+\.\s*/, ''))}</button>`).join('');
+    }
+    window.renderReportKeyChips = renderReportKeyChips;
 
     function selectSubReport(key) {
       window.appState.activeReportKey = key;
       renderReportButtons();
+      renderReportKeyChips();
       renderActiveReport();
     }
     window.selectSubReport = selectSubReport;
@@ -3944,7 +3983,11 @@
       // 담당자 칸에 직함까지 적힌 경우(예: '홍길동 경영컨설턴트') 직함이 두 번 찍히지 않게
       const consultantLabel = /컨설턴트$/.test(consultantName) ? consultantName : consultantName + ' 경영컨설턴트';
       const employees = escapeHtml(document.getElementById('sme_employees')?.value.trim()) || '-';
-      const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      // 시행일자: 진단 건 정보에 적은 날, 비우면 오늘
+      const docDateVal = document.getElementById('doc_date')?.value || '';
+      const todayStr = (docDateVal ? new Date(docDateVal + 'T00:00:00') : new Date()).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const docVia = escapeHtml(document.getElementById('doc_via')?.value.trim()) || '경영관리 및 자금 담당 부서장';
+      const docAgreement = escapeHtml(document.getElementById('doc_agreement')?.value.trim()) || '중소기업진흥법 제46조 및 2026년도 기업 맞춤형 경영컨설팅 자문 협약';
 
       // ================= 사업계획 개요서 입력값 연동 =================
       const bpProblem = escapeHtml(document.getElementById('bp_problem')?.value.trim()) || '사업 추진 배경 및 현장 애로사항 미기재 (기초조사서에서 작성 요망)';
@@ -4130,7 +4173,7 @@
               </div>
               <div class="flex items-center space-x-2">
                 <span class="w-16 font-bold text-slate-700">(경 &nbsp;&nbsp; 유) :</span>
-                <span class="text-slate-800">경영관리 및 자금 담당 부서장</span>
+                <span class="text-slate-800">${docVia}</span>
               </div>
               <div class="flex items-center space-x-2">
                 <span class="w-16 font-bold text-slate-700">발 &nbsp;&nbsp; 신 :</span>
@@ -4145,7 +4188,7 @@
             <!-- Official Body (조항체) -->
             <div class="space-y-3 pt-1 text-xs text-slate-900 leading-relaxed">
               <p>1. 귀 사의 무궁한 발전을 기원합니다.</p>
-              <p>2. 관련 : 중소기업진흥법 제46조 및 2026년도 기업 맞춤형 경영컨설팅 자문 협약</p>
+              <p>2. 관련 : ${docAgreement}</p>
               <p>3. 위 관련, 당사 자문 담당자의 현장 실태조사 및 대표자 심층 면담을 통하여 최종 확정된 경영개선 과제에 대하여, 원활하고 적법한 행정 절차 이행을 지원하고자 관계 법령 및 소관 기관 규정에 따라 아래와 같이 정식 통보하오니 업무에 참조하시기 바랍니다.</p>
               
               <!-- Highlight Recommendations Box -->
@@ -4174,7 +4217,7 @@
 
             <!-- Administrative Stamp Details -->
             <div class="border-t border-slate-300 pt-1 text-[9px] text-slate-600 flex justify-between items-center">
-              <div>기안자: ${consultantLabel} &nbsp;|&nbsp; 검토자: 수석컨설턴트 &nbsp;|&nbsp; 결재권자: 대표이사</div>
+              <div>기안자: ${consultantLabel} &nbsp;|&nbsp; 검토자: ${escapeHtml(brand.reviewer || '') || '수석컨설턴트'} &nbsp;|&nbsp; 결재권자: ${escapeHtml(brand.approver || '') || '대표이사'}</div>
               <div>시행: ${docNo} (${todayStr}) &nbsp;|&nbsp; 접수: (${todayStr})</div>
               <div>공개구분: 공개</div>
             </div>
@@ -5168,6 +5211,7 @@
         savedAt: new Date().toISOString(),
         bizTrack: window.appState.bizTrack,
         industryTrack: window.appState.industryTrack,
+        reportKey: window.appState.activeReportKey,
         debtItems: JSON.parse(JSON.stringify(window.appState.debtItems || [])),
         fields
       };
@@ -5178,6 +5222,7 @@
       if (!data || typeof data !== 'object' || !data.fields) throw new Error('고객 자료 형식이 아닙니다.');
       setBizTrack(data.bizTrack || 'smb');
       setIndustryTrack(data.industryTrack || 'mfg');
+      if (data.reportKey) { window.appState.activeReportKey = data.reportKey; renderReportButtons(); renderReportKeyChips(); }
       formFields().forEach(el => {
         if (!(el.id in data.fields)) return;
         const v = data.fields[el.id];
@@ -5801,7 +5846,7 @@
       if (new URLSearchParams(location.search).get('view') !== '3d') return;
       const STEPS = [
         ['내 정보', ['l3_me']],
-        ['진단 대상', ['client_bar', ':tier']],
+        ['진단 대상', ['client_bar', 'case_card', ':tier']],
         ['기업·대표자', [':basic']],
         ['거래처·인증', [':trade']],
         ['대출', [':debt']],
@@ -5831,7 +5876,7 @@
           '<div class="flex items-center gap-3 mb-3"><label class="w-40 h-16 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center cursor-pointer text-xs text-slate-500 bg-white overflow-hidden">' +
           '<img id="l3_me_logo" class="max-h-12 max-w-[9rem] hidden" alt="펌 로고"><span id="l3_me_logo_ph">로고 올리기</span><input type="file" accept="image/*" id="l3_me_logo_in" class="hidden"></label>' +
           '<button type="button" id="l3_me_logo_del" class="text-xs text-slate-500 underline cursor-pointer">로고 지우기</button></div>' +
-          '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">' + fld('firm', '상호', '예: 가나경영컨설팅') + fld('prefix', '문서번호 접두어', '예: GANA') + fld('ceo', '대표', '대표 성명') + fld('phone', '대표 전화', '02-000-0000') + fld('address', '주소', '사무실 주소', 1) + '</div></div>' +
+          '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">' + fld('firm', '상호', '예: 가나경영컨설팅') + fld('prefix', '문서번호 접두어', '예: GANA') + fld('ceo', '대표', '대표 성명') + fld('phone', '대표 전화', '02-000-0000') + fld('address', '주소', '사무실 주소', 1) + fld('reviewer', '검토자 (서식1 결재란)', '예: 수석컨설턴트 김OO') + fld('approver', '결재권자', '예: 대표이사') + '</div></div>' +
           '<div><h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 mb-3 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span><span>나</span></h3>' +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="l3_me_person">' + fld('mobile', '휴대폰', '010-0000-0000') + fld('email', '메일', 'name@example.com') + '</div></div>';
         scr.insertBefore(meCard, scr.firstChild);
@@ -5869,6 +5914,8 @@
           if (m.prefix) b.docPrefix = m.prefix;
           if (m.address) b.address = m.address;
           if (m.phone) b.phone = m.phone;
+          if (m.reviewer) b.reviewer = m.reviewer;
+          if (m.approver) b.approver = m.approver;
           if (m.logo !== undefined && m.logo !== null) b.logo = m.logo || b.logo;
           return b;
         };
@@ -5901,7 +5948,9 @@
         // 미리보기 머리: 분야 버튼 · 서식 탭 · 인쇄
         const sheetBox = document.getElementById('sheet_tab_all').parentNode;
         sheetBox.classList.add('l3-sheets');
-        document.getElementById('l3_row1').appendChild(document.getElementById('subrep_btn_bar'));
+        // 분야는 입력부(진단 건 정보)의 칩으로 고른다 — 미리보기 머리에는 서식 탭만
+        document.getElementById('l3_row1').remove();
+        if (named[':action']) named[':action'].style.display = 'none';
         const row2 = document.getElementById('l3_row2');
         row2.appendChild(sheetBox);
         const pr = document.createElement('button');
@@ -6003,7 +6052,7 @@
           clearTimeout(t);
           t = setTimeout(() => {
             calcSmbMetrics(); calcDebtTotals();
-            renderReportButtons(); renderActiveReport(); fit();
+            renderReportButtons(); renderReportKeyChips(); renderActiveReport(); fit();
           }, 150);
         }
         ['input', 'change', 'click'].forEach(ev => scr.addEventListener(ev, live));
