@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoStep 디자인 시스템 시안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal: #00E0C6;  --teal-deep: #00A898;  --teal-ink: #003D37;
+    --navy: #0A1F44;  --navy-deep: #050E22;  --navy-soft: #16305E;
+    --gold: #FFC300;  --gold-deep: #E0A100;  --gold-ink: #4A3500;
+    --black: #0A0B0F; --ink: #E8EEF6; --ink-2: #9FB0C8; --ink-3: #64748B;
+    --grad-brand: linear-gradient(135deg, #00E0C6 0%, #0A6BFF 55%, #0A1F44 100%);
+    --grad-gold: linear-gradient(135deg, #FFE27A 0%, #FFC300 45%, #E08A00 100%);
+    --grad-night: radial-gradient(ellipse at 15% 0%, #12406A 0%, transparent 55%), radial-gradient(ellipse at 90% 100%, #00594F 0%, transparent 50%), linear-gradient(160deg, #050E22, #0A1F44 60%, #050E22);
+    --r-lg: 20px; --r-md: 14px; --r-sm: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--grad-night); color: var(--ink); min-height: 100vh; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 40px 32px 60px; }
+  h1 { font-size: 32px; font-weight: 900; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--teal); margin: 40px 0 14px; text-transform: uppercase; }
+  .sub { color: var(--ink-2); font-size: 14px; margin-top: 6px; }
+  .row { display: grid; gap: 16px; }
+  .logo-box { display: flex; align-items: center; gap: 20px; }
+  .logo-box img { width: 84px; height: 84px; object-fit: cover; border-radius: 18px; background: #fff; }
+  .sw { border-radius: var(--r-md); overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+  .sw .chip { height: 92px; display: flex; align-items: flex-end; padding: 12px; font-weight: 900; font-size: 15px; }
+  .sw .meta { background: rgba(5,14,34,.7); padding: 10px 12px; font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+  .sw .meta b { color: var(--ink); font-weight: 700; }
+  .tints { display: flex; height: 14px; } .tints span { flex: 1; }
+  .type { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--r-lg); padding: 20px 24px; }
+  .type div { display: flex; align-items: baseline; gap: 18px; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,.06); }
+  .type div:last-child { border: 0; }
+  .type small { width: 150px; flex: none; color: var(--ink-3); font-size: 12px; font-weight: 500; }
+  .num { font-variant-numeric: tabular-nums; }
+  .themes { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .stage { position: relative; border-radius: var(--r-lg); padding: 22px; min-height: 360px; overflow: hidden; }
+  .stage .tag { font-size: 11px; font-weight: 700; color: var(--ink-2); letter-spacing: .08em; margin-bottom: 4px; }
+  .stage .name { font-size: 18px; font-weight: 900; margin-bottom: 14px; }
+  .kpi { border-radius: var(--r-md); padding: 16px; margin-bottom: 12px; position: relative; }
+  .kpi .l { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+  .kpi .v { font-size: 28px; font-weight: 900; margin-top: 4px; }
+  .kpi .d { font-size: 12px; font-weight: 700; color: var(--teal); }
+  .kpi .d.g { color: var(--gold); }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; border: 0; }
+  .note { font-size: 12px; color: var(--ink-2); line-height: 1.7; margin-top: 12px; }
+  /* 1. 글래스모피즘 */
+  .t-glass { background: radial-gradient(circle at 20% 20%, #00E0C6 0, transparent 38%), radial-gradient(circle at 85% 70%, #FFC300 0, transparent 30%), radial-gradient(circle at 60% 10%, #0A6BFF 0, transparent 40%), #0A1F44; }
+  .t-glass .kpi { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.28); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 10px 30px rgba(0,0,0,.25); }
+  .t-glass .btn { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.35); color: #fff; backdrop-filter: blur(10px); }
+  /* 2. 오로라 메시 + 벤토 */
+  .t-aurora { background: #050E22; }
+  .t-aurora::before { content: ''; position: absolute; inset: -40%; background: conic-gradient(from 200deg at 50% 50%, #00E0C6, #0A6BFF, #6B3BFF, #FFC300, #00E0C6); filter: blur(70px); opacity: .45; }
+  .t-aurora > * { position: relative; }
+  .t-aurora .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .t-aurora .kpi { background: rgba(5,14,34,.82); border: 1px solid rgba(255,255,255,.06); margin: 0; }
+  .t-aurora .kpi.wide { grid-column: span 2; }
+  .t-aurora .btn { background: var(--grad-brand); color: #fff; margin-top: 12px; }
+  /* 3. 그라데이션 테두리 다크 (네온 엣지) */
+  .t-edge { background: #07080C; }
+  .t-edge .kpi { background: linear-gradient(#0E1118, #0E1118) padding-box, linear-gradient(135deg, rgba(0,224,198,.9), rgba(10,31,68,.4) 40%, rgba(255,195,0,.8)) border-box; border: 1px solid transparent; box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 28px -8px rgba(0,224,198,.45); }
+  .t-edge .kpi .v { background: linear-gradient(90deg, #fff, #9FFFF2); -webkit-background-clip: text; color: transparent; }
+  .t-edge .btn { background: var(--grad-gold); color: var(--gold-ink); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+  .b-rec { background: rgba(255,195,0,.18); color: var(--gold); border: 1px solid rgba(255,195,0,.4); }
+  .doc { background: #fff; color: var(--black); border-radius: var(--r-md); padding: 18px 20px; font-size: 12px; }
+  .doc .h { font-weight: 900; font-size: 16px; border-bottom: 2px solid var(--black); padding-bottom: 6px; margin-bottom: 8px; }
+  .doc .bar { height: 6px; border-radius: 3px; background: var(--teal-deep); width: 70%; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo-box">
+    <img src="costep-logo.webp" alt="CoStep 로고">
+    <div>
+      <h1>CoStep 디자인 시스템 시안</h1>
+      <div class="sub">폰트 Noto Sans KR · 컬러 4색(청록·네이비·골드·블랙) · 그라데이션과 글래스모피즘 중심</div>
+    </div>
+  </div>
+
+  <h2>컬러 4색</h2>
+  <div class="row" style="grid-template-columns: repeat(4, minmax(0,1fr));">
+    <div class="sw"><div class="chip" style="background:var(--teal);color:var(--teal-ink)">청록 Teal</div><div class="tints"><span style="background:#B3FFF5"></span><span style="background:#5CF5E2"></span><span style="background:#00E0C6"></span><span style="background:#00A898"></span><span style="background:#003D37"></span></div><div class="meta"><b>#00E0C6</b> 강조·상승·주요 버튼<br>글자용 진한 톤 #00A898</div></div>
+    <div class="sw"><div class="chip" style="background:var(--navy);color:#fff">네이비 Navy</div><div class="tints"><span style="background:#2A4C8A"></span><span style="background:#16305E"></span><span style="background:#0A1F44"></span><span style="background:#071733"></span><span style="background:#050E22"></span></div><div class="meta"><b>#0A1F44</b> 바탕·화면 틀<br>가장 넓은 면적</div></div>
+    <div class="sw"><div class="chip" style="background:var(--gold);color:var(--gold-ink)">골드 Gold</div><div class="tints"><span style="background:#FFF3C2"></span><span style="background:#FFE27A"></span><span style="background:#FFC300"></span><span style="background:#E0A100"></span><span style="background:#4A3500"></span></div><div class="meta"><b>#FFC300</b> 핵심 수치·추천·프리미엄<br>한 화면에 한두 곳만</div></div>
+    <div class="sw"><div class="chip" style="background:var(--black);color:#fff;border-bottom:1px solid #222">블랙 Black</div><div class="tints"><span style="background:#3A3F4B"></span><span style="background:#22262F"></span><span style="background:#14171E"></span><span style="background:#0E1118"></span><span style="background:#0A0B0F"></span></div><div class="meta"><b>#0A0B0F</b> 로고·문서 글자<br>출력물(PDF) 본문색</div></div>
+  </div>
+  <div class="row" style="grid-template-columns: repeat(3, minmax(0,1fr)); margin-top:12px;">
+    <div class="sw"><div class="chip" style="background:var(--grad-brand);color:#fff;height:56px">브랜드 그라데이션 · 청록→블루→네이비</div></div>
+    <div class="sw"><div class="chip" style="background:var(--grad-gold);color:var(--gold-ink);height:56px">골드 그라데이션 · 강조 버튼·배지</div></div>
+    <div class="sw"><div class="chip" style="background:var(--grad-night);color:#fff;height:56px">나이트 그라데이션 · 화면 바탕</div></div>
+  </div>
+
+  <h2>글자 위계 — Noto Sans KR, 굵기와 크기만으로</h2>
+  <div class="type">
+    <div><small>Display 40 / 900</small><span style="font-size:40px;font-weight:900;letter-spacing:-.02em">경영진단 리포트</span></div>
+    <div><small>H1 28 / 900</small><span style="font-size:28px;font-weight:900">재무 건전성 진단 결과</span></div>
+    <div><small>H2 20 / 700</small><span style="font-size:20px;font-weight:700">Ⅱ. 수지균형 및 지출 분석</span></div>
+    <div><small>H3 16 / 700</small><span style="font-size:16px;font-weight:700">금융기관별 차입금 현황</span></div>
+    <div><small>Body 14 / 400</small><span style="font-size:14px;color:var(--ink-2)">월 고정비 중 인건비가 48.6%로 가장 커 절감 협상의 우선 대상입니다.</span></div>
+    <div><small>Label 12 / 500</small><span style="font-size:12px;font-weight:500;color:var(--ink-2)">총 금융차입금 잔액 합계</span></div>
+    <div><small>Number 32 / 900 고정폭</small><span class="num" style="font-size:32px;font-weight:900;color:var(--gold)">17,000만원</span><span class="num" style="font-size:16px;font-weight:700;color:var(--teal)">▲ 13.1%</span></div>
+  </div>
+
+  <h2>테마 3안 — 같은 내용, 다른 질감</h2>
+  <div class="row themes">
+    <div class="stage t-glass">
+      <div class="tag">요청안</div><div class="name">① 글래스모피즘</div>
+      <div class="kpi"><div class="l">부채비율</div><div class="v num">94%</div><div class="d">▼ 124%p 개선</div></div>
+      <div class="kpi"><div class="l">영업이익률</div><div class="v num">6.3%</div><div class="d g">▲ 5.1%p</div></div>
+      <span class="btn">보고서 만들기</span>
+    </div>
+    <div class="stage t-aurora">
+      <div class="tag">대안 1</div><div class="name">② 오로라 메시 + 벤토</div>
+      <div class="bento">
+        <div class="kpi wide"><div class="l">부채비율</div><div class="v num">94%</div><div class="d">▼ 124%p 개선</div></div>
+        <div class="kpi"><div class="l">영업이익률</div><div class="v num" style="font-size:22px">6.3%</div><div class="d g">▲ 5.1%p</div></div>
+        <div class="kpi"><div class="l">이자보상</div><div class="v num" style="font-size:22px">3.4배</div><div class="d">▲ 2.6배</div></div>
+      </div>
+      <span class="btn">보고서 만들기</span>
+    </div>
+    <div class="stage t-edge">
+      <div class="tag">대안 2 <span class="badge b-rec">데이터 화면 추천</span></div><div class="name">③ 그라데이션 테두리 다크</div>
+      <div class="kpi"><div class="l">부채비율</div><div class="v num">94%</div><div class="d">▼ 124%p 개선</div></div>
+      <div class="kpi"><div class="l">영업이익률</div><div class="v num">6.3%</div><div class="d g">▲ 5.1%p</div></div>
+      <span class="btn">보고서 만들기</span>
+    </div>
+  </div>
+  <div class="row themes note">
+    <div>뒤 배경이 비치는 반투명 유리. 첫인상·로그인·팝업에 강함. 입력칸·표가 많으면 글자 대비가 떨어지고 화면이 무거워짐.</div>
+    <div>흐릿한 빛 번짐 바탕 위에 단단한 카드를 격자로. 요약 대시보드·고객 요약 1장에 좋음. 글자는 단단한 카드 위라 잘 읽힘.</div>
+    <div>검정 면에 얇은 청록→골드 테두리와 은은한 빛. 표·숫자가 많은 분석 화면에서 가장 또렷함. 고급스럽지만 과하면 게임처럼 보임.</div>
+  </div>
+
+  <h2>출력물(고객용 PDF)은 별도 — 흰 종이 + 블랙 글자 + 청록 포인트</h2>
+  <div class="row" style="grid-template-columns: minmax(0,1fr) minmax(0,2fr); align-items:center">
+    <div class="doc"><div class="h">경영개선 진단서</div>월평균 매출 1,850만원 · 고정비 720만원<div class="bar"></div><div class="bar" style="width:45%;background:var(--gold-deep)"></div>담당 경영컨설턴트</div>
+    <div class="note" style="margin:0">유리·그라데이션은 화면에만 씁니다. PDF·인쇄물은 흰 바탕에 블랙 글자를 유지하고, 그래프·강조선에만 진한 청록(#00A898)과 진한 골드(#E0A100)를 씁니다. 쨍한 청록·골드는 흰 종이에서 글자로 쓰면 잘 안 읽히기 때문입니다.</div>
+  </div>
+</div>
+</body>
+</html>
