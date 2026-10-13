@@ -5787,6 +5787,26 @@
   <style>
     #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 200px) minmax(0, 1fr) var(--l3c, 44%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
     #l3.hidden { display: none; }
+    /* 3단 보기에서는 맨 위 머리글을 쓰지 않는다 — 로고는 사이드바, 계정은 왼쪽 아래, 지원사업은 미리보기 전환 */
+    body.l3-on > header.no-print { display: none !important; }
+    #l3_brand { display: flex; align-items: center; height: 28px; margin: 2px 8px 22px; }
+    #l3_brand img { max-height: 26px; max-width: 150px; object-fit: contain; }
+    #l3_brand .chip { background: #fff; border-radius: 8px; padding: 4px 8px; display: inline-flex; }
+    #l3_brand b { font-size: 14px; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #l3 .l3-mode { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; gap: 2px; }
+    #l3 .l3-mode button { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; color: var(--t-text-3, #66635C); cursor: pointer; white-space: nowrap; }
+    #l3 .l3-mode button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    #l3_radar { flex: 1; overflow-y: auto; padding: 16px; }
+    #l3_preview.radar #l3_stage, #l3_preview.radar .l3-sheets, #l3_preview.radar .l3-print { display: none !important; }
+    #l3_preview:not(.radar) #l3_radar { display: none; }
+    /* 고객 불러오기 줄 (고객사 정보 스텝 맨 위) */
+    #l3 #client_bar { gap: 8px; }
+    #l3 #client_bar details { position: relative; }
+    #l3 #client_bar summary { list-style: none; cursor: pointer; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--t-line-2, #D6D3CA); font-weight: 700; }
+    #l3 #client_bar summary::-webkit-details-marker { display: none; }
+    #l3 #client_bar .more { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; min-width: 180px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+    #l3 #client_bar .more > * { text-align: left; border: 0 !important; }
+    @media (max-width: 1180px) { #l3_brand b { display: none; } }
     body.l3-on { overflow: hidden; }
     #l3_steps { background: var(--t-panel, #0A1F44); color: var(--t-panel-text, #fff); padding: 18px 12px; overflow-y: auto; }
     #l3_steps ol { list-style: none; margin: 0; padding: 0; position: relative; }
@@ -5846,8 +5866,8 @@
       if (new URLSearchParams(location.search).get('view') !== '3d') return;
       const STEPS = [
         ['내 정보', ['l3_me']],
-        ['진단 대상', ['client_bar', 'case_card', ':tier']],
-        ['기업·대표자', [':basic']],
+        ['고객사 정보', ['client_bar', ':basic']],
+        ['진단 대상', ['case_card', ':tier']],
         ['거래처·인증', [':trade']],
         ['대출', [':debt']],
         ['실태·재무', ['section_smb_input', 'section_sme_input']],
@@ -5902,10 +5922,10 @@
           const f = e.target.files[0]; if (!f) return;
           if (f.size > 400 * 1024) { alert('로고 파일은 400KB 이하로 올려 주세요.'); return; }
           const r = new FileReader();
-          r.onload = () => { const m = readMe(); m.logo = r.result; writeMe(m); fillMe(); live(); };
+          r.onload = () => { const m = readMe(); m.logo = r.result; writeMe(m); fillMe(); renderBrand(); live(); };
           r.readAsDataURL(f);
         });
-        document.getElementById('l3_me_logo_del').addEventListener('click', () => { const m = readMe(); m.logo = ''; writeMe(m); fillMe(); live(); });
+        document.getElementById('l3_me_logo_del').addEventListener('click', () => { const m = readMe(); m.logo = ''; writeMe(m); fillMe(); renderBrand(); live(); });
         // 서식 발신란: 내 정보에 적은 펌 정보가 있으면 그것을 쓴다
         const baseBrand = getBrand;
         getBrand = window.getBrand = function () {
@@ -5929,7 +5949,7 @@
 
         const shell = document.createElement('div');
         shell.id = 'l3';
-        shell.innerHTML = '<nav id="l3_steps" class="no-print"><ol></ol>' +
+        shell.innerHTML = '<nav id="l3_steps" class="no-print"><div id="l3_brand"></div><ol></ol>' +
           '<div id="l3_acct"><span class="av" id="l3_acct_av"></span><div class="who"><b id="l3_acct_name"></b><span id="l3_acct_mail"></span></div>' +
           '<button type="button" class="gear" id="l3_acct_gear" aria-label="계정 설정" title="계정 설정"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>' +
           '<div id="l3_menu"><button type="button" data-act="me">내 정보 수정</button><button type="button" data-act="admin" class="hidden">구성원·펌 관리</button><button type="button" data-act="theme">밝게 / 어둡게</button><button type="button" data-act="out" class="hidden">로그아웃</button></div></div></nav><div id="l3_input"></div>' +
@@ -5952,12 +5972,55 @@
         document.getElementById('l3_row1').remove();
         if (named[':action']) named[':action'].style.display = 'none';
         const row2 = document.getElementById('l3_row2');
+        const mode = document.createElement('div');
+        mode.className = 'l3-mode';
+        mode.innerHTML = '<button type="button" data-m="report" class="on">보고서</button><button type="button" data-m="radar">지원사업</button>';
+        row2.appendChild(mode);
         row2.appendChild(sheetBox);
         const pr = document.createElement('button');
         pr.type = 'button'; pr.className = 'l3-print'; pr.textContent = '전체 인쇄·PDF';
         pr.onclick = () => printAllReportsBatch();
         row2.appendChild(pr);
         document.getElementById('l3_paper').appendChild(document.getElementById('active_report_render_area'));
+        // 지원사업 연계 화면을 미리보기 칸 안으로
+        const radarBox = document.createElement('div');
+        radarBox.id = 'l3_radar';
+        document.getElementById('l3_preview').appendChild(radarBox);
+        const radar = document.getElementById('screen_radar');
+        radarBox.appendChild(radar);
+        radar.classList.remove('hidden');
+        function setMode(m) {
+          document.getElementById('l3_preview').classList.toggle('radar', m === 'radar');
+          mode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+          // 원래 화면 전환 함수가 지원사업 화면에 hidden 을 붙이므로 여기서 다시 연다
+          if (m === 'radar') { radar.classList.remove('hidden'); updateCategoryCounts(); renderRadarAnnouncements(); } else fit();
+        }
+        mode.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
+
+        // 고객 불러오기 줄: 자주 쓰는 것(불러오기·새 고객·저장)만 보이고 나머지는 더보기
+        const cbar = document.getElementById('client_bar');
+        cbar.querySelector('span.font-extrabold').textContent = '기존 고객 불러오기';
+        const more = document.createElement('details');
+        more.innerHTML = '<summary>더보기</summary><div class="more"></div>';
+        const moreBox = more.querySelector('.more');
+        [...cbar.querySelectorAll('button, label')].filter(el => /내보내기|가져오기|삭제/.test(el.textContent)).forEach(el => moreBox.appendChild(el));
+        const demo = document.createElement('button');
+        demo.type = 'button';
+        demo.className = 'px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 font-bold cursor-pointer';
+        demo.textContent = '작성 예시로 채우기';
+        demo.onclick = () => { more.open = false; loadDemoData(); };
+        moreBox.appendChild(demo);
+        cbar.insertBefore(more, document.getElementById('client_status'));
+        document.addEventListener('click', e => { if (!e.target.closest('#client_bar details')) more.open = false; });
+
+        // 사이드바 로고: 내 펌 로고가 있으면 그것, 없으면 CoStep
+        function renderBrand() {
+          const b = getBrand(), el = document.getElementById('l3_brand');
+          const costep = document.getElementById('brand_logo_dark');
+          if (b.logo) el.innerHTML = '<span class="chip"><img src="' + b.logo + '" alt=""></span>';
+          else if (costep) el.innerHTML = '<img src="' + costep.src + '" alt="CoStep">';
+          else el.innerHTML = '<b>' + escapeHtml(b.name) + '</b>';
+        }
 
         const ol = document.querySelector('#l3_steps ol');
         const box = document.getElementById('l3_input');
@@ -5969,7 +6032,7 @@
           const y = box.scrollTop + box.clientHeight * 0.35;
           let cur = 0;
           secs.forEach((s, i) => { if (s.offsetTop <= y) cur = i; });
-          [...ol.children].forEach((li, i) => { li.className = i < cur ? 'done' : i === cur ? 'now' : ''; li.querySelector('.n').textContent = i < cur ? '2713' : i + 1; });
+          [...ol.children].forEach((li, i) => { li.className = i < cur ? 'done' : i === cur ? 'now' : ''; li.querySelector('.n').textContent = i < cur ? String.fromCharCode(10003) : i + 1; });
         }
         box.addEventListener('scroll', () => requestAnimationFrame(markStep));
 
@@ -5998,8 +6061,8 @@
         });
         // 로그인 상태가 바뀌면(머리글 이름 갱신) 계정 상자와 내 정보 기본값을 다시 채운다
         const nameEl = document.getElementById('auth_user_name');
-        if (nameEl) new MutationObserver(() => { fillMe(); renderAcct(); }).observe(nameEl, { childList: true, characterData: true, subtree: true });
-        meCard.addEventListener('input', renderAcct);
+        if (nameEl) new MutationObserver(() => { fillMe(); renderAcct(); renderBrand(); }).observe(nameEl, { childList: true, characterData: true, subtree: true });
+        meCard.addEventListener('input', () => { renderAcct(); renderBrand(); });
 
         // 미리보기 폭에 맞춰 A4 를 줄인다. 줄인 만큼 높이도 맞춰 빈 스크롤이 생기지 않게
         const stage = document.getElementById('l3_stage'), paper = document.getElementById('l3_paper');
@@ -6041,8 +6104,7 @@
           g.addEventListener('dblclick', () => { if (g.dataset.k === '0') delete size.a; else delete size.c; applySize(size); try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (e) { /* 저장 불가 */ } layout(); });
         });
         function layout() {
-          const hdr = document.querySelector('header.no-print');
-          shell.style.top = (hdr ? hdr.getBoundingClientRect().bottom : 0) + 'px';
+          shell.style.top = '0px';
           placeGuts();
           box.style.setProperty('--l3h', box.clientHeight + 'px');
           fit(); markStep();
@@ -6062,17 +6124,17 @@
         // 화면 전환: 입력·서식은 3단 화면 하나로, 지원사업은 따로
         const orig = window.switchMainScreen;
         window.switchMainScreen = function (id) {
-          if (id === 'radar') { shell.classList.add('hidden'); document.body.classList.remove('l3-on'); placeGuts(); return orig('radar'); }
           orig('input');
           document.getElementById('screen_reports').classList.add('hidden');
           shell.classList.remove('hidden'); document.body.classList.add('l3-on');
           renderReportButtons(); renderActiveReport(); layout();
+          setMode(id === 'radar' ? 'radar' : 'report');
         };
         switchMainScreen = window.switchMainScreen;
         window.generateAndOpenReports = live;
         generateAndOpenReports = live;
         if (!window.appState.activeSheet) window.appState.activeSheet = 'all';
-        setTimeout(() => { fillMe(); renderAcct(); window.switchMainScreen('input'); }, 0);
+        setTimeout(() => { fillMe(); renderAcct(); renderBrand(); window.switchMainScreen('input'); }, 0);
       });
     })();
   </script>
