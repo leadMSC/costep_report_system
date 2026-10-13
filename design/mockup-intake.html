@@ -8,137 +8,122 @@
 <style>
   :root { --bg: #F6F5F1; --card: #FFFFFF; --line: #E4E2DB; --text: #0A0B0F; --sub: #66635C; --teal: #00A898; --teal-soft: rgba(0,168,152,.08); --gold-soft: #FFF6D6; --gold-line: #E8C34A; }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--line); background: var(--card); }
-  header img { height: 28px; }
-  header .me { margin-left: auto; font-size: 13px; color: var(--sub); }
-  main { max-width: 720px; margin: 36px auto 60px; padding: 0 16px; }
-  .flow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; font-size: 12px; color: var(--sub); }
-  .flow span { padding: 4px 10px; border-radius: 999px; background: #EDEBE5; }
-  .flow span.on { background: var(--text); color: #fff; font-weight: 700; }
-  h1 { font-size: 24px; font-weight: 900; margin: 0 0 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
-  h2 { font-size: 15px; font-weight: 700; margin: 0 0 16px; }
+  .top { position: sticky; top: 0; z-index: 10; background: var(--card); border-bottom: 1px solid var(--line); }
+  .bar1 { display: flex; align-items: center; padding: 10px 24px; }
+  .bar1 img { height: 26px; } .bar1 .me { margin-left: auto; font-size: 13px; color: var(--sub); }
+  .progress { display: flex; max-width: 900px; margin: 0 auto; padding: 0 16px 12px; gap: 4px; }
+  .progress button { flex: 1; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; text-align: center; }
+  .progress i { display: block; height: 6px; border-radius: 3px; background: #E4E2DB; margin-bottom: 6px; }
+  .progress span { font-size: 12px; color: var(--sub); white-space: nowrap; }
+  .progress .done i { background: var(--teal); } .progress .done span { color: var(--text); }
+  .progress .now i { background: var(--text); } .progress .now span { color: var(--text); font-weight: 700; }
+  main { max-width: 760px; margin: 28px auto 120px; padding: 0 16px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 24px; margin-bottom: 16px; scroll-margin-top: 110px; }
+  section.hidden { display: none; }
+  section.closed .body { display: none; }
+  .head { display: flex; align-items: center; gap: 10px; }
+  .num { width: 28px; height: 28px; border-radius: 50%; background: var(--text); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; flex: none; }
+  section.ok .num { background: var(--teal); }
+  h2 { font-size: 18px; font-weight: 900; margin: 0; }
+  .sum { margin-left: auto; font-size: 13px; color: var(--sub); }
+  .edit { margin-left: 10px; font-size: 13px; color: var(--teal); background: none; border: 0; cursor: pointer; font-weight: 700; display: none; }
+  section.closed .edit { display: inline; }
+  .body { margin-top: 18px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .full { grid-column: 1 / -1; }
   label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
   input, select { width: 100%; border: 1px solid #C9CED8; border-radius: 10px; padding: 11px 12px; font: inherit; font-size: 14px; background: #fff; }
-  input.filled { background: var(--gold-soft); border-color: var(--gold-line); }
-  .row { display: flex; gap: 10px; }
-  .btn { flex: 1; padding: 14px; border-radius: 12px; border: 1px solid #C9CED8; background: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .f.filled input, .f.filled select { background: var(--gold-soft); border-color: var(--gold-line); }
+  body.only-missing .f.filled { display: none; }
+  .go { display: flex; justify-content: flex-end; margin-top: 18px; gap: 10px; }
+  .btn { padding: 12px 22px; border-radius: 12px; border: 1px solid #C9CED8; background: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
   .btn.dark { background: var(--text); color: #fff; border-color: var(--text); }
-  .choice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .choice button { text-align: left; padding: 22px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); font: inherit; cursor: pointer; }
-  .choice button:hover { border-color: var(--teal); background: var(--teal-soft); }
-  .choice b { display: block; font-size: 17px; margin-bottom: 6px; }
-  .choice small { color: var(--sub); font-size: 13px; }
-  .drop { border: 2px dashed #D6D3CA; border-radius: 16px; padding: 32px 16px; text-align: center; color: var(--sub); background: var(--card); margin-bottom: 16px; }
-  .files { font-size: 14px; }
-  .files div { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .drop { border: 2px dashed #D6D3CA; border-radius: 16px; padding: 44px 16px; text-align: center; color: var(--sub); }
+  .drop b { display: block; font-size: 17px; color: var(--text); margin-bottom: 8px; }
+  .files div { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
   .files div:last-child { border: 0; }
-  .ok { color: var(--teal); font-weight: 700; white-space: nowrap; }
-  .no { color: var(--sub); white-space: nowrap; }
+  .ok-t { color: var(--teal); font-weight: 700; } .mute { color: var(--sub); }
+  .result { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--gold-soft); border: 1px solid var(--gold-line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+  .result label { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; font-weight: 700; cursor: pointer; }
+  .result input { width: auto; }
   .me-line { display: flex; align-items: center; gap: 16px; }
-  .me-line img { height: 40px; }
-  .me-line .who b { font-size: 18px; } .me-line .who div { color: var(--sub); font-size: 14px; margin-top: 2px; }
-  .report div { display: flex; justify-content: space-between; align-items: center; padding: 14px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .me-line img { height: 38px; }
+  .me-line b { font-size: 17px; } .me-line div div { color: var(--sub); font-size: 14px; margin-top: 2px; }
+  .report div { display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
   .report div:last-child { border: 0; }
   .report button { padding: 8px 14px; border-radius: 10px; border: 1px solid #C9CED8; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-  .note { font-size: 13px; color: var(--sub); margin: -6px 0 16px; }
-  @media (max-width: 600px) { .grid, .choice { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } .progress span { font-size: 10px; } .sum { display: none; } }
 </style>
 </head>
 <body>
-<header><img src="logo/costep-logo-horizontal-color.svg" alt="로고"><span class="me">코스텝 · 홍길동</span></header>
-<main id="app"></main>
+<div class="top">
+  <div class="bar1"><img src="logo/costep-logo-horizontal-color.svg" alt="로고"><span class="me">코스텝 · 홍길동</span></div>
+  <div class="progress" id="progress"></div>
+</div>
+<main id="stack"></main>
 <script>
-  const FLOW = ['내 정보 확인', '서류 올리기', '대표자', '사업장', '매출·비용', '대출·세금', '앞으로 계획', '리포트'];
-  const DOC_FLOW = ['내 정보 확인', '서류 올리기', '빠진 것만 채우기', '리포트'];
-  // 받는 서류와 채우는 칸 (사용자 지정 10종)
-  const DOCS = [
-    ['사업자등록증', '상호·사업자번호·대표자·개업일·주소·업태/종목', true],
-    ['사업자등록증명', '상호·사업자번호·대표자·개업일·주소·업태/종목·과세유형', true],
-    ['부가세 과세표준증명원', '월평균 매출·전년 매출', true],
-    ['3개년 표준재무제표', '매출·영업이익·부채·자본 (3년)', true],
-    ['법인등기부등본', '법인번호·설립일·자본금·대표 취임일', false],
-    ['주주명부', '대표 지분', false],
-    ['4대보험 가입자명부', '상시근로자 수 (인원만)', false],
-    ['부채원장', '대출: 금융기관·잔액·금리·만기', false],
-    ['채권자변동조회', '대출 기관·잔액 변동', false],
-    ['임대차계약서', '사업장 임차·보증금·월세·면적·만기', false]
+  // f(라벨, 서류로 채운 값) — 값이 있으면 노란 칸(서류값)
+  const f = (l, v = '', full = false) => `<div class="f ${v ? 'filled' : ''} ${full ? 'full' : ''}"><label>${l}</label><input value="${v}"></div>`;
+  const s = (l, opts, v = '') => `<div class="f ${v ? 'filled' : ''}"><label>${l}</label><select>${opts.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select></div>`;
+  let docs = false;
+  const D = (v) => docs ? v : '';
+  const SECTIONS = [
+    { id: 'me', name: '내 정보', sum: '홍길동 · 코스텝', body: () => `
+      <div class="me-line"><img src="logo/costep-logo-horizontal-color.svg" alt=""><div><b>홍길동 경영컨설턴트</b><div>코스텝 · 대표 박○○ · 문서번호 COSTEP</div><div>010-1234-5678 · hong@example.com</div></div></div>`, next: '맞아요' },
+    { id: 'docs', name: '서류', sum: '', body: () => `
+      <div class="drop" ondragover="event.preventDefault();this.style.borderColor='#00A898'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';dropped()">
+        <b>가지고 있는 서류를 전부 여기에 끌어다 놓으세요</b>종류·순서 상관없이 한꺼번에 · <button class="btn" style="padding:8px 14px" onclick="dropped()">파일 찾기</button>
+      </div><div id="got"></div>`, next: '다음', alt: '서류 없이 직접 입력' },
+    { id: 'ceo', name: '대표자', sum: '', body: () => `<div class="grid">
+      ${f('대표자 성명', D('김대성'))}${f('생년월일', D('1979-05-12'))}${s('사업자 구분', ['개인', '법인'], D('법인'))}${f('대표 지분 (%)', D('60'))}${f('동종 경력 (년)')}${f('연락처')}</div>` },
+    { id: 'site', name: '사업장', sum: '', body: () => `<div class="grid">
+      ${f('상호', D('(주)한빛정밀'))}${f('사업자등록번호', D('123-81-45678'))}${f('법인등록번호', D('110111-1234567'))}${f('개업일', D('2016-04-01'))}
+      ${f('업태·종목', D('제조 / 금속가공'))}${f('자본금 (만원)', D('5,000'))}${f('사업장 주소', D('경기 화성시 동탄기흥로 27'), true)}
+      ${s('사업장', ['임차', '자가'], D('임차'))}${f('보증금·월세 (만원)', D('3,000 / 250'))}${f('상시근로자 (명)', D('18'))}</div>` },
+    { id: 'money', name: '매출·비용', sum: '', body: () => `<div class="grid">
+      ${f('올해 매출 (백만원)', D('2,850'))}${f('작년 매출 (백만원)', D('2,520'))}${f('재작년 매출 (백만원)', D('2,150'))}${f('영업이익 (백만원)', D('180'))}
+      ${f('부채총계 (백만원)', D('585'))}${f('자본총계 (백만원)', D('620'))}${f('인건비 (만원/월)')}${f('관리비·공과금 (만원/월)')}</div>` },
+    { id: 'debt', name: '대출·세금', sum: '', body: () => `<div class="grid">
+      ${f('금융기관')}${f('잔액 (만원)')}${f('금리 (%)')}${f('만기일')}</div>
+      <p style="font-size:13px;color:var(--sub);margin:10px 0 14px">+ 대출 추가</p>
+      <div class="grid">${s('국세·지방세', ['선택', '완납', '체납 있음'])}${s('보증 이용', ['선택', '없음', '있음'])}</div>` },
+    { id: 'plan', name: '앞으로 계획', sum: '', body: () => `<div class="grid">
+      ${f('가장 급한 고민', '', true)}${f('필요 자금 (만원)')}${f('채용 계획 (명)')}${f('1년 목표 매출', '', true)}</div>`, next: '리포트 만들기' },
+    { id: 'report', name: '리포트', sum: '', body: () => `<div class="report">
+      <div><span>행정시행문</span><button>PDF 저장</button></div><div><span>진단 결과보고서</span><button>PDF 저장</button></div>
+      <div><span>실행안내서·구비서류</span><button>PDF 저장</button></div><div><span>사업계획 개요서</span><button>PDF 저장</button></div></div>
+      <div class="go"><button class="btn dark">전체 PDF 저장</button></div>`, last: true }
   ];
-  let mode = 'direct';
-  const f = (l, v = '', cls = '', full = false) => `<div class="${full ? 'full' : ''}"><label>${l}</label><input class="${cls}" value="${v}"></div>`;
-  const sel = (l, opts) => `<div><label>${l}</label><select>${opts.map(o => `<option>${o}</option>`).join('')}</select></div>`;
-  const flowBar = (list, on) => `<div class="flow">${list.map(x => `<span class="${x === on ? 'on' : ''}">${x}</span>`).join('')}</div>`;
-  const nav = (prev, next, label = '다음') => `<div class="row">${prev ? `<button class="btn" onclick="show('${prev}')">이전</button>` : ''}<button class="btn dark" onclick="show('${next}')">${label}</button></div>`;
-
-  const SCREENS = {
-    me: () => `${flowBar(FLOW, '내 정보 확인')}<h1>내 정보 확인</h1>
-      <div class="card"><div class="me-line"><img src="logo/costep-logo-horizontal-color.svg" alt=""><div class="who"><b>홍길동 경영컨설턴트</b><div>코스텝 · 대표 박○○ · 문서번호 COSTEP</div><div>010-1234-5678 · hong@example.com</div></div></div></div>
-      <div class="row"><button class="btn" onclick="show('meEdit')">수정</button><button class="btn dark" onclick="show('upload')">맞아요, 시작</button></div>`,
-    meEdit: () => `${flowBar(FLOW, '내 정보 확인')}<h1>내 정보 수정</h1>
-      <div class="card"><h2>소속 펌</h2><div class="grid">${f('상호', '코스텝')}${f('문서번호 접두어', 'COSTEP')}${f('대표', '박○○')}</div></div>
-      <div class="card"><h2>내 정보</h2><div class="grid">${f('이름', '홍길동')}${f('직함', '경영컨설턴트')}${f('전화', '010-1234-5678')}${f('메일', 'hong@example.com')}</div></div>
-      ${nav('', 'me', '저장')}`,
-    start: () => SCREENS.upload(),
-    _oldStart: () => `${flowBar(FLOW, '고객사 시작')}<h1>고객사 시작</h1>
-      <div class="choice">
-        <button onclick="mode='docs';show('upload')"><b>서류 올리고 시작</b><small>사업자등록증명·재무제표·부가세 증명 등을 올리면 자동으로 채우고, 빠진 것만 묻습니다</small></button>
-        <button onclick="mode='direct';show('ceo')"><b>직접 입력</b><small>대표자 → 사업장 → 매출·비용 → 대출·세금 → 앞으로 계획 순서로 입력합니다</small></button>
-      </div>`,
-    ceo: () => `${flowBar(FLOW, '대표자')}<h1>대표자</h1>
-      <div class="card"><div class="grid">${f('대표자 성명')}${f('생년월일')}${sel('사업자 구분', ['개인', '법인'])}${f('주주 지분 (대표 %)')}${f('동종 경력 (년)')}${f('연락처')}</div></div>
-      ${nav('start', 'site')}`,
-    site: () => `${flowBar(FLOW, '사업장')}<h1>사업장</h1>
-      <div class="card"><div class="grid">${f('상호')}${f('사업자등록번호')}${f('개업일')}${f('업태·종목')}${f('사업장 주소', '', '', true)}${sel('사업장', ['임차', '자가'])}${f('상시근로자 (명)')}</div></div>
-      ${nav('ceo', 'money')}`,
-    money: () => `${flowBar(FLOW, '매출·비용')}<h1>매출·비용</h1>
-      <div class="card"><div class="grid">${f('월평균 매출 (만원)')}${f('전년 매출 (만원)')}${f('임차료 (만원/월)')}${f('인건비 (만원/월)')}${f('관리비·공과금 (만원/월)')}${f('통신·렌탈 (만원/월)')}</div></div>
-      ${nav('site', 'debt')}`,
-    debt: () => `${flowBar(FLOW, '대출·세금')}<h1>대출·세금</h1>
-      <div class="card"><h2>대출</h2><div class="grid">${f('금융기관')}${f('잔액 (만원)')}${f('금리 (%)')}${f('만기일')}</div><p class="note" style="margin:12px 0 0">+ 대출 추가</p></div>
-      <div class="card"><div class="grid">${sel('국세·지방세', ['완납', '체납 있음'])}${sel('보증 이용', ['없음', '있음'])}</div></div>
-      ${nav('money', 'plan')}`,
-    plan: () => `${flowBar(FLOW, '앞으로 계획')}<h1>앞으로 계획</h1>
-      <div class="card"><div class="grid">${f('가장 급한 고민', '', '', true)}${f('필요 자금 (만원)')}${f('채용 계획 (명)')}${f('1년 목표 매출 (만원)', '', '', true)}</div></div>
-      ${nav('debt', 'report', '리포트 만들기')}`,
-    upload: () => `${flowBar(DOC_FLOW, '서류 올리기')}<h1>고객사 서류 올리기</h1>
-      <div class="drop" id="drop" style="padding:56px 16px" ondragover="event.preventDefault();this.style.borderColor='#00A898'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';dropped()">
-        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">가지고 있는 서류를 전부 여기에 끌어다 놓으세요</div>
-        종류·순서 상관없이 한꺼번에 · <button class="btn" style="flex:none;padding:8px 14px" onclick="dropped()">파일 찾기</button>
-      </div>
-      <div id="got"></div>
-      <div class="row"><button class="btn" onclick="show('ceo')">서류 없이 직접 입력</button><button class="btn dark" onclick="show('missing')">다음</button></div>`,
-    missing: () => `${flowBar(DOC_FLOW, '빠진 것만 채우기')}<h1>빠진 것만 채우기</h1>
-      <p class="note">서류로 23칸을 채웠습니다. 아래 6칸만 입력하면 리포트가 나옵니다.</p>
-      <div class="card"><div class="grid">${f('대표자 연락처')}${f('상시근로자 (명)')}${f('임차료 (만원/월)')}${f('인건비 (만원/월)')}${f('가장 급한 고민', '', '', true)}${f('필요 자금 (만원)')}</div></div>
-      <div class="card"><h2>서류에서 채운 값 (확인만)</h2><div class="grid">${f('상호', '한빛분식', 'filled')}${f('사업자등록번호', '123-45-67890', 'filled')}${f('개업일', '2018-03-02', 'filled')}${f('월평균 매출 (만원)', '1,850', 'filled')}</div></div>
-      ${nav('upload', 'report', '리포트 만들기')}`,
-    report: () => `${flowBar(mode === 'docs' ? DOC_FLOW : FLOW, '리포트')}<h1>리포트</h1>
-      <div class="card report">
-        <div><span>행정시행문</span><button>PDF 저장</button></div>
-        <div><span>진단 결과보고서</span><button>PDF 저장</button></div>
-        <div><span>실행안내서·구비서류</span><button>PDF 저장</button></div>
-        <div><span>사업계획 개요서</span><button>PDF 저장</button></div>
-      </div>
-      <div class="row"><button class="btn" onclick="show('start')">다른 고객사</button><button class="btn dark">전체 PDF 저장</button></div>`
-  };
-  // 끌어다 놓으면 시스템이 종류를 알아서 나눈다 (목업: 예시 결과)
-  const SORTED = [
-    ['사업자등록증명원.pdf', '사업자등록증명', '읽음'], ['표준재무제표 2025.pdf', '표준재무제표', '읽음'],
-    ['부가세과세표준증명원.pdf', '부가세 과세표준증명원', '읽음'], ['4대보험가입자명부.pdf', '4대보험 가입자명부', '읽음'],
-    ['주주명부확인서.pdf', '주주명부', '읽음'], ['법인등기부등본.pdf', '법인등기부등본', '사진 → 글자 인식'],
-    ['임대차계약서.pdf', '임대차계약서', '사진 → 글자 인식'], ['사업자등록증.pdf', '사업자등록증', '사진 → 글자 인식']
-  ];
-  function dropped() {
-    document.getElementById('got').innerHTML = `<div class="card files">${SORTED.map(([n, t, st]) => `<div><span>${n}</span><span><b>${t}</b> · <span class="${st === '읽음' ? 'ok' : 'no'}">${st}</span></span></div>`).join('')}</div>`;
+  let reached = 0;
+  function sectionHtml(sec, i) {
+    return `<section id="sec_${sec.id}" class="${i > reached ? 'hidden' : ''} ${i < reached ? 'closed ok' : ''}">
+      <div class="head"><span class="num">${i + 1}</span><h2>${sec.name}</h2><span class="sum">${i < reached ? (sec.sum || '완료') : ''}</span><button class="edit" onclick="reopen(${i})">수정</button></div>
+      <div class="body">${sec.body()}${sec.last ? '' : `<div class="go">${sec.alt ? `<button class="btn" onclick="docs=false;next(${i})">${sec.alt}</button>` : ''}<button class="btn dark" onclick="next(${i})">${sec.next || '다음'}</button></div>`}</div></section>`;
   }
-  function show(id) { document.getElementById('app').innerHTML = SCREENS[id](); window.scrollTo(0, 0); }
-  const q = new URLSearchParams(location.search).get('s');
-  if (q === 'upload' || q === 'missing') mode = 'docs';
-  show(q || 'me');
-  if (q === 'upload') dropped();
+  function render() {
+    document.getElementById('stack').innerHTML = SECTIONS.map(sectionHtml).join('');
+    document.getElementById('progress').innerHTML = SECTIONS.map((sec, i) => `<button class="${i < reached ? 'done' : i === reached ? 'now' : ''}" onclick="jump(${i})"><i></i><span>${sec.name}</span></button>`).join('');
+    if (docs && reached >= 1) showGot();
+  }
+  function next(i) { reached = Math.max(reached, i + 1); render(); document.getElementById('sec_' + SECTIONS[reached].id).scrollIntoView(); }
+  function reopen(i) { const el = document.getElementById('sec_' + SECTIONS[i].id); el.classList.remove('closed'); el.scrollIntoView(); }
+  function jump(i) { if (i <= reached) reopen(i); }
+  // 끌어다 놓으면 종류를 알아서 나누고, 읽은 값으로 아래 칸을 채운다 (목업: 예시 결과)
+  const SORTED = [['사업자등록증명원.pdf', '사업자등록증명', '읽음'], ['표준재무제표.pdf', '표준재무제표 3개년', '읽음'], ['부가세과세표준증명원.pdf', '부가세 과세표준증명원', '읽음'],
+    ['4대보험가입자명부.pdf', '4대보험 가입자명부', '읽음'], ['주주명부.pdf', '주주명부', '읽음'], ['법인등기부등본.pdf', '법인등기부등본', '읽음 (사진 → 글자 인식)'], ['임대차계약서.pdf', '임대차계약서', '읽음 (사진 → 글자 인식)']];
+  function showGot() {
+    const el = document.getElementById('got'); if (!el) return;
+    el.innerHTML = `<div class="files" style="margin-top:14px">${SORTED.map(([n, t, st]) => `<div><span>${n}</span><span><b>${t}</b> · <span class="ok-t">${st}</span></span></div>`).join('')}</div>
+      <div class="result">서류로 <b>22칸</b>을 채웠어요 (노란 칸). 빈칸 <b>12칸</b>만 채우면 됩니다.<label><input type="checkbox" ${document.body.classList.contains('only-missing') ? 'checked' : ''} onchange="document.body.classList.toggle('only-missing', this.checked)"> 빈칸만 보기</label></div>`;
+  }
+  function dropped() { docs = true; SECTIONS[1].sum = '서류 7건 · 22칸 채움'; render(); }
+  const q = new URLSearchParams(location.search);
+  if (q.get('docs')) { docs = true; SECTIONS[1].sum = '서류 7건 · 22칸 채움'; }
+  if (q.get('upto')) reached = Number(q.get('upto'));
+  if (q.get('missing')) document.body.classList.add('only-missing');
+  render();
 </script>
 </body>
 </html>
