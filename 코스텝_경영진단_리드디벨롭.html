@@ -7401,6 +7401,20 @@
     #l3_menu button:hover { background: var(--t-surface-3, #F1EFE9); }
     #l3_menu button.hidden { display: none; }
     @media (max-width: 1180px) { #l3_acct .who { display: none; } #l3_acct { flex-direction: column; padding: 6px; } }
+    /* 사이드바 맨 위 브랜드 묶음 — 스텝 목록과 같은 격자에 맞춘다
+       · 좌우 안쪽 8px(스텝 줄과 같음) → 로고 마크 중심 ≈ 스텝 번호 동그라미 중심, 'MSC' 시작 = 스텝 이름 시작(54px)
+       · 로고 높이 28px, 접기 버튼도 28px 로 같은 줄 가운데, 오른쪽 끝 = 스텝 줄 오른쪽 끝
+       · 접기 버튼은 계정 상자 톱니바퀴와 같은 모양(테두리 없이, 올리면 옅은 바탕) */
+    #l3 #l3_brand { display: flex; flex-direction: row; align-items: flex-start !important; gap: 8px; margin: 2px 0 20px; padding: 0 11px 0 6px; }   /* 오른쪽 11px: 접기 버튼 중심 = 계정 상자 톱니바퀴 중심 */
+    #l3 #l3_brand .lkbox { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+    #l3 #l3_brand .lk { height: 28px; width: auto; display: block; }
+    #l3 #l3_brand .pw { font-size: 10px; font-weight: 600; letter-spacing: .03em; color: rgba(255,255,255,.5); margin-top: 4px; padding-left: 35.5px; line-height: 1.2; white-space: nowrap; }
+    #l3 #l3_fold { margin: 0 0 0 auto; width: 28px; height: 28px; border-radius: 8px; border: 0; box-shadow: none; background: transparent; color: rgba(255,255,255,.65); }
+    #l3 #l3_fold:hover { background: rgba(255,255,255,.1); color: #fff; }
+    #l3 #l3_fold svg { width: 17px; height: 17px; }
+    #l3.folded #l3_brand { flex-direction: column; align-items: center !important; gap: 10px; padding: 0; margin-bottom: 18px; }
+    #l3.folded #l3_brand .em { width: 32px; height: 32px; }
+    #l3.folded #l3_fold { margin: 0; }
     #l3_input #screen_input > .l3-step { min-height: var(--l3h, 100vh); box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 24px 28px; margin: 0; }
     #l3_input #screen_input > .l3-step > * { margin: 0 !important; }
     #l3_preview { display: flex; flex-direction: column; min-width: 0; background: var(--t-surface-3, #F1EFE9); border-left: 1px solid var(--t-line, #E4E2DB); position: relative; }
@@ -7691,16 +7705,12 @@
         // 사이드바 로고: 내 펌 로고가 있으면 그것, 없으면 CoStep
         // 서비스 로고(MSC report)는 고정 — 펌 로고는 서식·내 정보에서만 쓴다. 아래에 powered by COSTEP
         function renderBrand() {
-          const wide = (document.getElementById('l3_steps')?.offsetWidth || 200) >= 264;   // 로고 폭 240px 이상 확보될 때만 부제(powered by COSTEP) 포함판
+          // 로고는 부제 없는 조합형(높이 28px) + 그 아래 'MSC' 시작에 맞춘 부제 글자 — 사이드바 폭이 달라도 같은 모양
           document.getElementById('l3_brand').innerHTML =
-            `<span class="lkbox"><img class="lk" src="brand/msc-lockup-horizontal-dark${wide ? '' : '-nosub'}.svg" alt="MSC report${wide ? ' — powered by COSTEP' : ''}">` +
-            (wide ? '' : '<span class="pw">powered by COSTEP</span>') + '</span>' +
+            '<span class="lkbox"><img class="lk" src="brand/msc-lockup-horizontal-dark-nosub.svg" alt="MSC report"><span class="pw">powered by COSTEP</span></span>' +
             '<img class="em" src="brand/msc-emblem-color-ondark.svg" alt="MSC report">' +
             '<button type="button" id="l3_fold" aria-label="사이드바 접기" title="사이드바 접기/펴기"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M9.5 4v16"/><path d="M5.6 8.5h1.6M5.6 11.5h1.6"/></svg></button>';
           document.getElementById('l3_fold').onclick = () => setFold(!shell.classList.contains('folded'));
-          const lkImg = document.querySelector('#l3_brand .lk'), pwEl = document.querySelector('#l3_brand .pw');
-          const alignPw = () => { if (pwEl && lkImg.offsetWidth) pwEl.style.paddingLeft = Math.round(lkImg.offsetWidth * 305 / 1091) + 'px'; };
-          if (lkImg) { if (lkImg.complete) alignPw(); else lkImg.onload = alignPw; }
         }
         // 사이드바 접기 상태는 이 PC에 기억
         const FOLD_KEY = 'MSC_L3_FOLD_V1';
