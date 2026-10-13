@@ -52,8 +52,8 @@
 <header><img src="logo/costep-logo-horizontal-color.svg" alt="로고"><span class="me">코스텝 · 홍길동</span></header>
 <main id="app"></main>
 <script>
-  const FLOW = ['내 정보 확인', '고객사 시작', '대표자', '사업장', '매출·비용', '대출·세금', '앞으로 계획', '리포트'];
-  const DOC_FLOW = ['내 정보 확인', '고객사 시작', '서류 올리기', '빠진 것만 채우기', '리포트'];
+  const FLOW = ['내 정보 확인', '서류 올리기', '대표자', '사업장', '매출·비용', '대출·세금', '앞으로 계획', '리포트'];
+  const DOC_FLOW = ['내 정보 확인', '서류 올리기', '빠진 것만 채우기', '리포트'];
   // 받는 서류와 채우는 칸 (사용자 지정 10종)
   const DOCS = [
     ['사업자등록증', '상호·사업자번호·대표자·개업일·주소·업태/종목', true],
@@ -76,12 +76,13 @@
   const SCREENS = {
     me: () => `${flowBar(FLOW, '내 정보 확인')}<h1>내 정보 확인</h1>
       <div class="card"><div class="me-line"><img src="logo/costep-logo-horizontal-color.svg" alt=""><div class="who"><b>홍길동 경영컨설턴트</b><div>코스텝 · 대표 박○○ · 문서번호 COSTEP</div><div>010-1234-5678 · hong@example.com</div></div></div></div>
-      <div class="row"><button class="btn" onclick="show('meEdit')">수정</button><button class="btn dark" onclick="show('start')">맞아요, 시작</button></div>`,
+      <div class="row"><button class="btn" onclick="show('meEdit')">수정</button><button class="btn dark" onclick="show('upload')">맞아요, 시작</button></div>`,
     meEdit: () => `${flowBar(FLOW, '내 정보 확인')}<h1>내 정보 수정</h1>
       <div class="card"><h2>소속 펌</h2><div class="grid">${f('상호', '코스텝')}${f('문서번호 접두어', 'COSTEP')}${f('대표', '박○○')}</div></div>
       <div class="card"><h2>내 정보</h2><div class="grid">${f('이름', '홍길동')}${f('직함', '경영컨설턴트')}${f('전화', '010-1234-5678')}${f('메일', 'hong@example.com')}</div></div>
       ${nav('', 'me', '저장')}`,
-    start: () => `${flowBar(FLOW, '고객사 시작')}<h1>고객사 시작</h1>
+    start: () => SCREENS.upload(),
+    _oldStart: () => `${flowBar(FLOW, '고객사 시작')}<h1>고객사 시작</h1>
       <div class="choice">
         <button onclick="mode='docs';show('upload')"><b>서류 올리고 시작</b><small>사업자등록증명·재무제표·부가세 증명 등을 올리면 자동으로 채우고, 빠진 것만 묻습니다</small></button>
         <button onclick="mode='direct';show('ceo')"><b>직접 입력</b><small>대표자 → 사업장 → 매출·비용 → 대출·세금 → 앞으로 계획 순서로 입력합니다</small></button>
@@ -102,10 +103,13 @@
     plan: () => `${flowBar(FLOW, '앞으로 계획')}<h1>앞으로 계획</h1>
       <div class="card"><div class="grid">${f('가장 급한 고민', '', '', true)}${f('필요 자금 (만원)')}${f('채용 계획 (명)')}${f('1년 목표 매출 (만원)', '', '', true)}</div></div>
       ${nav('debt', 'report', '리포트 만들기')}`,
-    upload: () => `${flowBar(DOC_FLOW, '서류 올리기')}<h1>서류 올리기</h1>
-      <div class="drop">여기에 서류를 한꺼번에 끌어다 놓거나 <button class="btn" style="flex:none;padding:8px 14px;margin-left:6px">파일 찾기</button></div>
-      <div class="card files">${DOCS.map(([n, fields, got]) => `<div><span><b>${n}</b><br><small style="color:var(--sub)">${fields}</small></span><span class="${got ? 'ok' : 'no'}">${got ? '읽음' : '없음'}</span></div>`).join('')}</div>
-      ${nav('start', 'missing')}`,
+    upload: () => `${flowBar(DOC_FLOW, '서류 올리기')}<h1>고객사 서류 올리기</h1>
+      <div class="drop" id="drop" style="padding:56px 16px" ondragover="event.preventDefault();this.style.borderColor='#00A898'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';dropped()">
+        <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">가지고 있는 서류를 전부 여기에 끌어다 놓으세요</div>
+        종류·순서 상관없이 한꺼번에 · <button class="btn" style="flex:none;padding:8px 14px" onclick="dropped()">파일 찾기</button>
+      </div>
+      <div id="got"></div>
+      <div class="row"><button class="btn" onclick="show('ceo')">서류 없이 직접 입력</button><button class="btn dark" onclick="show('missing')">다음</button></div>`,
     missing: () => `${flowBar(DOC_FLOW, '빠진 것만 채우기')}<h1>빠진 것만 채우기</h1>
       <p class="note">서류로 23칸을 채웠습니다. 아래 6칸만 입력하면 리포트가 나옵니다.</p>
       <div class="card"><div class="grid">${f('대표자 연락처')}${f('상시근로자 (명)')}${f('임차료 (만원/월)')}${f('인건비 (만원/월)')}${f('가장 급한 고민', '', '', true)}${f('필요 자금 (만원)')}</div></div>
@@ -120,10 +124,21 @@
       </div>
       <div class="row"><button class="btn" onclick="show('start')">다른 고객사</button><button class="btn dark">전체 PDF 저장</button></div>`
   };
+  // 끌어다 놓으면 시스템이 종류를 알아서 나눈다 (목업: 예시 결과)
+  const SORTED = [
+    ['사업자등록증명원.pdf', '사업자등록증명', '읽음'], ['표준재무제표 2025.pdf', '표준재무제표', '읽음'],
+    ['부가세과세표준증명원.pdf', '부가세 과세표준증명원', '읽음'], ['4대보험가입자명부.pdf', '4대보험 가입자명부', '읽음'],
+    ['주주명부확인서.pdf', '주주명부', '읽음'], ['법인등기부등본.pdf', '법인등기부등본', '사진 → 글자 인식'],
+    ['임대차계약서.pdf', '임대차계약서', '사진 → 글자 인식'], ['사업자등록증.pdf', '사업자등록증', '사진 → 글자 인식']
+  ];
+  function dropped() {
+    document.getElementById('got').innerHTML = `<div class="card files">${SORTED.map(([n, t, st]) => `<div><span>${n}</span><span><b>${t}</b> · <span class="${st === '읽음' ? 'ok' : 'no'}">${st}</span></span></div>`).join('')}</div>`;
+  }
   function show(id) { document.getElementById('app').innerHTML = SCREENS[id](); window.scrollTo(0, 0); }
   const q = new URLSearchParams(location.search).get('s');
   if (q === 'upload' || q === 'missing') mode = 'docs';
   show(q || 'me');
+  if (q === 'upload') dropped();
 </script>
 </body>
 </html>
