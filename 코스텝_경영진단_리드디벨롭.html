@@ -1020,8 +1020,9 @@
             <span>중소기업 최근 3개년 표준재무제표 및 대표자 신용평점</span>
             <button type="button" onclick="openDocsModal && openDocsModal()" class="no-print ml-auto px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer">재무제표 올리기</button>
           </h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs border-collapse border border-slate-200">
+          <div class="fold-wrap">
+          <div id="fs_fold" class="fold-box overflow-x-auto">
+            <table class="w-full text-xs border-collapse border border-slate-200 fs-tight">
               <thead>
                 <tr class="bg-slate-100 font-bold text-slate-700 text-center">
                   <th class="p-2 border border-slate-200 w-1/4">결산 재무 항목 (백만원)</th>
@@ -1067,7 +1068,7 @@
                   <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">자본금</td>
                   <td class="p-1.5 border border-slate-200"><input type="text" id="sme_capital_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_capital_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_capital" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
                 </tr>
-                <tr class="fin-more">
+                <tr class="fin-more" data-fold-start>
                   <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">단기차입금</td>
                   <td class="p-1.5 border border-slate-200"><input type="text" id="sme_st_loan_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_st_loan_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_st_loan" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
                 </tr>
@@ -1110,13 +1111,18 @@
               </tbody>
             </table>
           </div>
+          <button type="button" class="fold-btn no-print" data-fold="fs_fold" aria-expanded="false" aria-label="표 펼치기"><svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l7 6 7-6"/></svg></button>
+          </div>
           <div id="fin_ind_box" class="fin-ind">
             <div class="flex items-center gap-2 mb-1.5">
               <span class="text-xs font-extrabold text-slate-900 mr-auto">주요 재무지표 <span class="font-medium text-slate-500">(입력값으로 자동 계산)</span></span>
               <label class="text-[11px] text-slate-600">당기 결산연도</label>
               <input type="text" id="sme_fy_y1" value="" placeholder="예: 2025" maxlength="4" oninput="this.value=this.value.replace(/\D/g,''); syncCompanyData();" class="form-input-control !w-20 text-center font-mono text-xs">
             </div>
-            <div id="fin_ind_table"></div>
+            <div class="fold-wrap">
+              <div id="fin_ind_table" class="fold-box"></div>
+              <button type="button" class="fold-btn no-print" data-fold="fin_ind_table" aria-expanded="false" aria-label="표 펼치기"><svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l7 6 7-6"/></svg></button>
+            </div>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div>
@@ -3919,17 +3925,63 @@
       if (compact && !rows.length && m.limit === null) return '';
       const cls = compact ? 'p-1 border border-slate-300' : 'px-2 py-1.5 border border-slate-200';
       return `<table class="w-full ${compact ? 'text-[9.5px]' : 'text-xs'} border-collapse text-center fin-ind-t"><thead><tr class="bg-slate-100 font-bold text-slate-800"><th class="${cls} text-left">${compact ? '주요 재무지표' : '지표'}</th>${hdr.map((h, i) => `<th class="${cls}${i === 2 ? ' text-[#0f766e]' : ''}">${h}</th>`).join('')}</tr></thead><tbody>` +
-        rows.map(([n, vals, u]) => `<tr><td class="${cls} text-left font-bold text-slate-700">${n}</td>${vals.map((v, i) => `<td class="${cls} font-mono${i === 2 ? ' font-black' : ''}">${fmtInd(v, u)}</td>`).join('')}</tr>`).join('') +
+        rows.map(([n, vals, u]) => `<tr${!compact && n === '매출 대비 차입금' ? ' data-fold-start' : ''}><td class="${cls} text-left font-bold text-slate-700">${n}</td>${vals.map((v, i) => `<td class="${cls} font-mono${i === 2 ? ' font-black' : ''}">${fmtInd(v, u)}</td>`).join('')}</tr>`).join('') +
         `<tr><td class="${cls} text-left font-bold text-slate-700">운전자금 한도 참고</td><td colspan="3" class="${cls} text-left">${m.limit === null ? '<span class="text-slate-400">—</span>' : Math.round(m.limit).toLocaleString() + '백만원'} <span class="text-slate-500">(${m.limitRule})</span></td></tr></tbody></table>`;
     }
     window.finIndTableHtml = finIndTableHtml;
     function renderFinInd() {
-      const box = document.getElementById('fin_ind_table'); if (box) box.innerHTML = finIndTableHtml(false);
+      const box = document.getElementById('fin_ind_table'); if (box) { box.innerHTML = finIndTableHtml(false); foldFit(box); }
       const m = computeFinIndicators();
       const ths = document.querySelectorAll('#section_sme_input table thead th');
       if (ths.length >= 4) ['Y-3 결산 (전전기)', 'Y-2 결산 (전기)', 'Y-1 결산 (당기)'].forEach((t, i) => { ths[i + 1].textContent = m.years ? `${m.years[i]}년 결산${i === 2 ? ' (당기)' : ''}` : t; });
     }
     window.renderFinInd = renderFinInd;
+
+    // 긴 표 접기: 기본은 data-fold-start 행 앞까지만 보이고, 표 아래 얇은 화살표를 누르면 부드럽게 늘어난다
+    function foldLimit(box) {
+      const start = box.querySelector('[data-fold-start]');
+      return start ? Math.round(start.getBoundingClientRect().top - box.getBoundingClientRect().top) : null;
+    }
+    function foldFit(box, animate) {
+      if (!box || !box.getClientRects().length) return;
+      const btn = box.parentElement.querySelector('.fold-btn');
+      const open = box.classList.contains('open');
+      const lim = foldLimit(box);
+      if (btn) btn.hidden = lim === null;
+      // 접힌 칸에 값이 있으면 화살표를 진하게(숨은 내용이 있다는 표시)
+      if (btn) btn.classList.toggle('has', !open && [...box.querySelectorAll('[data-fold-start], [data-fold-start] ~ tr')].some(tr => [...tr.querySelectorAll('input')].some(i => i.value.trim()) || /\d/.test([...tr.cells].slice(1).map(c => c.textContent).join(''))));
+      if (lim === null) { box.style.height = ''; return; }
+      const target = open ? box.scrollHeight : lim;
+      if (!animate) { box.style.transition = 'none'; box.style.height = target + 'px'; void box.offsetHeight; box.style.transition = ''; return; }
+      box.style.height = box.getBoundingClientRect().height + 'px'; void box.offsetHeight;
+      box.style.height = target + 'px';
+    }
+    function foldToggle(box, open) {
+      box.classList.toggle('open', open);
+      const btn = box.parentElement.querySelector('.fold-btn');
+      if (btn) { btn.setAttribute('aria-expanded', open); btn.setAttribute('aria-label', open ? '표 접기' : '표 펼치기'); }
+      foldFit(box, true);
+      // 펼치면 새로 보이는 행까지 화면 안으로 부드럽게 따라 내려간다
+      if (open && btn) setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 280);
+    }
+    window.foldFit = foldFit;
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.fold-btn'); if (!btn) return;
+      const box = document.getElementById(btn.dataset.fold); if (box) foldToggle(box, !box.classList.contains('open'));
+    });
+    // Tab 키로 접힌 칸에 들어가면 저절로 펼침
+    document.addEventListener('focusin', e => {
+      const box = e.target.closest && e.target.closest('.fold-box');
+      if (box && !box.classList.contains('open') && e.target.closest('[data-fold-start], [data-fold-start] ~ tr')) foldToggle(box, true);
+    });
+    const foldAll = () => document.querySelectorAll('.fold-box').forEach(b => foldFit(b));
+    // 숨어 있던 카드가 보일 때(규모 전환 등)·창 크기 바뀔 때 높이를 다시 잼
+    document.addEventListener('DOMContentLoaded', () => {
+      window.addEventListener('resize', () => { clearTimeout(window.__foldT); window.__foldT = setTimeout(foldAll, 120); });
+      if (window.ResizeObserver) { const ro = new ResizeObserver(foldAll); document.querySelectorAll('.fold-wrap').forEach(w => ro.observe(w.parentElement)); }
+      document.getElementById('section_sme_input')?.addEventListener('input', () => foldFit(document.getElementById('fs_fold')));
+      setTimeout(foldAll, 0);
+    });
     document.addEventListener('DOMContentLoaded', () => {
       const sec = document.getElementById('section_sme_input'); if (!sec) return;
       ['input', 'change'].forEach(t => sec.addEventListener(t, () => renderFinInd()));
@@ -6202,6 +6254,21 @@
     .ip-row .ip-del:hover { background: #FEF2F2; color: #DC2626; }
     .ip-row .form-input-control { padding: 6px 8px; font-size: 12px; min-width: 0; }
     /* 주요 재무지표 */
+    /* 긴 표 접기 */
+    .fold-box { overflow: hidden; transition: height .32s cubic-bezier(.2,.7,.2,1); }
+    .fold-box.overflow-x-auto { overflow-x: auto; overflow-y: hidden; }
+    .fold-btn { display: flex; width: 100%; height: 16px; align-items: center; justify-content: center; margin-top: -1px; border: 1px solid #E2E8F0; border-top: 0; border-radius: 0 0 10px 10px; background: linear-gradient(#F8FAFC, #F1F5F9); color: #94A3B8; cursor: pointer; transition: color .15s, background .15s; }
+    .fold-btn:hover { color: #0f766e; background: #ECFDF5; }
+    .fold-btn.has { color: #0f766e; }
+    .fold-btn svg { transition: transform .32s; }
+    .fold-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+    .fold-btn[hidden] { display: none; }
+    .fin-ind .fold-btn { background: #fff; }
+    /* 재무제표 표 셀 높이 줄임 */
+    .fs-tight td { padding-top: 2px !important; padding-bottom: 2px !important; }
+    .fs-tight th { padding-top: 5px !important; padding-bottom: 5px !important; }
+    .fs-tight .form-input-control { padding-top: 3px; padding-bottom: 3px; }
+    @media print { .fold-box { height: auto !important; } }
     .fin-ind { border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; background: #F8FAFC; }
     .fin-ind-t td, .fin-ind-t th { white-space: nowrap; }
     /* 내용 길이만큼 늘어나는 글 칸 */
