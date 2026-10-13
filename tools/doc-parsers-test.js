@@ -35,6 +35,39 @@ ok('대출표 변환', () => {
   const d = P.toDebtItems(L); assert.strictEqual(d.length, 3); assert.strictEqual(d[0].balance, 20000); assert.strictEqual(d[0].rate, '');
   const c = P.toDebtItems(C); assert.ok(c[0].type.startsWith('대표자 개인'));
 });
+// 사진 글자 인식(합성 글 — 실제 사진·번호 아님)
+ok('주민번호 뒷자리 가리기(잡음 포함)', () => {
+  const r = P.redact(['홍길동 (洪吉童)', '800101-1234567', '800101 - 12345)7', '금액 120000 -45000'].join('\n'));
+  assert.ok(!/1234567|12345\)7/.test(r));
+  assert.ok(/800101-\*{7}/.test(r));
+  assert.ok(/120000 -45000/.test(r), '금액은 지우지 않음');
+});
+ok('신분증: 이름·생년월일(세기 추정)·번호 미노출', () => {
+  const t = ['JT 논 스 독스', '홍길동 (ERR)', '800101-1234567', '서울특별시 중구 시험로 1', '2020. 01. 02.', '서울특별시 중구청장'].join('\n');
+  const r = P.parseTextDocument(t, 'a.jpg');
+  assert.strictEqual(r.kind, 'idcard');
+  assert.strictEqual(r.fields.corp_ceo, '홍길동');
+  assert.strictEqual(r.fields.corp_ceo_birth, '1980-01-01');
+  assert.ok(!/1234567/.test(JSON.stringify(r)));
+});
+ok('임대차: 금액(₩ 오독)·월세·주거 판별', () => {
+  const t = ['아파트임대차계약서', '용도 공동주택(아파트) 전용면적 84.9133㎡', '[글 | 金 삼천만원정 (#30,000,000)',
+    '[를 | 金 일백만원정 (¥1,000,000) 은 계약시', '술 이천구백만원정 (%29,000,000) 은', '술 일백이십만원정 (\\1,200,000) 은 후불로 매월 25일에 지불한다.'].join('\n');
+  const r = P.parseTextDocument(t, 'b.jpg');
+  assert.strictEqual(r.kind, 'lease');
+  assert.strictEqual(r.fields.corp_house, '임차 거주 (월세)');
+  assert.ok(r.notes.some(x => /보증금 3,000만원$/.test(x)));
+  assert.ok(r.notes.some(x => /월세 120만원/.test(x)));
+});
+ok('한글 금액', () => {
+  assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
+  assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);
+  assert.strictEqual(P.koreanAmount('일억 이천만'), 120000000);
+});
+ok('사업자등록번호 검증식', () => {
+  assert.strictEqual(P.bizNoValid('220-81-62517'), true);
+  assert.strictEqual(P.bizNoValid('123-45-67890'), false);
+});
 console.log(`\n${n}개 통과`);
 
 // 앱(HTML) 안에 넣은 해석기가 tools/doc-parsers.js 와 같은지

@@ -249,6 +249,7 @@
     ['creditor', '채권자변동정보 조회서', t => /채권자변동/.test(t)],
     ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
     ['lease', '임대차계약서', t => /임대차/.test(t)],
+    ['idcard', '신분증', t => /주민등록증|운전면허증|신분증/.test(t)],
     ['bizreg', '사업자등록증', t => /사업자등록증/.test(t)]
   ];
   function classify(rows, fileName) {
@@ -359,6 +360,118 @@
     return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
   }
 
+  // ───────── 사진·스캔(글자 인식) 서류 ─────────
+  // 개인정보 가리기: 주민·외국인등록번호 뒷자리는 읽자마자 지운다(앞 6자리가 날짜 꼴일 때만 — 금액 오인 방지)
+  function redact(text) {
+    const dateLike = s => { const m = +s.slice(2, 4), d = +s.slice(4, 6); return m >= 1 && m <= 12 && d >= 1 && d <= 31; };
+    return String(text || '')
+      // 뒷자리는 OCR 이 ) | l 같은 잡음을 섞어 읽기도 하므로 그런 글자까지 함께 지운다
+      .replace(/(^|[^\d])(\d{6})\s*[-–—~_.]\s*([1-8][\d)(|lIoO*]{4,9})/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
+      .replace(/(^|[^\d])(\d{6})\s+([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
+      .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**');   // 운전면허번호
+  }
+  // 줄 → 칸: 공백 2칸 이상이나 | 로 나눔
+  const textRows = text => String(text || '').split(/\r?\n/).map(l => l.split(/\s{2,}|\|/).map(norm).filter(Boolean)).filter(r => r.length);
+
+  // 한글 금액(삼천만원정, 일백이십만원) → 원
+  function koreanAmount(s) {
+    const D = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 }, U = { 십: 10, 백: 100, 천: 1000 }, B = { 만: 1e4, 억: 1e8 };
+    let total = 0, block = 0, num = 0, hit = false;
+    for (const ch of String(s).replace(/[^일이삼사오육칠팔구십백천만억]/g, '')) {
+      hit = true;
+      if (D[ch]) num = D[ch];
+      else if (U[ch]) { block += (num || 1) * U[ch]; num = 0; }
+      else if (B[ch]) { total += (block + num || 1) * B[ch]; block = 0; num = 0; }
+    }
+    return hit ? total + block + num : null;
+  }
+  // 계약서 금액 한 줄: 괄호 안 숫자 우선(₩ 기호는 OCR 에서 ¥ % # \ 로 바뀜), 없으면 한글 금액
+  function amountOfLine(l) {
+    const m = l.match(/\(\s*[^\d\s(]{0,2}\s*([\d][\d,.\s]{3,})\s*\)/);
+    if (m) { const v = Number(m[1].replace(/[^\d]/g, '')); if (v) return v; }
+    const k = l.match(/([일이삼사오육칠팔구십백천만억]{2,})\s*원/);
+    return k ? koreanAmount(k[1]) : null;
+  }
+
+  // 임대차계약서: 보증금·월세·전용면적·용도(주택이면 대표자 주거 형태, 사업장이면 임차료)
+  function parseLease(text) {
+    const lines = String(text).split(/\r?\n/).map(norm).filter(Boolean);
+    const amt = lines.filter(l => /원\s*정|원정|\(\s*[^\d\s]{0,2}\s*\d[\d,]{5,}\s*\)/.test(l)).map(l => ({ l, v: amountOfLine(l) })).filter(x => x.v);
+    const monthlyLine = amt.find(x => /후불|선불|매월|월\s*세|차\s*임/.test(x.l));
+    const deposit = amt.find(x => x !== monthlyLine);
+    const others = amt.filter(x => x !== monthlyLine && x !== deposit).map(x => x.v);
+    // 계약금 + 잔금(+중도금) = 보증금 이면 높은 정확도
+    const sumOk = deposit && others.length >= 2 && others.reduce((a, b) => a + b, 0) === deposit.v;
+    const all = despace(lines.join(''));
+    const area = (lines.join(' ').match(/전용\s*면적[^\d]{0,12}(\d{1,4}(?:\.\d{1,4})?)/) || lines.join(' ').match(/(\d{1,4}\.\d{2,4})\s*(?:㎡|m2|m²)/) || [])[1];
+    const residential = /주택|아파트|공동주택|다세대|오피스텔.*주거|원룸/.test(all);
+    const f = {}, meta = {}, info = [];
+    if (residential) {
+      // 대표자 개인 주거 계약 → 주택 소유형태
+      f.corp_house = monthlyLine && monthlyLine.v ? '임차 거주 (월세)' : '임차 거주 (전세)';
+      meta.corp_house = { conf: 0.7, note: '주거용 계약 — 대표자 본인 계약인지 확인' };
+    } else if (monthlyLine) {
+      f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e4));
+      meta.smb_cost_rent = { conf: 0.7, src: monthlyLine.v, note: '부가세 별도 여부 확인' };
+    }
+    if (deposit) info.push('보증금 ' + Math.round(deposit.v / 1e4).toLocaleString('ko-KR') + '만원' + (sumOk ? '' : ' (확인 필요)'));
+    if (monthlyLine) info.push('월세 ' + Math.round(monthlyLine.v / 1e4).toLocaleString('ko-KR') + '만원');
+    if (area) info.push('전용면적 ' + area + '㎡ (약 ' + (Number(area) / 3.3058).toFixed(1) + '평)');
+    const notes = [residential ? '주거용 임대차' : '사업장 임대차'].concat(info);
+    if (!amt.length) notes.push('금액을 찾지 못했어요');
+    return { fields: f, meta, notes };
+  }
+
+  // 신분증(주민등록증·운전면허증): 이름, 생년월일(앞 6자리 — 세기는 추정). 주소는 저장하지 않고 참고만
+  function parseIdCard(text) {
+    const t = redact(text);
+    const lines = t.split(/\r?\n/).map(norm).filter(Boolean);
+    const f = {}, meta = {};
+    const nm = t.match(/([가-힣]{2,4})\s*\(\s*[^\s)]{1,8}\s*\)/) || t.match(/성\s*명\s*[:：]?\s*([가-힣]{2,4})/);
+    if (nm) { f.corp_ceo = nm[1]; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
+    const rr = t.match(/(\d{2})(\d{2})(\d{2})-\*{7}/);
+    if (rr) {
+      const yy = +rr[1], now = new Date().getFullYear() % 100;
+      f.corp_ceo_birth = (yy > now ? '19' : '20') + rr[1] + '-' + rr[2] + '-' + rr[3];
+      meta.corp_ceo_birth = { conf: 0.6, note: '태어난 세기는 추정 — 확인해 주세요' };
+    }
+    return { fields: f, meta, notes: ['주소·번호 뒷자리는 저장하지 않아요'] };
+  }
+
+  // 글자 인식 결과(문자열) 하나 → 서류 결과. 판별 실패하면 사용자가 고른 종류로 다시 읽는다
+  function parseTextDocument(rawText, fileName, forceKind) {
+    const text = redact(rawText);
+    const rows = textRows(text);
+    const auto = classify(rows, fileName);
+    // 신분증은 제목이 깨지기 쉬워 번호 꼴 + 발급기관으로도 판별
+    if (auto.kind === 'unknown' && /\d{6}-\*{7}/.test(text) && (/(시장|구청장|군수|도지사|경찰청장)/.test(despace(text)) || /[가-힣]{2,4}\s*\(/.test(text))) Object.assign(auto, { kind: 'idcard', title: '신분증' });
+    const picked = forceKind && forceKind !== 'unknown' ? DOC_TYPES.find(d => d[0] === forceKind) : null;
+    const c = picked ? { kind: picked[0], title: picked[1] } : auto;
+    const out = { kind: c.kind, title: c.title, fields: {}, meta: {}, debtItems: [], notes: [], status: 'ok', ocr: true };
+    if (despace(text).length < 15) { out.status = 'skip'; out.notes.push('글자를 거의 읽지 못했어요 — 더 밝고 반듯한 사진으로'); return out; }
+    let r = null;
+    if (c.kind === 'idcard') r = parseIdCard(text);
+    else if (c.kind === 'lease') r = parseLease(text);
+    else if (c.kind === 'bizcert' || c.kind === 'bizreg') r = parseBizCert(rows);
+    else if (c.kind === 'share') r = parseShare(rows);
+    else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
+    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
+    // 사진 인식은 한 단계 낮은 정확도로
+    Object.keys(out.fields).forEach(k => { const m = out.meta[k] = out.meta[k] || {}; m.conf = Math.min(m.conf ?? 0.9, 0.75); });
+    return out;
+  }
+
+  // 스캔 보정(픽셀 배열, 순수 함수): 밝기 150 미만만 글자로 보는 흑백화 + 긴 가로·세로 표 선 지우기
+  function cleanScan(rgba, w, h) {
+    const g = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) { const y = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]; g[i] = y < 150 ? 1 : 0; }
+    const minH = Math.round(w * 0.06), minV = Math.round(h * 0.03);
+    for (let y = 0; y < h; y++) { let run = 0; for (let x = 0; x <= w; x++) { if (x < w && g[y * w + x]) run++; else { if (run >= minH) for (let k = x - run; k < x; k++) g[y * w + k] = 2; run = 0; } } }
+    for (let x = 0; x < w; x++) { let run = 0; for (let y = 0; y <= h; y++) { if (y < h && g[y * w + x]) run++; else { if (run >= minV) for (let k = y - run; k < y; k++) g[k * w + x] = 2; run = 0; } } }
+    for (let i = 0; i < w * h; i++) { const v = g[i] === 1 ? 0 : 255; rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = v; rgba[i * 4 + 3] = 255; }
+    return rgba;
+  }
+
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
   // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
   function parseDocument(pages, fileName, forceKind) {
@@ -409,6 +522,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

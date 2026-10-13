@@ -567,7 +567,7 @@
         <div class="dz">
           <div class="flex-1 min-w-0">
             <div class="text-sm font-extrabold text-slate-900">서류가 있으면 여기에 끌어다 놓으세요</div>
-            <div class="text-xs text-slate-500 truncate">사업자등록증명 · 재무제표 · 부가세 · 4대보험 · 주주명부 · 차입금 원장 · 채권자변동 — 종류 상관없이 한꺼번에</div>
+            <div class="text-xs text-slate-500 truncate">사업자등록증명 · 재무제표 · 부가세 · 4대보험 · 주주명부 · 차입금 원장 · 채권자변동 · 신분증 · 임대차계약서 — PDF·사진, 한꺼번에</div>
             <div id="docs_last" class="text-xs font-bold text-[#8A6200] mt-1"></div>
           </div>
           <button type="button" onclick="openDocsModal()" class="shrink-0 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold cursor-pointer">문서로 자동입력</button>
@@ -5851,7 +5851,7 @@
       <div class="hd"><h4 id="docs_modal_t">문서로 자동입력</h4><button type="button" data-x aria-label="닫기">×</button></div>
       <div class="bd">
         <div class="lock">파일은 이 기기 안에서만 읽고 저장하지 않아요. 읽은 값은 아래 표에서 고른 칸만 들어갑니다.</div>
-        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf" multiple hidden><br>PDF · 20MB 이하 · 여러 개 한꺼번에</div>
+        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp" multiple hidden><br>PDF · 사진(JPG·PNG·WebP) · 20MB 이하 · 여러 개 한꺼번에 · 스캔 PDF 는 첫 쪽을 글자 인식</div>
         <div class="sup" id="docs_sup">
           <b>읽을 수 있는 서류</b><br>
           <b>사업자등록증명</b> <span>— 상호 · 사업자등록번호 · 사업자구분·과세유형 · 대표자 · 소재지 · 개업일 · 업태/종목</span><br>
@@ -5861,7 +5861,9 @@
           <b>주주명부</b> <span>— 대표이사 지분율</span><br>
           <b>거래처원장(차입금)</b> <span>— 대출표: 기관 · 과목 · 잔액 (금리는 직접)</span><br>
           <b>채권자변동정보 조회서</b> <span>— 대표자 개인 대출: 기관 · 종류 · 발생금액 · 연체 이력</span><br>
-          <span>사진으로 된 서류(법인등기·사업자등록증 사진·임대차계약서)는 다음 단계(글자 인식)에서 읽습니다.</span>
+          <b>신분증(주민등록증·운전면허증) 사진</b> <span>— 대표자 이름 · 생년월일 (번호 뒷자리·주소는 읽자마자 지움)</span><br>
+          <b>임대차계약서 사진·스캔</b> <span>— 주거용이면 대표자 주택 형태, 사업장이면 월 임차료 · 보증금·면적은 참고</span><br>
+          <span>사진은 이 기기 안에서 글자 인식으로 읽어요(한 장 몇 초~십여 초). 처음 한 번은 인식 도구(약 12MB)를 받아요.</span>
         </div>
         <div id="docs_prog" hidden><div class="pt"><span id="docs_prog_t"></span><span id="docs_prog_n"></span></div><div class="pb"><i id="docs_prog_bar"></i></div></div>
         <div class="files" id="docs_files"></div>
@@ -6123,6 +6125,7 @@
     ['creditor', '채권자변동정보 조회서', t => /채권자변동/.test(t)],
     ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
     ['lease', '임대차계약서', t => /임대차/.test(t)],
+    ['idcard', '신분증', t => /주민등록증|운전면허증|신분증/.test(t)],
     ['bizreg', '사업자등록증', t => /사업자등록증/.test(t)]
   ];
   function classify(rows, fileName) {
@@ -6233,6 +6236,118 @@
     return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
   }
 
+  // ───────── 사진·스캔(글자 인식) 서류 ─────────
+  // 개인정보 가리기: 주민·외국인등록번호 뒷자리는 읽자마자 지운다(앞 6자리가 날짜 꼴일 때만 — 금액 오인 방지)
+  function redact(text) {
+    const dateLike = s => { const m = +s.slice(2, 4), d = +s.slice(4, 6); return m >= 1 && m <= 12 && d >= 1 && d <= 31; };
+    return String(text || '')
+      // 뒷자리는 OCR 이 ) | l 같은 잡음을 섞어 읽기도 하므로 그런 글자까지 함께 지운다
+      .replace(/(^|[^\d])(\d{6})\s*[-–—~_.]\s*([1-8][\d)(|lIoO*]{4,9})/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
+      .replace(/(^|[^\d])(\d{6})\s+([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
+      .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**');   // 운전면허번호
+  }
+  // 줄 → 칸: 공백 2칸 이상이나 | 로 나눔
+  const textRows = text => String(text || '').split(/\r?\n/).map(l => l.split(/\s{2,}|\|/).map(norm).filter(Boolean)).filter(r => r.length);
+
+  // 한글 금액(삼천만원정, 일백이십만원) → 원
+  function koreanAmount(s) {
+    const D = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 }, U = { 십: 10, 백: 100, 천: 1000 }, B = { 만: 1e4, 억: 1e8 };
+    let total = 0, block = 0, num = 0, hit = false;
+    for (const ch of String(s).replace(/[^일이삼사오육칠팔구십백천만억]/g, '')) {
+      hit = true;
+      if (D[ch]) num = D[ch];
+      else if (U[ch]) { block += (num || 1) * U[ch]; num = 0; }
+      else if (B[ch]) { total += (block + num || 1) * B[ch]; block = 0; num = 0; }
+    }
+    return hit ? total + block + num : null;
+  }
+  // 계약서 금액 한 줄: 괄호 안 숫자 우선(₩ 기호는 OCR 에서 ¥ % # \ 로 바뀜), 없으면 한글 금액
+  function amountOfLine(l) {
+    const m = l.match(/\(\s*[^\d\s(]{0,2}\s*([\d][\d,.\s]{3,})\s*\)/);
+    if (m) { const v = Number(m[1].replace(/[^\d]/g, '')); if (v) return v; }
+    const k = l.match(/([일이삼사오육칠팔구십백천만억]{2,})\s*원/);
+    return k ? koreanAmount(k[1]) : null;
+  }
+
+  // 임대차계약서: 보증금·월세·전용면적·용도(주택이면 대표자 주거 형태, 사업장이면 임차료)
+  function parseLease(text) {
+    const lines = String(text).split(/\r?\n/).map(norm).filter(Boolean);
+    const amt = lines.filter(l => /원\s*정|원정|\(\s*[^\d\s]{0,2}\s*\d[\d,]{5,}\s*\)/.test(l)).map(l => ({ l, v: amountOfLine(l) })).filter(x => x.v);
+    const monthlyLine = amt.find(x => /후불|선불|매월|월\s*세|차\s*임/.test(x.l));
+    const deposit = amt.find(x => x !== monthlyLine);
+    const others = amt.filter(x => x !== monthlyLine && x !== deposit).map(x => x.v);
+    // 계약금 + 잔금(+중도금) = 보증금 이면 높은 정확도
+    const sumOk = deposit && others.length >= 2 && others.reduce((a, b) => a + b, 0) === deposit.v;
+    const all = despace(lines.join(''));
+    const area = (lines.join(' ').match(/전용\s*면적[^\d]{0,12}(\d{1,4}(?:\.\d{1,4})?)/) || lines.join(' ').match(/(\d{1,4}\.\d{2,4})\s*(?:㎡|m2|m²)/) || [])[1];
+    const residential = /주택|아파트|공동주택|다세대|오피스텔.*주거|원룸/.test(all);
+    const f = {}, meta = {}, info = [];
+    if (residential) {
+      // 대표자 개인 주거 계약 → 주택 소유형태
+      f.corp_house = monthlyLine && monthlyLine.v ? '임차 거주 (월세)' : '임차 거주 (전세)';
+      meta.corp_house = { conf: 0.7, note: '주거용 계약 — 대표자 본인 계약인지 확인' };
+    } else if (monthlyLine) {
+      f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e4));
+      meta.smb_cost_rent = { conf: 0.7, src: monthlyLine.v, note: '부가세 별도 여부 확인' };
+    }
+    if (deposit) info.push('보증금 ' + Math.round(deposit.v / 1e4).toLocaleString('ko-KR') + '만원' + (sumOk ? '' : ' (확인 필요)'));
+    if (monthlyLine) info.push('월세 ' + Math.round(monthlyLine.v / 1e4).toLocaleString('ko-KR') + '만원');
+    if (area) info.push('전용면적 ' + area + '㎡ (약 ' + (Number(area) / 3.3058).toFixed(1) + '평)');
+    const notes = [residential ? '주거용 임대차' : '사업장 임대차'].concat(info);
+    if (!amt.length) notes.push('금액을 찾지 못했어요');
+    return { fields: f, meta, notes };
+  }
+
+  // 신분증(주민등록증·운전면허증): 이름, 생년월일(앞 6자리 — 세기는 추정). 주소는 저장하지 않고 참고만
+  function parseIdCard(text) {
+    const t = redact(text);
+    const lines = t.split(/\r?\n/).map(norm).filter(Boolean);
+    const f = {}, meta = {};
+    const nm = t.match(/([가-힣]{2,4})\s*\(\s*[^\s)]{1,8}\s*\)/) || t.match(/성\s*명\s*[:：]?\s*([가-힣]{2,4})/);
+    if (nm) { f.corp_ceo = nm[1]; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
+    const rr = t.match(/(\d{2})(\d{2})(\d{2})-\*{7}/);
+    if (rr) {
+      const yy = +rr[1], now = new Date().getFullYear() % 100;
+      f.corp_ceo_birth = (yy > now ? '19' : '20') + rr[1] + '-' + rr[2] + '-' + rr[3];
+      meta.corp_ceo_birth = { conf: 0.6, note: '태어난 세기는 추정 — 확인해 주세요' };
+    }
+    return { fields: f, meta, notes: ['주소·번호 뒷자리는 저장하지 않아요'] };
+  }
+
+  // 글자 인식 결과(문자열) 하나 → 서류 결과. 판별 실패하면 사용자가 고른 종류로 다시 읽는다
+  function parseTextDocument(rawText, fileName, forceKind) {
+    const text = redact(rawText);
+    const rows = textRows(text);
+    const auto = classify(rows, fileName);
+    // 신분증은 제목이 깨지기 쉬워 번호 꼴 + 발급기관으로도 판별
+    if (auto.kind === 'unknown' && /\d{6}-\*{7}/.test(text) && (/(시장|구청장|군수|도지사|경찰청장)/.test(despace(text)) || /[가-힣]{2,4}\s*\(/.test(text))) Object.assign(auto, { kind: 'idcard', title: '신분증' });
+    const picked = forceKind && forceKind !== 'unknown' ? DOC_TYPES.find(d => d[0] === forceKind) : null;
+    const c = picked ? { kind: picked[0], title: picked[1] } : auto;
+    const out = { kind: c.kind, title: c.title, fields: {}, meta: {}, debtItems: [], notes: [], status: 'ok', ocr: true };
+    if (despace(text).length < 15) { out.status = 'skip'; out.notes.push('글자를 거의 읽지 못했어요 — 더 밝고 반듯한 사진으로'); return out; }
+    let r = null;
+    if (c.kind === 'idcard') r = parseIdCard(text);
+    else if (c.kind === 'lease') r = parseLease(text);
+    else if (c.kind === 'bizcert' || c.kind === 'bizreg') r = parseBizCert(rows);
+    else if (c.kind === 'share') r = parseShare(rows);
+    else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
+    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
+    // 사진 인식은 한 단계 낮은 정확도로
+    Object.keys(out.fields).forEach(k => { const m = out.meta[k] = out.meta[k] || {}; m.conf = Math.min(m.conf ?? 0.9, 0.75); });
+    return out;
+  }
+
+  // 스캔 보정(픽셀 배열, 순수 함수): 밝기 150 미만만 글자로 보는 흑백화 + 긴 가로·세로 표 선 지우기
+  function cleanScan(rgba, w, h) {
+    const g = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) { const y = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]; g[i] = y < 150 ? 1 : 0; }
+    const minH = Math.round(w * 0.06), minV = Math.round(h * 0.03);
+    for (let y = 0; y < h; y++) { let run = 0; for (let x = 0; x <= w; x++) { if (x < w && g[y * w + x]) run++; else { if (run >= minH) for (let k = x - run; k < x; k++) g[y * w + k] = 2; run = 0; } } }
+    for (let x = 0; x < w; x++) { let run = 0; for (let y = 0; y <= h; y++) { if (y < h && g[y * w + x]) run++; else { if (run >= minV) for (let k = y - run; k < y; k++) g[k * w + x] = 2; run = 0; } } }
+    for (let i = 0; i < w * h; i++) { const v = g[i] === 1 ? 0 : 255; rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = v; rgba[i * 4 + 3] = 255; }
+    return rgba;
+  }
+
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
   // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
   function parseDocument(pages, fileName, forceKind) {
@@ -6283,7 +6398,7 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -6318,16 +6433,81 @@
         return pages;
       }
 
+      // 글자 인식(OCR): tesseract — 에셋은 같은 도메인 vendor/ocr 에서만(경로를 못 찾으면 CDN 을 조용히 받는 것을 막으려 경로를 모두 지정)
+      const OCR = { lib: 'vendor/ocr/tesseract.min.js', worker: 'vendor/ocr/worker.min.js', core: 'vendor/ocr/', lang: 'vendor/ocr/lang' };
+      let ocrLib = null, ocrWorker = null, ocrLangs = '', ocrProg = null;
+      function loadOcr() {
+        if (ocrLib) return ocrLib;
+        ocrLib = new Promise((ok, no) => {
+          const s = document.createElement('script');
+          s.src = OCR.lib;
+          s.onload = () => ok(window.Tesseract);
+          s.onerror = () => { ocrLib = null; no(new Error('글자 인식 도구를 불러오지 못했어요.')); };
+          document.head.appendChild(s);
+        });
+        return ocrLib;
+      }
+      async function getWorker(langs) {
+        if (ocrWorker && ocrLangs === langs) return ocrWorker;
+        if (ocrWorker) { await ocrWorker.terminate(); ocrWorker = null; }
+        const T = await loadOcr();
+        const base = new URL('.', location.href).href;
+        ocrWorker = await T.createWorker(langs.split('+'), 1, {
+          workerPath: base + OCR.worker, corePath: base + OCR.core, langPath: base + OCR.lang,
+          gzip: true, cacheMethod: 'none', workerBlobURL: false,
+          logger: m => { if (ocrProg && m.status === 'recognizing text') ocrProg(m.progress); }
+        });
+        ocrLangs = langs;
+        return ocrWorker;
+      }
+      function withTimeout(p, ms) { return Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('시간 초과')), ms))]); }
+      async function ocrCanvas(canvas, langs, onProg) {
+        const w = await getWorker(langs);
+        ocrProg = onProg;
+        try { const { data } = await withTimeout(w.recognize(canvas), 120000); return data.text || ''; }
+        finally { ocrProg = null; }
+      }
+      // 사진: 긴 변 3000px 이하로 줄여 인식(사진에는 흑백화를 하지 않는다 — 조명 얼룩에서 글자가 지워짐)
+      async function imageToCanvas(file) {
+        const bmp = await createImageBitmap(file);
+        const k = Math.min(1, 3000 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        bmp.close && bmp.close();
+        return c;
+      }
+      // 스캔 PDF: 첫 쪽을 3.5배로 그리고 흑백화 + 표 선 지우기 후 인식(kor+eng — 숫자는 영어 모델이 잘 잡음)
+      async function scanPdfToCanvas(file) {
+        const lib = await loadPdfJs();
+        const task = lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+        const doc = await task.promise;
+        const page = await doc.getPage(1);
+        const vp0 = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: Math.min(3.5, 3000 / Math.max(vp0.width, vp0.height)) });
+        const c = document.createElement('canvas');
+        c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        const ctx = c.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        const img = ctx.getImageData(0, 0, c.width, c.height);
+        P().cleanScan(img.data, c.width, c.height);
+        ctx.putImageData(img, 0, 0);
+        await task.destroy();
+        return c;
+      }
+      const freeCanvas = c => { if (c) { c.width = 0; c.height = 0; } };
+
       const P = () => window.MSCDocParsers;
       const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const LABEL = {
         corp_name: '상호', corp_biz_no: '사업자등록번호', corp_form: '사업자구분 · 과세유형', corp_ceo: '대표자 성명',
         corp_address: '본점 / 주사업장 소재지', corp_est_date: '개업일', corp_biz_type: '주요 업태 및 주생산품', corp_ceo_share: '주주현황 (대표 지분)',
         sme_sales: '매출액', sme_profit: '영업이익', sme_debt: '부채총계', sme_equity: '자본총계',
-        sme_loan_to_ceo: '대표자 가지급금', sme_employees: '상시근로자 수', smb_monthly_sales: '월평균 매출'
+        sme_loan_to_ceo: '대표자 가지급금', sme_employees: '상시근로자 수', smb_monthly_sales: '월평균 매출',
+        corp_ceo_birth: '대표자 생년월일', corp_house: '대표자 주택 소유형태', smb_cost_rent: '월 임차료'
       };
       const UNIT = { sme: '백만원', smb_monthly_sales: '만원' };
-      const ORDER = ['corp_name', 'corp_biz_no', 'corp_form', 'corp_ceo', 'corp_address', 'corp_est_date', 'corp_biz_type', 'corp_ceo_share', 'sme_employees', 'smb_monthly_sales'];
+      const ORDER = ['corp_name', 'corp_biz_no', 'corp_form', 'corp_ceo', 'corp_ceo_birth', 'corp_house', 'corp_address', 'smb_cost_rent', 'corp_est_date', 'corp_biz_type', 'corp_ceo_share', 'sme_employees', 'smb_monthly_sales'];
       const fmt = n => Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
 
       let files = [];   // {name, pages, res, kind}  — 팝업이 열려 있는 동안만
@@ -6368,6 +6548,7 @@
           });
           if (fx._monthlyFromFs && !cands.some(c => c.id === 'smb_monthly_sales')) cands.push({ id: 'smb_monthly_sales', value: String(fx._monthlyFromFs), conf: 0.6, valid: true, src: Math.round(fx._src._monthlyFromFs), note: '재무제표 연매출 ÷ 12', file: fsList[0].file });
         }
+        derivedRows(cands).forEach(c => cands.push(c));
         const by = new Map();
         cands.forEach(c => {
           const g = by.get(c.id) || { id: c.id, opts: [] };
@@ -6380,8 +6561,50 @@
           g.pick = 0;
           return checkState(g);
         });
-        const rank = id => { const i = ORDER.indexOf(id); return i >= 0 ? i : id.startsWith('sme_') ? 50 : id.startsWith('_debt') ? 90 : 60; };
+        const rank = id => { if (id === '_industry') return -2; if (id === '_track') return -1; const i = ORDER.indexOf(id); return i >= 0 ? i : id.startsWith('sme_') ? 50 : id.startsWith('_debt') ? 90 : 60; };
         rows.sort((a, b) => rank(a.id) - rank(b.id) || (b.opts[0].year || 0) - (a.opts[0].year || 0));
+      }
+      // 업태·종목 → 주업종(②) 추정. 앞에서부터 먼저 맞는 것
+      const IND_RULES = [
+        ['food', /음식|식품|요식|주점|카페|제과|제빵|탁주|막걸리|주류|양조|급식/],
+        ['bio', /바이오|의료|의약|제약|보건|헬스케어|화장품/],
+        ['it', /정보통신|소프트웨어|\bSW\b|플랫폼|프로그램|시스템\s*통합|데이터|인터넷|앱\s*개발|IT/],
+        ['const', /건설|공사|전기|설비|토목|인테리어|조경/],
+        ['logis', /운수|운송|창고|물류|택배|화물|보관/],
+        ['content', /출판|영상|방송|디자인|광고|콘텐츠|인쇄|촬영/],
+        ['esg', /환경|에너지|재활용|폐기물|태양광|신재생/],
+        ['mfg', /제조|가공|금형|부품|기계|주조|용접/],
+        ['dist', /도매|소매|유통|전자상거래|쇼핑몰|판매/],
+        ['service', /전문|기술|연구|컨설팅|서비스|교육/]
+      ];
+      const IND_NAME = { mfg: '제조업 (기계·금형·부품)', it: '정보통신·SW·플랫폼', bio: '바이오·의료기기·보건', const: '건설·전기·설비공사업', dist: '도매·소매·전자상거래', food: '음식점·식품제조가공업', logis: '운수·창고·물류서비스업', content: '출판·영상·방송·디자인', esg: '환경·신재생에너지·재활용', service: '전문·기술·연구개발서비스' };
+      const TIER_NAME = { smb: '소상공인', small: '소기업', sme: '중기업' };
+      // 소상공인 상시근로자 기준(제조·건설·운수 10인 미만, 그 밖 5인 미만) · 소기업 매출 상한(억원, 업종 대표값 — 단순 판정)
+      const SMB_EMP = { mfg: 10, const: 10, logis: 10, food: 5, it: 5, bio: 10, dist: 5, content: 5, esg: 10, service: 5 };
+      const SMALL_SALES_EOK = { mfg: 120, food: 120, it: 50, bio: 120, const: 80, dist: 50, logis: 80, content: 50, esg: 80, service: 30 };
+      function guessIndustry(text) { const t = String(text || ''); for (const [k, re] of IND_RULES) if (re.test(t)) return k; return ''; }
+      function derivedRows(cands) {
+        const out = [];
+        const pickVal = id => { const c = cands.filter(x => x.id === id).sort((a, b) => b.conf - a.conf)[0]; return c ? c.value : ''; };
+        const bizType = pickVal('corp_biz_type') || (document.getElementById('corp_biz_type')?.value || '');
+        const ind = guessIndustry(bizType);
+        if (ind) out.push({ id: '_industry', value: ind, conf: 0.7, valid: true, note: '업태·종목으로 추정 — 확인', file: cands.find(x => x.id === 'corp_biz_type')?.file || '입력된 업태·종목' });
+        const useInd = ind || window.appState.industryTrack || 'mfg';
+        const emp = Number(pickVal('sme_employees') || 0) || null;
+        // 연매출(억): 재무제표 당기 매출(백만원) 우선, 없으면 부가세 월평균(만원)×12
+        const fsSales = cands.find(x => x.id === 'sme_sales');
+        const vat = cands.find(x => x.id === 'smb_monthly_sales' && !/재무제표/.test(x.note || ''));
+        const salesEok = fsSales ? Number(fsSales.value) / 100 : vat ? Number(vat.value) * 12 / 10000 : null;
+        if (emp !== null || salesEok !== null) {
+          let tier, why = [];
+          if (emp !== null) why.push(`근로자 ${emp}명`);
+          if (salesEok !== null) why.push(`연매출 약 ${salesEok.toFixed(1)}억`);
+          if (emp !== null && emp < SMB_EMP[useInd]) tier = 'smb';
+          else if (salesEok !== null) tier = salesEok <= SMALL_SALES_EOK[useInd] ? 'small' : 'sme';
+          else tier = emp >= 50 ? 'sme' : 'small';
+          out.push({ id: '_track', value: tier, conf: 0.6, valid: true, note: why.join(' · ') + ` · ${IND_NAME[useInd].split(' ')[0]} 기준 단순 판정 — 확인`, file: [fsSales?.file, vat?.file, cands.find(x => x.id === 'sme_employees')?.file].filter(Boolean).join(', ') });
+        }
+        return out;
       }
       // 기본 체크: 지금 칸이 비어 있고 검증을 통과하면 체크. 값이 있으면 해제하고 이유 표시
       function checkState(g) {
@@ -6390,6 +6613,12 @@
           const cur = window.appState.debtItems || [];
           const dup = cur.some(c => c.institution === o.debt.institution && Number(c.balance) === Number(o.debt.balance));
           g.cur = ''; g.checked = !dup; g.why = dup ? '대출표에 이미 있어요' : '';
+          return g;
+        }
+        if (g.id === '_industry' || g.id === '_track') {
+          const cur = g.id === '_industry' ? window.appState.industryTrack : window.appState.bizTrack;
+          g.cur = g.id === '_industry' ? IND_NAME[cur] : TIER_NAME[cur];
+          g.checked = cur !== o.value; g.why = cur === o.value ? '지금 선택과 같아요' : '';
           return g;
         }
         g.cur = curValue(g.id);
@@ -6402,9 +6631,9 @@
       }
       const displayRaw = (id, v) => { const el = document.getElementById(id); return el && el.tagName === 'SELECT' ? ([...el.options].find(x => x.value === v)?.text || v) : v; };
       function showVal(g, o) {
-        const unit = g.id.startsWith('sme_') && g.id !== 'sme_employees' ? '백만원' : g.id === 'smb_monthly_sales' ? '만원' : g.id === 'sme_employees' ? '명' : '';
-        const main = unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
-        const raw = o.src !== undefined && o.src !== null ? `원문 ${fmt(Math.round(o.src))}원${g.id === 'smb_monthly_sales' ? '/월' : ''}` : '';
+        const unit = g.id.startsWith('sme_') && g.id !== 'sme_employees' ? '백만원' : (g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent') ? '만원' : g.id === 'sme_employees' ? '명' : '';
+        const main = g.id === '_industry' ? IND_NAME[o.value] : g.id === '_track' ? TIER_NAME[o.value] : unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
+        const raw = o.src !== undefined && o.src !== null ? `원문 ${fmt(Math.round(o.src))}원${g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' ? '/월' : ''}` : '';
         return { main, raw };
       }
       const cfTag = c => c >= 0.8 ? '<span class="cf h">높음</span>' : c >= 0.5 ? '<span class="cf m">보통</span>' : '<span class="cf l">낮음</span>';
@@ -6415,9 +6644,9 @@
         document.getElementById('docs_files').innerHTML = files.map((f, i) => {
           const r = f.res;
           const st = !r ? '<span class="st">읽는 중…</span>' : r.status === 'ok' ? `<span class="st ok">읽음${r.notes && r.notes.length ? ' · ' + esc(r.notes.join(' · ')) : ''}</span>`
-            : r.status === 'scan' ? '<span class="st warn">사진 서류 — 다음 단계(글자 인식)</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
+            : r.status === 'scan' ? '<span class="st warn">글자층 없는 PDF</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
           const sel = `<select data-i="${i}" aria-label="서류 종류">${kinds.map(([k, t]) => `<option value="${k}" ${r && r.kind === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="unknown" ${!r || r.kind === 'unknown' ? 'selected' : ''}>어떤 서류인지 골라 주세요</option></select>`;
-          return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${f.pages ? sel : ''}${st}</div>`;
+          return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${f.pages || f.text !== undefined ? sel : ''}${st}</div>`;
         }).join('');
         const t = document.getElementById('docs_table');
         if (!rows.length) { t.innerHTML = files.length && files.every(f => f.res) ? '<div class="sup">채울 수 있는 값을 찾지 못했어요. 서류 종류가 맞는지 확인해 주세요.</div>' : ''; }
@@ -6427,7 +6656,7 @@
             const val = g.opts.length > 1
               ? `<select data-pick="${i}">${g.opts.map((x, k) => `<option value="${k}" ${k === g.pick ? 'selected' : ''}>${esc(showVal(g, x).main)} (${esc([...x.files].join(', '))})</option>`).join('')}</select>`
               : `<b>${esc(v.main)}</b>`;
-            const label = g.id.startsWith('_debt') ? '대출표에 추가' : labelOf(g.id, o.year);
+            const label = g.id.startsWith('_debt') ? '대출표에 추가' : g.id === '_industry' ? '② 주업종 (버튼 자동 선택)' : g.id === '_track' ? '① 기업 규모 (버튼 자동 선택)' : labelOf(g.id, o.year);
             return `<tr><td><input type="checkbox" data-chk="${i}" ${g.checked ? 'checked' : ''}></td><td>${esc(label)}</td><td class="cur">${esc(g.cur || '—')}</td>
               <td class="val">${val}${v.raw ? `<small>${esc(v.raw)}</small>` : ''}${o.note && !g.why.includes(o.note) ? `<small>${esc(o.note)}</small>` : ''}${g.why ? `<span class="why">${esc(g.why)}</span>` : ''}</td><td>${cfTag(o.conf)}</td></tr>`;
           }).join('')}</tbody></table>`;
@@ -6439,12 +6668,12 @@
 
       // 진행: 받은 파일 전체 중 몇 번째, 그 파일의 몇 쪽째
       let queued = 0, finished = 0;
-      function progress(name, page, pages) {
+      function progress(name, page, pages, ocrPart) {
         const box = document.getElementById('docs_prog');
         if (finished >= queued) { box.hidden = true; return; }
         box.hidden = false;
-        const part = pages ? (page - 1) / pages : 0;
-        document.getElementById('docs_prog_t').textContent = '읽는 중 · ' + name + (pages ? ` (${page}/${pages}쪽)` : '');
+        const part = ocrPart !== undefined ? ocrPart : pages ? (page - 1) / pages : 0;
+        document.getElementById('docs_prog_t').textContent = (ocrPart !== undefined ? '글자 인식 중 · ' + name + ` (${Math.round(ocrPart * 100)}%)` : '읽는 중 · ' + name + (pages ? ` (${page}/${pages}쪽)` : ''));
         document.getElementById('docs_prog_n').textContent = `${finished}/${queued}`;
         document.getElementById('docs_prog_bar').style.width = Math.round((finished + part) / queued * 100) + '%';
       }
@@ -6455,18 +6684,36 @@
           const f = { name: file.name, pages: null, res: null };
           files.push(f); render(); progress(file.name, 0, 0);
           try {
-            if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { f.res = { status: 'skip', notes: ['PDF만 읽어요(사진은 다음 단계)'] }; continue; }
+            const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+            const isImg = /^image\/(jpeg|png|webp)$/.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
+            if (!isPdf && !isImg) { f.res = { status: 'skip', notes: ['PDF·사진(JPG·PNG·WebP)만 읽어요'] }; continue; }
             if (file.size > 20 * 1024 * 1024) { f.res = { status: 'skip', notes: ['20MB 넘는 파일'] }; continue; }
-            f.pages = await readPdf(file, (p, n) => progress(file.name, p, n));
-            f.res = P().parseDocument(f.pages, file.name);
-          } catch (e) { f.res = { status: 'skip', notes: ['이 파일은 읽지 못했어요'] }; }
+            if (isPdf) {
+              f.pages = await readPdf(file, (p, n) => progress(file.name, p, n));
+              f.res = P().parseDocument(f.pages, file.name);
+            }
+            if (isImg || (f.res && f.res.status === 'scan')) {
+              // 사진·스캔: 글자 인식 → 번호 뒷자리를 지운 글만 들고 있는다
+              f.pages = null; f.res = null; render();
+              const c = isImg ? await imageToCanvas(file) : await scanPdfToCanvas(file);
+              try { f.text = P().redact(await ocrCanvas(c, isImg ? 'kor+eng' : 'kor+eng', x => progress(file.name, 0, 0, x))); }
+              finally { freeCanvas(c); }
+              f.res = P().parseTextDocument(f.text, file.name);
+            }
+          } catch (e) { f.res = { status: 'skip', notes: [/시간 초과/.test(e && e.message) ? '시간이 너무 오래 걸려 멈췄어요' : /도구/.test(e && e.message) ? e.message : '이 파일은 읽지 못했어요'] }; }
           finally { finished++; buildRows(); render(); progress(file.name, 0, 0); }
         }
+        if (finished >= queued && ocrWorker) { const w = ocrWorker; ocrWorker = null; ocrLangs = ''; w.terminate(); }
       }
 
       function apply() {
         let n = 0;
-        rows.filter(g => g.checked).forEach(g => {
+        // 업종을 먼저, 규모를 나중에(규모 버튼이 보고서 종류를 다시 고르므로)
+        const sel = rows.filter(g => g.checked);
+        const ind = sel.find(g => g.id === '_industry'), tr = sel.find(g => g.id === '_track');
+        if (ind) { setIndustryTrack(ind.opts[ind.pick].value); n++; }
+        if (tr) { setBizTrack(tr.opts[tr.pick].value); n++; }
+        sel.filter(g => g !== ind && g !== tr).forEach(g => {
           const o = g.opts[g.pick];
           if (g.id.startsWith('_debt')) {
             (window.appState.debtItems = window.appState.debtItems || []).push({ institution: o.debt.institution, type: o.debt.type, balance: o.debt.balance, rate: '', monthlyInterest: '', payback: o.debt.payback });
@@ -6492,7 +6739,8 @@
       }
       function close() {
         document.getElementById('docs_modal').classList.remove('open');
-        files = []; rows = []; queued = 0; finished = 0;   // 원문·파일은 닫을 때 버린다
+        files = []; rows = []; queued = 0; finished = 0;   // 원문·인식 글·파일은 닫을 때 버린다
+        if (ocrWorker) { const w = ocrWorker; ocrWorker = null; ocrLangs = ''; w.terminate(); }
         document.getElementById('docs_prog').hidden = true;
         render();
       }
@@ -6508,7 +6756,7 @@
         });
         m.addEventListener('change', e => {
           const s = e.target.closest('select[data-i]');
-          if (s) { const f = files[s.dataset.i]; f.res = P().parseDocument(f.pages, f.name, s.value); buildRows(); render(); }
+          if (s) { const f = files[s.dataset.i]; f.res = f.text !== undefined ? P().parseTextDocument(f.text, f.name, s.value) : P().parseDocument(f.pages, f.name, s.value); buildRows(); render(); }
           const pk = e.target.closest('select[data-pick]');
           if (pk) { const g = rows[pk.dataset.pick]; g.pick = Number(pk.value); checkState(g); render(); }
         });
@@ -6566,8 +6814,18 @@
     #l3 .l3-step[data-cust] { gap: 12px; }
     #l3 #docs_card { padding: 14px 18px !important; }
     /* 3단 보기 입력 칸: 폭에 맞춰 열 수 자동(좁으면 2~3열) */
-    #l3 .l3-step .lg\:grid-cols-4, #l3 .l3-step .lg\:grid-cols-3 { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)) !important; gap: 8px 10px !important; }
+    #l3 .l3-step .lg\:grid-cols-4, #l3 .l3-step .lg\:grid-cols-3 { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)) !important; gap: 8px 12px !important; }
     #l3 #screen_input > .l3-step { padding: 14px 18px; }
+    /* ① 기업 규모 · ② 주업종: 3단 보기에서는 위아래로(가로로 나누면 버튼 글자가 잘림) */
+    #l3 .l3-step .lg\:grid-cols-12 { grid-template-columns: 1fr !important; }
+    #l3 .l3-step .lg\:col-span-4, #l3 .l3-step .lg\:col-span-8 { grid-column: 1 / -1 !important; }
+    /* 규모 이름(소상공인·소기업·중기업)은 한 줄, 아래 법 조문 글씨는 칸 안에서 줄바꿈 */
+    #l3 .l3-step [id^="tier_btn_"] { min-width: 0; }
+    #l3 .l3-step [id^="tier_btn_"] span:first-child { white-space: nowrap; font-size: 13px; }
+    #l3 .l3-step [id^="tier_btn_"] span + span { display: block; font-size: 9px !important; white-space: normal; word-break: keep-all; line-height: 1.25; margin-top: 2px; }
+    #l3 .l3-step [id^="ind_btn_"] { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #l3 .l3-step .sm\:grid-cols-5 { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
+    #l3 .l3-step .form-input-control { text-overflow: ellipsis; }
     #l3 #screen_input > .l3-step > div[class*="p-5"] { padding: 14px 16px !important; }
     #l3 .l3-step .form-input-control { padding-top: 6px; padding-bottom: 6px; }
     #l3 .l3-step label.block { margin-bottom: 2px; }

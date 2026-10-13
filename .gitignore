@@ -1,3 +1,6 @@
 tests/_orig_copy.html
 __pycache__/
 tests/pdf_sample/
+
+# 글자 인식 도구(약 12MB) — tools/vendor-ocr.sh 로 만든다
+vendor/ocr/
