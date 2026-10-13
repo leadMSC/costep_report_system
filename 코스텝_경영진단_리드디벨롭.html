@@ -6953,7 +6953,9 @@
   <script>
     // 원본 입력 카드와 원본 서식을 그대로 옮겨 담는 배치 층 — 입력칸 id·서식 생성 함수는 바꾸지 않는다
     (function () {
-      if (new URLSearchParams(location.search).get('view') !== '3d') return;
+      // 3단 보기가 기본. 예전 화면: ?view=classic · 시험 도구(__MSC_CLASSIC__) · 좁은 화면(900px 미만, 휴대폰·작은 태블릿)
+      const viewQ = new URLSearchParams(location.search).get('view');
+      if (viewQ === 'classic' || window.__MSC_CLASSIC__ || (viewQ !== '3d' && window.innerWidth < 900)) return;
       const STEPS = [
         ['내 정보', ['l3_me']],
         ['고객사 정보', ['l3_cchoice', 'client_bar', 'docs_card', ':basic']],

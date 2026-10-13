@@ -33,7 +33,7 @@
       if (!keepStorage) { try { localStorage.removeItem('COSTEP_DRAFT_V1'); localStorage.removeItem('COSTEP_CLIENTS_V1'); } catch (e) {} }
       return new Promise(resolve => {
         frame.onload = () => { stub(frame.contentWindow); resolve(); };
-        frame.src = APP_URL + '?t=' + Date.now();
+        frame.src = APP_URL + '?view=classic&t=' + Date.now();   // 시나리오는 예전 화면 기준(3단 보기는 배치만 바꾸고 같은 함수를 씀)
       });
     }
     function stub(w) {
