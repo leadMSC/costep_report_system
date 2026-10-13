@@ -3419,6 +3419,7 @@
     // INTELLIGENT BUSINESS PLAN AUTO-GENERATOR (업종/업태/규모/매출/업력/아이템/혁신성/문제 다각도 맞춤 생성 엔진)
     // =========================================================================
     function autoGenerateBusinessPlan() {
+      setTimeout(() => { if (typeof fitAllTextareas === 'function') fitAllTextareas(); }, 0);
       // 1. Gather all inputs from Screen 1
       const corpName = document.getElementById('corp_name')?.value.trim() || '귀사';
       const bizType = document.getElementById('corp_biz_type')?.value.trim() || '주력 제품 및 기술 가공';
@@ -4317,8 +4318,9 @@
           <div class="space-y-4 text-slate-950 font-sans leading-relaxed text-xs">
             <!-- Classical Letterhead -->
             <div class="text-center pt-2">
-              <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-[0.35em] pb-2 border-b-2 border-slate-950 flex items-center justify-center">
-                ${brand.logo ? `<img src="${brand.logo}" alt="${brandName}" class="h-9 w-auto object-contain">` : brandName}
+              <h1 class="relative text-xl sm:text-2xl font-black text-slate-900 tracking-[0.35em] pb-2 border-b-2 border-slate-950 flex items-center justify-center min-h-[2.75rem]">
+                ${brand.logo ? `<img src="${brand.logo}" alt="${brandName} 로고" class="absolute left-0 top-0 h-9 w-auto max-w-[9rem] object-contain object-left">` : ''}
+                <span>${brandName}</span>
               </h1>
               <div class="flex justify-between items-center gap-2 text-[9px] text-slate-600 py-1 border-b border-slate-300">
                 <span>${escapeHtml(brand.address) || '주소 미등록 (관리 → 펌 정보)'}</span>
@@ -5482,7 +5484,25 @@
     });
     // 예시 불러오기 · 고객 불러오기 · 새 고객(loadDemoData·applyFormData·resetFormToDefaults 안에서 직접 부름) 뒤에
     // 인증 체크와 지식재산권 표를 저장 칸(corp_certs·corp_ip_json) 값에 다시 맞춘다 — 이전 고객 내용이 남지 않게
-    function syncCertIpViews() { try { certFromText(); ipFromJson(); renderFinInd(); } catch (e) { /* 화면 없음 */ } }
+    function syncCertIpViews() { try { certFromText(); ipFromJson(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } }
+
+    // 글 칸(사업계획 개요서 등)은 내용 길이만큼 저절로 늘어난다 — 안쪽 스크롤로 글이 잘려 보이지 않게.
+    // 비어 있을 때는 안내 예시(placeholder) 길이만큼
+    function fitTextarea(ta) {
+      if (!ta || !ta.offsetParent) return;
+      const empty = !ta.value;
+      if (empty && ta.placeholder) ta.value = ta.placeholder;
+      ta.style.height = 'auto';
+      ta.style.height = (ta.scrollHeight + 2) + 'px';
+      if (empty) ta.value = '';
+    }
+    function fitAllTextareas() { document.querySelectorAll('#screen_input textarea').forEach(fitTextarea); }
+    window.fitAllTextareas = fitAllTextareas;
+    document.addEventListener('input', e => { if (e.target.tagName === 'TEXTAREA') fitTextarea(e.target); });
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(fitAllTextareas, 50);
+      window.addEventListener('resize', () => { clearTimeout(window.__taT); window.__taT = setTimeout(fitAllTextareas, 120); });
+    });
 
 
     // =========================================================================
@@ -6184,6 +6204,8 @@
     /* 주요 재무지표 */
     .fin-ind { border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; background: #F8FAFC; }
     .fin-ind-t td, .fin-ind-t th { white-space: nowrap; }
+    /* 내용 길이만큼 늘어나는 글 칸 */
+    #screen_input textarea { resize: none; overflow: hidden; min-height: 64px; }
     .doc-filled { background: #FFF6D6 !important; border-color: #E8C34A !important; color: #0A0B0F !important; }
   </style>
   <div id="docs_modal" role="dialog" aria-modal="true" aria-labelledby="docs_modal_t">
@@ -7218,17 +7240,18 @@
 
   <!-- ================= 3단 보기: 스텝 | 입력 | 출력 미리보기 (?view=3d) ================= -->
   <style>
-    #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 200px) minmax(0, 1fr) var(--l3c, 50%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
+    #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 224px) minmax(0, 1fr) var(--l3c, 50%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
     #l3.hidden { display: none; }
     /* 3단 보기에서는 맨 위 머리글을 쓰지 않는다 — 로고는 사이드바, 계정은 왼쪽 아래, 지원사업은 미리보기 전환 */
     body.l3-on > header.no-print { display: none !important; }
     #l3_brand { display: flex; align-items: center; gap: 10px; margin: 2px 6px 22px; }
     #l3_brand .mk { width: 32px; height: 32px; flex: none; }
     #l3_brand { flex-wrap: nowrap; align-items: center; }
-    #l3_brand .lkbox { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; flex: 1; }
-    #l3_brand .lk { height: 34px; width: auto; max-width: 100%; }
+    #l3_brand .lkbox { display: flex; flex-direction: column; align-items: flex-start; gap: 0; flex: none; }
+    #l3_brand { align-items: flex-start !important; }
+    #l3_brand .lk { height: 36px; width: auto; max-width: none; flex: none; }
     #l3_brand .em { display: none; width: 36px; height: 36px; }
-    #l3_brand .pw { font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: .04em; padding-left: 2px; white-space: nowrap; }
+    #l3_brand .pw { font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: .04em; padding-left: 46px; margin-top: -4px; white-space: nowrap; }
     #l3.folded #l3_brand .lkbox { display: none; }
     #l3.folded #l3_brand .em { display: block; }
     #l3_brand .wm { display: flex; flex-direction: column; line-height: 1.05; font-size: 17px; font-weight: 500; color: #fff; letter-spacing: -.01em; white-space: nowrap; }
@@ -7332,15 +7355,17 @@
     #l3 #client_bar summary::-webkit-details-marker { display: none; }
     #l3 #client_bar .more { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; min-width: 180px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); }
     #l3 #client_bar .more > * { text-align: left; border: 0 !important; }
-    @media (max-width: 1180px) { #l3_brand .wm { display: none; } }
+    @media (max-width: 1180px) { #l3:not(.sized) #l3_brand .lkbox { display: none; } #l3:not(.sized) #l3_brand .em { display: block; } #l3:not(.sized) #l3_brand { flex-direction: column; align-items: center !important; } #l3:not(.sized) #l3_fold { margin: 0; } }
     /* 사이드바 접기: 아이콘(로고 마크·스텝 번호·계정 동그라미)만 남김 */
-    #l3_fold { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; color: rgba(255,255,255,.55); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
-    #l3_fold:hover { background: rgba(255,255,255,.1); color: #fff; }
+    #l3_fold { margin-left: auto; margin-top: 2px; width: 32px; height: 32px; border-radius: 9px; color: rgba(255,255,255,.8); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 2px 6px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; transition: background .15s, border-color .15s; }
+    #l3_fold:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.4); color: #fff; }
+    #l3_fold:active { transform: translateY(1px); box-shadow: none; }
     #l3.folded { --l3a: 68px !important; }
     #l3.folded #l3_steps { padding-left: 8px; padding-right: 8px; }
     #l3.folded #l3_brand { flex-direction: column; gap: 10px; margin-left: 0; margin-right: 0; }
     #l3.folded #l3_brand .wm, #l3.folded #l3_steps .t, #l3.folded #l3_acct .who { display: none; }
-    #l3.folded #l3_fold { margin-left: 0; transform: rotate(180deg); }
+    #l3.folded #l3_fold { margin-left: 0; margin-top: 0; }
+    #l3.folded #l3_brand { align-items: center !important; }
     #l3.folded #l3_steps li { justify-content: center; padding: 9px 0; }
     #l3.folded #l3_steps ol::before { left: 50%; margin-left: -1px; }
     #l3.folded #l3_acct { flex-direction: column; padding: 8px 4px; gap: 6px; }
@@ -7668,8 +7693,11 @@
             `<span class="lkbox"><img class="lk" src="brand/msc-lockup-horizontal-dark${wide ? '' : '-nosub'}.svg" alt="MSC report${wide ? ' — powered by COSTEP' : ''}">` +
             (wide ? '' : '<span class="pw">powered by COSTEP</span>') + '</span>' +
             '<img class="em" src="brand/msc-emblem-color-ondark.svg" alt="MSC report">' +
-            '<button type="button" id="l3_fold" aria-label="사이드바 접기" title="사이드바 접기/펴기"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
+            '<button type="button" id="l3_fold" aria-label="사이드바 접기" title="사이드바 접기/펴기"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M9.5 4v16"/><path d="M5.6 8.5h1.6M5.6 11.5h1.6"/></svg></button>';
           document.getElementById('l3_fold').onclick = () => setFold(!shell.classList.contains('folded'));
+          const lkImg = document.querySelector('#l3_brand .lk'), pwEl = document.querySelector('#l3_brand .pw');
+          const alignPw = () => { if (pwEl && lkImg.offsetWidth) pwEl.style.paddingLeft = Math.round(lkImg.offsetWidth * 305 / 1091) + 'px'; };
+          if (lkImg) { if (lkImg.complete) alignPw(); else lkImg.onload = alignPw; }
         }
         // 사이드바 접기 상태는 이 PC에 기억
         const FOLD_KEY = 'MSC_L3_FOLD_V1';
@@ -7850,7 +7878,7 @@
             const apply = () => {
               raf = 0;
               const W = shell.clientWidth, side = document.getElementById('l3_steps').offsetWidth, pv = document.getElementById('l3_preview').offsetWidth;
-              if (g.dataset.k === '0') size.a = Math.round(Math.max(64, Math.min(360, W - pv - 360, lastX)));
+              if (g.dataset.k === '0') size.a = Math.round(Math.max(224, Math.min(360, W - pv - 360, lastX)));
               else size.c = Math.round(Math.max(300, Math.min(W - side - 360, W - lastX)));
               applySize(size); placeGuts(); placeNav(); fit();
               box.style.setProperty('--l3h', box.clientHeight + 'px'); fitWide();
