@@ -7224,11 +7224,12 @@
     body.l3-on > header.no-print { display: none !important; }
     #l3_brand { display: flex; align-items: center; gap: 10px; margin: 2px 6px 22px; }
     #l3_brand .mk { width: 32px; height: 32px; flex: none; }
-    #l3_brand { flex-wrap: wrap; row-gap: 4px; }
-    #l3_brand .lk { height: 34px; width: auto; max-width: calc(100% - 34px); }
+    #l3_brand { flex-wrap: nowrap; align-items: center; }
+    #l3_brand .lkbox { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; flex: 1; }
+    #l3_brand .lk { height: 34px; width: auto; max-width: 100%; }
     #l3_brand .em { display: none; width: 36px; height: 36px; }
-    #l3_brand .pw { flex-basis: 100%; order: 3; font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: .04em; padding-left: 2px; }
-    #l3.folded #l3_brand .lk, #l3.folded #l3_brand .pw { display: none; }
+    #l3_brand .pw { font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.5); letter-spacing: .04em; padding-left: 2px; white-space: nowrap; }
+    #l3.folded #l3_brand .lkbox { display: none; }
     #l3.folded #l3_brand .em { display: block; }
     #l3_brand .wm { display: flex; flex-direction: column; line-height: 1.05; font-size: 17px; font-weight: 500; color: #fff; letter-spacing: -.01em; white-space: nowrap; }
     #l3_brand .wm b { font-weight: 900; letter-spacing: .02em; }
@@ -7503,7 +7504,7 @@
         choice.id = 'l3_cchoice';
         choice.innerHTML = '<div class="l3-ask"><div class="q">어떤 고객을 작성할까요?</div><div class="opts">' +
           '<button type="button" data-c="new"><b>새 고객 작성</b><span>서류를 올리면 빈칸을 알아서 채웁니다</span></button>' +
-          '<button type="button" data-c="old"><b>기존 고객 불러오기</b><span>이 PC에 저장한 고객을 다시 엽니다</span></button></div></div>' +
+          '<button type="button" data-c="old"><b>기존 고객 불러오기</b><span>내 계정으로 이 PC에 저장한 고객을 다시 엽니다</span></button></div></div>' +
           '<div class="l3-seg"><button type="button" data-c="new">새 고객 작성</button><button type="button" data-c="old">기존 고객 불러오기</button></div>';
         scr.insertBefore(choice, scr.firstChild);
         // 원본의 '자문 수행 담당자'(이름·직함) 칸을 여기로 옮긴다 — 서식이 읽는 id 는 그대로
@@ -7521,9 +7522,13 @@
         meCard.addEventListener('input', e => {
           const m = readMe();
           if (e.target.dataset.me === 'mobile' || e.target.dataset.me === 'phone') {
-            const d = e.target.value.replace(/\D/g, '').slice(0, 11);
-            const f = d.startsWith('02') ? d.replace(/^(02)(\d{0,4})(\d{0,4}).*/, (x, a, b, c) => [a, b, c].filter(Boolean).join('-'))
-              : d.length > 10 ? d.replace(/^(\d{3})(\d{4})(\d{0,4}).*/, '$1-$2-$3') : d.replace(/^(\d{3})(\d{0,3})(\d{0,4}).*/, (x, a, b, c) => [a, b, c].filter(Boolean).join('-'));
+            // 전국대표번호(15xx·16xx·18xx) 1577-8888 · 서울 02-123-4567/02-1234-5678 · 안심번호 0505-123-4567 · 그 밖 031-123-4567/010-1234-5678
+            const d = e.target.value.replace(/\D/g, '').slice(0, 12);
+            const grp = (x, ...n) => { const out = []; let i = 0; for (const k of n) { if (i >= x.length) break; out.push(x.slice(i, i + k)); i += k; } if (i < x.length) out[out.length - 1] += x.slice(i); return out.join('-'); };
+            const f = /^1[568]/.test(d) ? grp(d.slice(0, 8), 4, 4)
+              : d.startsWith('02') ? (d.length <= 9 ? grp(d, 2, 3, 4) : grp(d.slice(0, 10), 2, 4, 4))
+              : /^050\d/.test(d) ? (d.length <= 11 ? grp(d, 4, 3, 4) : grp(d, 4, 4, 4))
+              : d.length <= 10 ? grp(d, 3, 3, 4) : grp(d.slice(0, 11), 3, 4, 4);
             if (f !== e.target.value) e.target.value = f;
           }
           if (e.target.dataset.me) m[e.target.dataset.me] = e.target.value;
@@ -7660,9 +7665,9 @@
         function renderBrand() {
           const wide = (document.getElementById('l3_steps')?.offsetWidth || 200) >= 264;   // 로고 폭 240px 이상 확보될 때만 부제(powered by COSTEP) 포함판
           document.getElementById('l3_brand').innerHTML =
-            `<img class="lk" src="brand/msc-lockup-horizontal-dark${wide ? '' : '-nosub'}.svg" alt="MSC report${wide ? ' — powered by COSTEP' : ''}">` +
+            `<span class="lkbox"><img class="lk" src="brand/msc-lockup-horizontal-dark${wide ? '' : '-nosub'}.svg" alt="MSC report${wide ? ' — powered by COSTEP' : ''}">` +
+            (wide ? '' : '<span class="pw">powered by COSTEP</span>') + '</span>' +
             '<img class="em" src="brand/msc-emblem-color-ondark.svg" alt="MSC report">' +
-            (wide ? '' : '<span class="pw">powered by COSTEP</span>') +
             '<button type="button" id="l3_fold" aria-label="사이드바 접기" title="사이드바 접기/펴기"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
           document.getElementById('l3_fold').onclick = () => setFold(!shell.classList.contains('folded'));
         }
