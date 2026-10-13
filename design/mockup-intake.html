@@ -3,367 +3,127 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>입력 흐름 목업 · MSC Report Generator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<title>입력 흐름 목업</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #F6F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7; --surface-3: #F1EFE9;
-    --line: #E4E2DB; --line-2: #D6D3CA; --text: #0A0B0F; --text-2: #33363D; --text-3: #66635C;
-    --teal: #00E0C6; --teal-ink: #00A898; --teal-soft: rgba(0,168,152,.09);
-    --navy: #0A1F44; --gold: #FFC300; --gold-ink: #8A6200; --gold-soft: rgba(255,195,0,.16);
-    --red: #A32D2D; --red-soft: #FCEBEB; --accent: #0A0B0F; --on-accent: #FFFFFF;
-    --docval: #FFF6D6; --docval-line: #E8C34A;
-  }
-  :root[data-theme="ink"] {
-    --bg: #0B0D12; --surface: #151922; --surface-2: #1D222D; --surface-3: #262C39;
-    --line: rgba(255,255,255,.16); --line-2: rgba(255,255,255,.24); --text: #FFFFFF; --text-2: #E1E6EF; --text-3: #B4BDCC;
-    --teal-ink: #00E0C6; --teal-soft: rgba(0,224,198,.14); --gold-ink: #FFC300; --gold-soft: rgba(255,195,0,.14);
-    --red: #FF9B9B; --red-soft: rgba(255,107,107,.14); --accent: #00E0C6; --on-accent: #00241F;
-    --docval: rgba(255,195,0,.14); --docval-line: rgba(255,195,0,.55);
-  }
+  :root { --bg: #F6F5F1; --card: #FFFFFF; --line: #E4E2DB; --text: #0A0B0F; --sub: #66635C; --teal: #00A898; --teal-soft: rgba(0,168,152,.08); --gold-soft: #FFF6D6; --gold-line: #E8C34A; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); font-size: 13px; }
-  button { font-family: inherit; cursor: pointer; }
-  .num { font-variant-numeric: tabular-nums; }
-  /* 상단 */
-  header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-  .hbar { max-width: 1440px; margin: 0 auto; display: flex; align-items: center; gap: 12px; padding: 10px 20px; }
-  .hbar .logo { height: 30px; }
-  .hbar .logo-dark { display: none; } :root[data-theme="ink"] .hbar .logo-dark { display: block; } :root[data-theme="ink"] .hbar .logo-light { display: none; }
-  .firmchip { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 700; }
-  .firmchip small { color: var(--text-3); font-weight: 500; }
-  .tabs { display: flex; gap: 4px; background: var(--surface-3); padding: 4px; border-radius: 12px; margin-left: 8px; }
-  .tabs button { border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; font-weight: 700; color: var(--text-2); }
-  .tabs button.on { background: var(--accent); color: var(--on-accent); }
-  .spacer { flex: 1; }
-  .seg { display: flex; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
-  .seg button { border: 0; background: var(--surface); padding: 7px 12px; font-weight: 700; color: var(--text-2); }
-  .seg button.on { background: var(--navy); color: #fff; }
-  .iconbtn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; }
-  /* 진단 건 바 */
-  .casebar { max-width: 1440px; margin: 0 auto; padding: 10px 20px 0; }
-  .casecard { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
-  .casecard label { color: var(--text-3); font-size: 11px; font-weight: 700; margin-right: 6px; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface-2); font-weight: 700; color: var(--text-2); }
-  .pill.on { background: var(--navy); border-color: var(--navy); color: #fff; }
-  .chip { border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); padding: 5px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
-  .chip.on { background: var(--teal-soft); border-color: var(--teal-ink); color: var(--teal-ink); }
-  .btn { border: 1px solid var(--line-2); background: var(--surface); color: var(--text); padding: 8px 14px; border-radius: 10px; font-weight: 700; }
-  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
-  .btn.gold { background: var(--gold); color: #241A00; border-color: transparent; }
-  .ready { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
-  .ready .r { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 700; font-size: 12px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .ok { background: var(--teal-ink); } .no { background: var(--line-2); } .half { background: var(--gold); }
-  /* 3단 */
-  .wrap { max-width: 1440px; margin: 0 auto; padding: 12px 20px 60px; display: grid; grid-template-columns: 230px minmax(0,1fr) 280px; gap: 14px; }
-  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
-  .steps { padding: 10px; position: sticky; top: 76px; align-self: start; }
-  .step { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 9px 8px; border-radius: 10px; border: 0; background: transparent; width: 100%; text-align: left; color: var(--text-2); }
-  .step:hover { background: var(--surface-3); }
-  .step.on { background: var(--teal-soft); color: var(--text); }
-  .step .no_ { width: 24px; height: 24px; border-radius: 8px; background: var(--surface-3); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; }
-  .step.on .no_ { background: var(--accent); color: var(--on-accent); }
-  .step b { font-weight: 700; } .step small { display: block; color: var(--text-3); font-size: 11px; }
-  .tri { display: flex; gap: 3px; }
-  .steps .foot { border-top: 1px solid var(--line); margin-top: 8px; padding: 10px 8px 4px; color: var(--text-3); font-size: 12px; line-height: 1.8; }
-  .main { padding: 18px 20px; }
-  .main h2 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
-  .goal { color: var(--text-2); margin: 6px 0 4px; }
-  .uses { display: flex; gap: 6px; margin: 8px 0 14px; flex-wrap: wrap; }
-  .uses span { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); }
-  .sec { border-top: 1px solid var(--line); padding: 14px 0 6px; }
-  .sec h3 { margin: 0 0 10px; font-size: 13px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
-  .sec h3 em { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
-  .t-a em { background: var(--surface-3); color: var(--text-2); } .t-past em { background: #EEF1F7; color: var(--navy); } .t-now em { background: var(--teal-soft); color: var(--teal-ink); } .t-future em { background: var(--gold-soft); color: var(--gold-ink); }
-  :root[data-theme="ink"] .t-past em { background: rgba(143,183,255,.14); color: #A9C8FF; }
-  .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 14px; }
-  .f { display: flex; flex-direction: column; gap: 5px; }
-  .f.wide { grid-column: 1 / -1; }
-  .f .lab { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
-  .tag { font-size: 10px; font-weight: 700; padding: 0 6px; height: 18px; line-height: 16px; display: inline-flex; align-items: center; border-radius: 5px; border: 1px solid var(--line-2); color: var(--text-3); }
-  .tag.dtag { border-color: var(--docval-line); color: var(--gold-ink); }
-  .tag.req { border-color: var(--red); color: var(--red); }
-  .tag.sens { border-color: var(--navy); color: var(--navy); } :root[data-theme="ink"] .tag.sens { border-color: #A9C8FF; color: #A9C8FF; }
-  .in { border: 1px solid #C9CED8; background: #FFFFFF; color: #0A0B0F; border-radius: 9px; padding: 8px 10px; font: inherit; width: 100%; }
-  :root[data-theme="ink"] .in { border-color: rgba(255,255,255,.3); }
-  .in.docv { background: #FFF6D6; border-color: #E8C34A; }
-  .in::placeholder { color: #8A8F99; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .mini { display: flex; gap: 4px; }
-  .mini button { border: 0; background: transparent; color: var(--text-3); font-size: 11px; padding: 0 2px; text-decoration: underline; }
-  .src { font-size: 11px; color: var(--gold-ink); }
-  .gate { margin: 10px 0 4px; border: 1px dashed var(--navy); border-radius: 12px; padding: 12px; background: var(--surface-2); }
-  :root[data-theme="ink"] .gate { border-color: #A9C8FF; }
-  .gate .row { display: flex; align-items: center; gap: 8px; font-weight: 700; }
-  .confirmbox { margin-top: 12px; border: 1px solid var(--teal-ink); background: var(--teal-soft); border-radius: 12px; padding: 12px; }
-  .confirmbox .line { display: flex; gap: 8px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
-  .nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
-  .docs { padding: 14px; position: sticky; top: 76px; align-self: start; }
-  .drop { border: 2px dashed var(--line-2); border-radius: 14px; padding: 18px 12px; text-align: center; color: var(--text-3); background: var(--surface-2); }
-  .drop.hover { border-color: var(--teal-ink); color: var(--teal-ink); background: var(--teal-soft); }
-  .doc { display: grid; grid-template-columns: 18px 1fr; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 12px; }
-  .doc:last-child { border-bottom: 0; }
-  .doc small { color: var(--text-3); display: block; }
-  .st { width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; color: #fff; margin-top: 2px; }
-  .st.done { background: var(--teal-ink); } .st.check { background: var(--gold); color: #241A00; } .st.none { background: var(--line-2); } .st.exp { background: var(--red); }
-  .legend { margin-top: 10px; font-size: 11px; color: var(--text-3); line-height: 1.8; }
-  /* 모달 */
-  .modal { position: fixed; inset: 0; background: rgba(10,11,15,.5); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 50; overflow-y: auto; }
-  .modal.on { display: flex; }
-  .sheet { width: 100%; max-width: 1080px; background: var(--surface); border-radius: 18px; border: 1px solid var(--line); padding: 18px 20px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; color: var(--text-3); font-weight: 700; padding: 8px; border-bottom: 1px solid var(--line-2); background: var(--surface-2); }
-  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .conf-h { color: var(--teal-ink); font-weight: 900; } .conf-m { color: var(--gold-ink); font-weight: 900; } .conf-l { color: var(--red); font-weight: 900; }
-  /* 현재 화면 */
-  .cur { max-width: 900px; margin: 20px auto 60px; padding: 0 20px; }
-  .cur .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
-  .cur .card b { font-weight: 900; }
-  .cur .prob { color: var(--red); font-size: 12px; margin-top: 6px; }
-  .note { background: var(--gold-soft); border: 1px solid var(--docval-line); border-radius: 12px; padding: 10px 12px; color: var(--text-2); }
-  @media (max-width: 1100px) {
-    .wrap { grid-template-columns: minmax(0,1fr); }
-    .steps { position: static; display: flex; overflow-x: auto; gap: 6px; padding: 8px; }
-    .step { min-width: 150px; } .steps .foot { display: none; }
-    .docs { position: static; }
-    .grid { grid-template-columns: minmax(0,1fr); }
-    .tabs, .firmchip small { display: none; }
-  }
+  body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--line); background: var(--card); }
+  header img { height: 28px; }
+  header .me { margin-left: auto; font-size: 13px; color: var(--sub); }
+  main { max-width: 720px; margin: 36px auto 60px; padding: 0 16px; }
+  .flow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; font-size: 12px; color: var(--sub); }
+  .flow span { padding: 4px 10px; border-radius: 999px; background: #EDEBE5; }
+  .flow span.on { background: var(--text); color: #fff; font-weight: 700; }
+  h1 { font-size: 24px; font-weight: 900; margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+  h2 { font-size: 15px; font-weight: 700; margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  input, select { width: 100%; border: 1px solid #C9CED8; border-radius: 10px; padding: 11px 12px; font: inherit; font-size: 14px; background: #fff; }
+  input.filled { background: var(--gold-soft); border-color: var(--gold-line); }
+  .row { display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 14px; border-radius: 12px; border: 1px solid #C9CED8; background: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn.dark { background: var(--text); color: #fff; border-color: var(--text); }
+  .choice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .choice button { text-align: left; padding: 22px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); font: inherit; cursor: pointer; }
+  .choice button:hover { border-color: var(--teal); background: var(--teal-soft); }
+  .choice b { display: block; font-size: 17px; margin-bottom: 6px; }
+  .choice small { color: var(--sub); font-size: 13px; }
+  .drop { border: 2px dashed #D6D3CA; border-radius: 16px; padding: 32px 16px; text-align: center; color: var(--sub); background: var(--card); margin-bottom: 16px; }
+  .files { font-size: 14px; }
+  .files div { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .files div:last-child { border: 0; }
+  .ok { color: var(--teal); font-weight: 700; white-space: nowrap; }
+  .no { color: var(--sub); white-space: nowrap; }
+  .me-line { display: flex; align-items: center; gap: 16px; }
+  .me-line img { height: 40px; }
+  .me-line .who b { font-size: 18px; } .me-line .who div { color: var(--sub); font-size: 14px; margin-top: 2px; }
+  .report div { display: flex; justify-content: space-between; align-items: center; padding: 14px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .report div:last-child { border: 0; }
+  .report button { padding: 8px 14px; border-radius: 10px; border: 1px solid #C9CED8; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  .note { font-size: 13px; color: var(--sub); margin: -6px 0 16px; }
+  @media (max-width: 600px) { .grid, .choice { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<header>
-  <div class="hbar">
-    <img class="logo logo-light" src="logo/costep-logo-horizontal-color.svg" alt="CoStep">
-    <img class="logo logo-dark" src="logo/costep-logo-horizontal-color-dark.svg" alt="CoStep">
-    <div class="firmchip" title="0단계 작성자 정보 (누르면 0단계)" onclick="go(0)" style="cursor:pointer">코스텝 <small>· 홍길동 경영컨설턴트 ▾</small></div>
-    <div class="tabs"><button class="on">1. 진단 입력</button><button>2. 서식</button><button>3. 지원사업</button></div>
-    <div class="spacer"></div>
-    <div class="seg"><button id="v_cur" onclick="setView('cur')">현재 화면</button><button id="v_new" class="on" onclick="setView('new')">개선안</button></div>
-    <div class="seg"><button id="p_smb" class="on" onclick="setPreset('smb')">예시: 소상공인 개인</button><button id="p_corp" onclick="setPreset('corp')">예시: 법인 소기업</button></div>
-    <button class="iconbtn" onclick="toggleTheme()" title="다크/라이트" aria-label="다크 라이트 전환">◐</button>
-  </div>
-</header>
-
-<div id="view_new">
-  <div class="casebar">
-    <div class="casecard">
-      <div><label>고객</label><span class="pill on" id="cb_client">한빛분식 · 123-45-67890 ▾</span></div>
-      <div><label>회차</label><b class="num" id="cb_round">2회차</b></div>
-      <div><label>진단일</label><b class="num">2026-10-13</b></div>
-      <div><label>협약</label><span class="pill">2026 경영지원 컨설팅 ▾</span></div>
-      <div><label>상담목적 = 보고서 분야 (최대 2)</label><span class="chips" id="cb_purpose"></span></div>
-      <div class="spacer"></div>
-      <button class="btn gold" onclick="openUpload()">서류 올리기</button>
-    </div>
-  </div>
-  <div class="wrap">
-    <nav class="panel steps" id="steps"></nav>
-    <main class="panel main" id="main"></main>
-    <aside class="panel docs" id="docs"></aside>
-  </div>
-</div>
-
-<div id="view_cur" class="cur" style="display:none">
-  <p class="note">지금 운영 화면의 입력 순서를 그대로 줄여 그린 것입니다. 한 장을 세로로 길게 스크롤(약 2,380px)합니다.</p>
-  <div class="card"><b>고객 파일</b> — 저장된 고객 · 새 고객 · 저장 · 내보내기 · 가져오기 · 삭제<div class="prob">계정별 저장은 됐지만 고객 목록이 PC마다 따로 있음</div></div>
-  <div class="card"><b>진단 대상 구분</b> — 규모 3버튼 · 업종 10버튼<div class="prob">근거 입력(인원·매출·업태) 없이 맨 앞에서 화면이 정해짐</div></div>
-  <div class="card"><b>기본정보·대표자·주주 (14칸)</b> — 상호 · 사업자 구분(기본 '법인') · 사업자번호 · 법인번호 · 대표자 · 생년월일(글자칸) · 개업일 · 주택(기본 '자가') · 지분율 · 주거래은행 · 본점 · 공장 · 업태·생산품 · 담당자<div class="prob">대표자·사업자·작성자 정보가 한 카드에 섞임 · 과거/현재/미래 구분 없음 · 기본값이 사실처럼 출력</div></div>
-  <div class="card"><b>거래처·특허·인증 (5칸)</b></div>
-  <div class="card"><b>차입금 표</b> — 기관 · 종류 · 잔액 · 금리 · 월이자 · 상환<div class="prob">만기일 없음 · 고금리 체크가 따로 놀아 표와 어긋남</div></div>
-  <div class="card"><b>소상공인 실태</b> 또는 <b>3개년 재무·신용</b> (규모별)<div class="prob">체크 10개 중 다수가 기본 '예' → 확인 안 해도 판정 문장이 출력 · 3개년 열 이름이 연도와 어긋남</div></div>
-  <div class="card"><b>업종 특화 3칸</b><div class="prob">견본 문구·'보유' 기본값</div></div>
-  <div class="card"><b>사업계획 6칸</b> [자동 생성]<div class="prob">근거 없는 인증·수치 문구가 자동으로 들어감</div></div>
-  <div class="card"><b>[보고서 생성 →]</b><div class="prob">단계·필수·진행률·출력 전 점검 없음 · 서류 업로드 없음</div></div>
-</div>
-
-<div class="modal" id="m_upload" onclick="if(event.target===this)closeUpload()">
-  <div class="sheet">
-    <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;font-size:18px">서류 올리기 <small style="font-size:12px;color:var(--text-3);font-weight:500">2차 출시 · 화면 예시</small></h2><button class="btn" onclick="closeUpload()">닫기</button></div>
-    <div class="drop" id="bigdrop" style="margin:12px 0">PDF·사진·엑셀을 여기에 한꺼번에 끌어다 놓거나 <button class="btn" style="margin-left:6px">파일 찾기</button><br><small>파일은 이 PC 브라우저에서만 읽고 저장하지 않습니다 · 최대 30개, 파일당 20MB</small></div>
-    <table>
-      <thead><tr><th>받은 파일</th><th>판별된 서류</th><th>형식</th><th>채울 칸</th><th>처리</th></tr></thead>
-      <tbody>
-        <tr><td>사업자등록증명.pdf</td><td>D01 사업자등록증명 (발급 10/02)</td><td>텍스트 PDF</td><td>8칸</td><td><button class="btn" onclick="showConfirm()">확인표</button></td></tr>
-        <tr><td>부가세과세표준증명.pdf</td><td>D08 부가세 과세표준증명 2025 1·2기</td><td>텍스트 PDF</td><td>3칸</td><td><button class="btn" onclick="showConfirm()">확인표</button></td></tr>
-        <tr><td>세금계산서_매출.xlsx</td><td>D11 전자세금계산서 매출 목록</td><td>엑셀</td><td>1칸</td><td><button class="btn" onclick="showConfirm()">확인표</button></td></tr>
-        <tr><td>scan_0012.jpg</td><td>임대차계약서? (OCR, 3차)</td><td>이미지</td><td>–</td><td><span class="chip">종류 선택 ▾</span></td></tr>
-        <tr><td>납세증명서.pdf</td><td style="color:var(--red)">사업자번호 다름 → 적용 불가</td><td>텍스트 PDF</td><td>–</td><td>–</td></tr>
-        <tr><td>사업계획서.hwp</td><td>HWP는 읽을 수 없음 → "PDF로 저장해 올려 주세요"</td><td>HWP</td><td>–</td><td>–</td></tr>
-      </tbody>
-    </table>
-    <div id="confirm" style="display:none;margin-top:16px">
-      <h3 style="margin:0 0 8px">확인표 · D01 사업자등록증명 (발급 2026-10-02)</h3>
-      <table>
-        <thead><tr><th>단계</th><th>앱 항목</th><th>지금 값</th><th>서류 값</th><th>원문 위치</th><th>신뢰</th><th>처리</th></tr></thead>
-        <tbody>
-          <tr><td>G</td><td>상호</td><td>한빛분식</td><td>한빛분식</td><td>p1 "상호(법인명)"</td><td class="conf-h">높음</td><td>같음</td></tr>
-          <tr><td>2</td><td>개업일</td><td>(빈칸)</td><td>2018-03-02</td><td>p1 "개업연월일 2018년 03월 02일"</td><td class="conf-h">높음</td><td><label><input type="checkbox" checked> 적용</label></td></tr>
-          <tr><td>2</td><td>업태 / 종목</td><td>(빈칸)</td><td>음식점업 / 분식</td><td>p1 "업태 · 종목"</td><td class="conf-h">높음</td><td><label><input type="checkbox" checked> 적용</label></td></tr>
-          <tr><td>2</td><td>업종 추천</td><td>–</td><td>음식점·식품제조</td><td>업태 '음식' 키워드</td><td class="conf-m">중간</td><td><button class="btn">확인</button></td></tr>
-          <tr><td>1</td><td>대표자 생년월일</td><td>(빈칸)</td><td>1979-05-12</td><td>주민번호 앞 6자리에서 계산 · 원문 폐기</td><td class="conf-m">중간</td><td><label><input type="checkbox"> 적용</label></td></tr>
-        </tbody>
-      </table>
-      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary">체크한 것만 적용</button><button class="btn">모두 유지</button><button class="btn">되돌리기</button><span style="color:var(--text-3);align-self:center">신뢰 '높음'만 일괄 적용 · '중간'·'낮음'은 한 칸씩 확인</span></div>
-    </div>
-  </div>
-</div>
-
+<header><img src="logo/costep-logo-horizontal-color.svg" alt="로고"><span class="me">코스텝 · 홍길동</span></header>
+<main id="app"></main>
 <script>
-  const PURPOSE = { smb: ['경영개선', '재기·정리', '부채·대환', '마케팅·판로', '시설', '노무'], corp: ['성장전략', '재무·자금', '노무', '안전', '공공조달', 'ESG'] };
-  const PRESET = {
-    smb: { client: '한빛분식 · 123-45-67890', round: '2회차', purpose: ['경영개선', '부채·대환'], corp: '한빛분식', ceo: '김대성', form: '개인', birth: '1979-05-12', open: '2018-03-02', addr: '서울 마포구 망원로 12', staff: '2', sales: '1,850', size: '소상공인(추천: 인원 2명·음식점업)' },
-    corp: { client: '(주)한빛정밀 · 123-81-45678', round: '1회차', purpose: ['재무·자금', '성장전략'], corp: '(주)한빛정밀', ceo: '김대성', form: '법인', birth: '1979-05-12', open: '2016-04-01', addr: '경기 화성시 동탄기흥로 27', staff: '18', sales: '2,850', size: '소·중기업(추천: 인원 18명 · 소/중은 4단계 매출로 확정)' }
-  };
-  const PROFILE = { firm: '코스텝', prefix: 'COSTEP', reviewer: '대표 박○○ · 검토 이○○ 수석컨설턴트', program: '2026 경영지원 컨설팅', name: '홍길동', phone: '010-1234-5678', mail: 'hong@example.com (로그인 메일)' };
-  let preset = 'smb', cur = 0;
-  // 단계 정의: sections = [구획 종류, 제목, 칸 목록]. 칸 = [라벨, 형식, 태그(불/준/가), 서류, 필수?, 민감?, 값키]
-  const STEPS = [
-    { n: 0, name: '작성자 정보', sub: '계정당 처음 한 번', goal: '서식 머리글·발신·서명·문서번호에 내 펌과 내 이름이 찍힙니다. 다음 로그인부터 자동으로 불러옵니다.', uses: ['서식1 머리글·발신', '서식1~4 서명·직인', '문서번호'], docs: [['로고·직인 이미지', 'done']], profile: true },
-    { n: 1, name: '대표자', sub: '불변 → 경력 → 연락·신용 → 의향', goal: '서식2·4의 대표자 란, 지원 요건(나이), 사업계획 수행 인력의 근거가 채워집니다.', uses: ['서식2 대표자', '서식4 대표자', '지원 요건'], docs: [['D01 사업자등록증명', 'done'], ['D03 법인등기(법인)', 'none'], ['D20 신용점수 화면(동의 후)', 'none']],
-      sections: [
-        ['a', 'A 확인 (변하지 않는 정보)', [['대표자 성명', 'text', '준', 'D01', 1, 0, 'ceo'], ['생년월일 (만 나이 자동)', 'date', '불', 'D01', 0, 0, 'birth'], ['공동대표', 'chips:없음,있음', '준', 'D03'], ['여성 대표', 'chips:예,아니오,응답 안 함', '불', '']]],
-        ['past', '과거', [['동종업계 경력', 'chips:3년 미만,3~10년,10년 이상', '불', ''], ['주요 경력·학력·자격 한 줄', 'text', '불', ''], ['대표 취임일 (법인)', 'date', '불', 'D03'], ['이전 사업·폐업 이력', 'chips:없음,있음,나중에', '불', '']]],
-        ['now', '현재 · 기준일 2026-10-13', [['대표 연락처 (서식에는 출력 안 함)', 'text', '준', '']], 'sens'],
-        ['future', '미래', [['사업 지속 의향', 'chips:확장,유지,승계 준비,정리 고려', '가', ''], ['시기', 'chips:6개월,1년,3년,미정', '가', '']]]
-      ] },
-    { n: 2, name: '사업자', sub: '구분 → 개업 → 소재지·인원 → 계획', goal: '사업자 정보가 확정되고, 끝에서 업종과 규모(소상공인 여부)를 확정합니다. 이후 단계 화면 구성이 정해집니다.', uses: ['서식1 수신·문서번호', '서식2 기업 개요', '서식4 신청기업'], docs: [['D01 사업자등록증명', 'done'], ['D03 법인등기', 'check'], ['D05 소상공인 확인서', 'none'], ['D14 4대보험 가입자명부', 'none'], ['D16 임대차계약서', 'none']],
-      sections: [
-        ['a', 'A 확인', [['사업자 구분 (사업자번호 가운데 2자리로 제안)', 'chips:개인,법인,미선택', '불', 'D01', 1, 0, 'form'], ['법인등록번호 (법인만)', 'text', '불', 'D03'], ['업태', 'text', '준', 'D01'], ['종목', 'text', '준', 'D01']]],
-        ['past', '과거', [['개업일 (업력 자동)', 'date', '불', 'D01', 0, 0, 'open'], ['법인설립일', 'date', '불', 'D03'], ['정부지원사업 수혜 이력', 'chips:없음,있음,나중에', '불', '']]],
-        ['now', '현재 · 기준일 2026-10-13', [['과세유형', 'chips:일반,간이,면세', '준', 'D01'], ['사업장 소재지', 'text', '준', 'D01', 1, 0, 'addr'], ['대표 지분 (%)', 'num', '준', 'D04'], ['사업장 점유', 'chips:자가,임차,무상,미확인', '준', 'D16'], ['전용면적 (평)', 'num', '준', 'D16'], ['상시근로자 (명)', 'num', '가', 'D14', 0, 0, 'staff'], ['서면 근로계약', 'chips:예,아니오,미확인', '가', ''], ['4대보험 가입', 'chips:예,아니오,미확인', '가', 'D14']]],
-        ['future', '미래', [['채용 계획', 'chips:없음,1명,2~3명,미정', '가', ''], ['이전·확장·법인전환', 'chips:없음,이전,확장,법인전환', '가', '']]]
-      ], frame: true },
-    { n: 3, name: '사업 운영', sub: '인허가 → 인증·특허 → 제품·거래처 → 계획', goal: '서식2 기업 개요와 업종 특화 진단이 완성됩니다.', uses: ['서식2 기업 개요', '맞춤 진단 문장'], docs: [['D11 세금계산서 엑셀', 'check'], ['D25~D31 인증·인허가', 'none']],
-      sections: [
-        ['a', 'A 확인', [['업종 인허가 (영업신고 등)', 'chips:보유,미보유,미확인', '준', 'D31']]],
-        ['past', '과거', [['특허·실용신안', 'text', '준', 'D28'], ['보유 인증 (벤처·이노비즈·ISO 등)', 'text', '준', 'D25']]],
-        ['now', '현재', [['주력 제품·서비스', 'text', '준', '', 1], ['판매 채널', 'chips:매장,배달,온라인,B2B,공공', '준', 'D10'], ['주요 매출처·비중', 'text', '가', 'D11'], ['주요 매입처·결제조건', 'text', '가', 'D11'], ['스마트 주문기기 (상태)', 'chips:보유,미보유,미확인', '가', '']]],
-        ['future', '미래', [['스마트 주문기기 도입', 'chips:희망,불필요,미정', '가', ''], ['간판·시설 개선', 'chips:있음,없음,미정', '가', ''], ['신규 판로', 'text', '가', '']]]
-      ] },
-    { n: 4, name: '실적·비용', sub: '결산 → 월매출·고정비 → 목표', goal: '수지 판정(손익분기)·재무 진단(성장률·이익률)이 계산됩니다.', uses: ['서식2 수지·재무', '맞춤 진단 문장', '사업계획 예산 상한'], docs: [['D08 부가세 과세표준증명', 'done'], ['D06 표준재무제표증명', 'none'], ['D15 원천징수신고서', 'none']],
-      sections: [
-        ['a', 'A 확인', [['기준일', 'date', '가', ''], ['당기 사업연도 (중소)', 'num', '불', 'D06']]],
-        ['past', '과거', [['전년 연매출 (만원)', 'num', '불', 'D08'], ['원자재 단가 (지난 1년)', 'chips:현저히 상승,완만히 상승,변동 없음,미확인', '가', '']]],
-        ['now', '현재', [['월평균 매출 (만원)', 'num', '가', 'D08', 1, 0, 'sales'], ['기준 기간', 'chips:최근 3개월,6개월,12개월', '가', ''], ['임차료 · 관리비 · 인건비 · 렌탈 (만원/월)', 'text', '가', 'D16', 1], ['월 이자 (5단계 대출표에서 자동)', 'text', '가', ''], ['마진율', 'chips:30%,40%,50%,60%,직접', '가', '']]],
-        ['future', '미래', [['1년 목표 매출', 'num', '가', '']]]
-      ] },
-    { n: 5, name: '부채·의무', sub: '은행 → 보증 이력 → 대출·납세 → 자금 수요', goal: '대출 합계·평균금리·이자 부담과 납세 상태로 서식2 재무 진단이 완성됩니다.', uses: ['서식2 차입금 표', '맞춤 진단 문장', '연계 공고'], docs: [['D17 부채증명·금융거래확인서', 'none'], ['D22 국세 납세증명', 'exp'], ['D23 지방세 납세증명', 'none']],
-      sections: [
-        ['a', 'A 확인', [['주거래은행 (끝 4자리만)', 'text', '준', 'D17']]],
-        ['past', '과거', [['보증 이용 이력', 'chips:예,아니오,미확인', '준', 'D19']]],
-        ['now', '현재', [['대출표 (기관·잔액·금리·만기) — 고금리 7% 자동 판정', 'text', '가', 'D17', 0], ['국세·지방세 완납', 'chips:완납,체납 있음,미확인', '가', 'D22']]],
-        ['future', '미래', [['필요 자금 (금액·용도·시기)', 'text', '가', ''], ['대환 희망', 'chips:예,아니오,미정', '가', '']]]
-      ] },
-    { n: 6, name: '사업계획', sub: '모아보기 → 문제 → 인력 → 해결·판로·예산·효과', goal: '서식4 사업계획 개요서가 출력 가능해집니다.', uses: ['서식4 전체'], docs: [['D32 견적서', 'none']],
-      sections: [
-        ['a', '앞 단계 미래 답 모아보기', [['상담목적 · 지속 의향 · 채용 · 목표 매출 · 필요 자금 (읽기 전용, 누르면 해당 단계로)', 'text', '가', '']]],
-        ['past', '과거→현재', [['현장 문제', 'text', '가', '', 1]]],
-        ['now', '현재', [['수행 인력', 'text', '가', '', 1]]],
-        ['future', '미래', [['해결 방안', 'text', '가', '', 1], ['판로', 'text', '가', '', 1], ['예산 (필요 자금에서 초안)', 'text', '가', '', 1], ['기대 효과 (목표 매출·채용에서 초안)', 'text', '가', '', 1]]]
-      ] },
-    { n: 7, name: '점검·발행', sub: '입력칸 없음', goal: '발행할 분야를 확정하고, 빈칸·미확인·확인 전 서류값·만료 서류·A4 넘침을 점검한 뒤 발행합니다(시행일 = 발행일, 문서번호 일련).', uses: ['발행 대장'], docs: [], check: true }
+  const FLOW = ['내 정보 확인', '고객사 시작', '대표자', '사업장', '매출·비용', '대출·세금', '앞으로 계획', '리포트'];
+  const DOC_FLOW = ['내 정보 확인', '고객사 시작', '서류 올리기', '빠진 것만 채우기', '리포트'];
+  // 받는 서류와 채우는 칸 (사용자 지정 10종)
+  const DOCS = [
+    ['사업자등록증', '상호·사업자번호·대표자·개업일·주소·업태/종목', true],
+    ['사업자등록증명', '상호·사업자번호·대표자·개업일·주소·업태/종목·과세유형', true],
+    ['부가세 과세표준증명원', '월평균 매출·전년 매출', true],
+    ['3개년 표준재무제표', '매출·영업이익·부채·자본 (3년)', true],
+    ['법인등기부등본', '법인번호·설립일·자본금·대표 취임일', false],
+    ['주주명부', '대표 지분', false],
+    ['4대보험 가입자명부', '상시근로자 수 (인원만)', false],
+    ['부채원장', '대출: 금융기관·잔액·금리·만기', false],
+    ['채권자변동조회', '대출 기관·잔액 변동', false],
+    ['임대차계약서', '사업장 임차·보증금·월세·면적·만기', false]
   ];
-  const TIMECLS = { a: 't-a', past: 't-past', now: 't-now', future: 't-future' };
-  const TIMETAG = { a: '불변', past: '과거', now: '현재', future: '미래' };
-  const PROG = { 0: [1, 1, 1], 1: [1, 1, 0.5], 2: [1, 0.5, 0], 3: [0, 0, 0], 4: [0.5, 0, 0], 5: [0, 0, 0], 6: [0, 0, 0], 7: [0, 0, 0] };
-  const dotCls = v => v >= 1 ? 'ok' : v > 0 ? 'half' : 'no';
+  let mode = 'direct';
+  const f = (l, v = '', cls = '', full = false) => `<div class="${full ? 'full' : ''}"><label>${l}</label><input class="${cls}" value="${v}"></div>`;
+  const sel = (l, opts) => `<div><label>${l}</label><select>${opts.map(o => `<option>${o}</option>`).join('')}</select></div>`;
+  const flowBar = (list, on) => `<div class="flow">${list.map(x => `<span class="${x === on ? 'on' : ''}">${x}</span>`).join('')}</div>`;
+  const nav = (prev, next, label = '다음') => `<div class="row">${prev ? `<button class="btn" onclick="show('${prev}')">이전</button>` : ''}<button class="btn dark" onclick="show('${next}')">${label}</button></div>`;
 
-  function renderSteps() {
-    const html = STEPS.map(s => {
-      const p = PROG[s.n];
-      return `<button class="step ${s.n === cur ? 'on' : ''}" onclick="go(${s.n})"><span class="no_">${s.n + 1}</span><span><b>${s.name}</b></span><span></span></button>`;
-    }).join('');
-    document.getElementById('steps').innerHTML = html;
-  }
-  function fieldHtml(f) {
-    const [label, type, vol, doc, req, sens, key] = f;
-    const P = PRESET[preset];
-    const val = key ? (P[key] || PROFILE[key] || '') : '';
-    const fromDoc = val && doc;
-    let input;
-    if (type.startsWith('chips:')) {
-      const opts = type.slice(6).split(',');
-      const pick = key === 'form' ? P.form : '';
-      input = `<div class="chips">${opts.map(o => `<button class="chip ${o === pick ? 'on' : ''}" onclick="this.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${o}</button>`).join('')}</div>`;
-    } else {
-      input = `<input class="in ${fromDoc ? 'docv' : ''}" type="${type === 'date' ? 'date' : 'text'}" value="${val}" placeholder="${type === 'num' ? '숫자' : ''}">`;
-    }
-    return `<div class="f ${label.length > 26 ? 'wide' : ''}"><div class="lab">${label}</div>${input}</div>`;
-  }
-  function renderMain() {
-    const s = STEPS[cur];
-    let body = '';
-    if (s.profile) {
-      const inp = (l, v) => `<div class="f"><div class="lab">${l}</div><input class="in" value="${v}"></div>`;
-      body = `<div class="sec"><h3>소속 펌</h3>
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><div style="width:160px;height:64px;border:2px dashed var(--line-2);border-radius:12px;display:flex;align-items:center;justify-content:center;background:#fff"><img src="logo/costep-logo-horizontal-color.svg" style="max-height:44px;max-width:140px" alt="펌 로고"></div><span style="color:var(--text-3)">로고 (눌러서 바꾸기)</span></div>
-        <div class="grid">${inp('상호', '코스텝')}${inp('문서번호 접두어', 'COSTEP')}${inp('대표', '박○○')}</div></div>
-        <div class="sec"><h3>내 정보</h3><div class="grid">${inp('이름', '홍길동')}${inp('직함', '경영컨설턴트')}${inp('전화', '010-1234-5678')}${inp('메일', 'hong@example.com')}</div></div>
-        <div class="nav"><span></span><button class="btn primary" onclick="go(1)">저장</button></div>`;
-    } else if (s.check) {
-      body = `<div class="sec t-a"><h3><em>분야</em>발행할 분야 확정</h3><div class="chips">${PURPOSE[preset].map(p => `<button class="chip ${PRESET[preset].purpose.includes(p) ? 'on' : ''}">${p}</button>`).join('')}</div></div>
-        <div class="sec t-now"><h3><em>점검</em>누르면 해당 칸으로 이동</h3><table><thead><tr><th>항목</th><th>상태</th><th>위치</th></tr></thead><tbody>
-        <tr><td>서식2 출력 차단 칸</td><td class="conf-l">3칸 비어 있음</td><td>4 실적·비용 · 월 고정비 외 2</td></tr>
-        <tr><td>'미확인'으로 남은 칸</td><td class="conf-m">5칸</td><td>2 근로계약 · 5 납세 외 3</td></tr>
-        <tr><td>확인 전 서류값</td><td class="conf-m">2칸</td><td>2 업종 추천 · 1 생년월일</td></tr>
-        <tr><td>유효기간 지난 서류</td><td class="conf-l">국세 납세증명 (30일 경과)</td><td>5 부채·의무</td></tr>
-        <tr><td>규모 재판정</td><td class="conf-h">일치 (인원·매출·업종)</td><td>2·4</td></tr>
-        <tr><td>A4 넘침</td><td class="conf-h">0장</td><td>–</td></tr>
-        <tr><td>추후 요청 목록</td><td>'나중에' 1칸 + 미제출 서류 3종</td><td><button class="btn">고객에게 보낼 목록 복사</button></td></tr>
-        </tbody></table></div>
-        <div class="nav"><button class="btn" onclick="go(6)">← 이전</button><button class="btn primary">발행 (문서번호 부여)</button></div>`;
-    } else {
-      body = s.sections.map(([k, title, fields, extra]) => {
-        let inner = `<div class="grid">${fields.map(fieldHtml).join('')}</div>`;
-        if (extra === 'sens') inner += `<div class="gate"><div class="row"><input type="checkbox" id="consent" onchange="document.getElementById('sensbox').style.display=this.checked?'grid':'none'"> <label for="consent">대표자 개인신용정보 입력 동의 (동의 일시가 기록됩니다)</label></div>
-          <div class="grid" id="sensbox" style="display:none;margin-top:10px">${fieldHtml(['NICE 개인신용평점 (1~1000)', 'num', '가', 'D20', 0, 1])}${fieldHtml(['KCB 개인신용평점 (1~1000)', 'num', '가', 'D20', 0, 1])}${fieldHtml(['주택 형태 (출력 여부 선택)', 'chips:자가,전세,월세,응답 안 함', '준', '', 0, 1])}</div></div>`;
-        return `<div class="sec ${TIMECLS[k]}"><h3><em>${TIMETAG[k]}</em>${title}</h3>${inner}</div>`;
-      }).join('');
-      if (s.frame) body += `<div class="confirmbox"><b>진단 틀 확정</b> (확정해야 3단계로 넘어갑니다)<div class="line">업종: <span class="chip on">${preset === 'smb' ? '음식점·식품제조' : '제조업'}</span> 업태 '${preset === 'smb' ? '음식점업' : '제조'}'로 추천 <button class="btn">확인</button></div><div class="line">규모: <span class="chip on">${PRESET[preset].size}</span> <button class="btn">확인</button></div></div>`;
-      body += `<div class="nav"><button class="btn" onclick="go(${Math.max(0, cur - 1)})">← 이전</button><button class="btn">변경 없음 확인</button><button class="btn primary" onclick="go(${Math.min(7, cur + 1)})">다음 →</button></div>`;
-    }
-    document.getElementById('main').innerHTML = `<h2 style="margin-bottom:6px">${s.name}</h2>${body}`;
-  }
-  function renderDocs() {
-    const s = STEPS[cur];
-    const mark = { done: ['done', '✓'], check: ['check', '!'], none: ['none', ''], exp: ['exp', '×'] };
-    const txt = { done: '추출 완료 · 확인됨', check: '확인 필요', none: '미제출', exp: '유효기간 만료' };
-    document.getElementById('docs').innerHTML = `<b>이 단계 서류</b><div class="drop" style="margin:10px 0" ondragover="event.preventDefault();this.classList.add('hover')" ondragleave="this.classList.remove('hover')" ondrop="event.preventDefault();this.classList.remove('hover');openUpload()">끌어다 놓기 · <u onclick="openUpload()" style="cursor:pointer">파일 찾기</u></div>
-      ${s.docs.length ? s.docs.map(([n, st]) => `<div class="doc"><span class="st ${mark[st][0]}">${mark[st][1]}</span><span>${n}<small>${txt[st]}</small></span></div>`).join('') : '<p style="color:var(--text-3)">이 단계는 서류가 없습니다</p>'}
-      <div class="legend">칸 색: 흰색 = 빈칸 · <span style="background:#FFF6D6;color:#5A4500;padding:0 4px;border-radius:4px">노랑</span> = 서류값(확인 전) · 테두리 = 확인/직접 입력<br>서류 자동입력은 2차 출시 · 이 목업에서는 화면 자리만</div>`;
-  }
-  function renderCase() {
-    const P = PRESET[preset];
-    document.getElementById('cb_client').innerText = P.client + ' ▾';
-    document.getElementById('cb_round').innerText = P.round;
-    document.getElementById('cb_purpose').innerHTML = PURPOSE[preset].map(p => `<button class="chip ${P.purpose.includes(p) ? 'on' : ''}">${p}</button>`).join('');
-    const ready = P.purpose.map(p => `<span class="r">${p} × 서식1 <i class="dot ${cur >= 5 ? 'ok' : 'no'}"></i> · 서식2 <i class="dot ${cur >= 6 ? 'ok' : 'half'}"></i> · 서식3 <i class="dot ok"></i> · 서식4 <i class="dot no"></i></span>`).join('');
-  }
-  function render() {
-    renderSteps(); renderMain(); renderDocs(); renderCase();
-    const first = cur === 0;
-    document.querySelector('.casebar').style.display = first ? 'none' : '';
-    document.getElementById('docs').style.display = first ? 'none' : '';
-    document.querySelector('.wrap').style.gridTemplateColumns = first ? '230px minmax(0,1fr)' : '';
-  }
-  function go(n) { cur = n; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function setPreset(p) { preset = p; document.getElementById('p_smb').classList.toggle('on', p === 'smb'); document.getElementById('p_corp').classList.toggle('on', p === 'corp'); render(); }
-  function setView(v) { document.getElementById('view_new').style.display = v === 'new' ? '' : 'none'; document.getElementById('view_cur').style.display = v === 'cur' ? '' : 'none'; document.getElementById('v_new').classList.toggle('on', v === 'new'); document.getElementById('v_cur').classList.toggle('on', v === 'cur'); }
-  function toggleTheme() { const r = document.documentElement; r.setAttribute('data-theme', r.getAttribute('data-theme') === 'ink' ? 'paper' : 'ink'); }
-  function openUpload() { document.getElementById('m_upload').classList.add('on'); }
-  function closeUpload() { document.getElementById('m_upload').classList.remove('on'); document.getElementById('confirm').style.display = 'none'; }
-  function showConfirm() { document.getElementById('confirm').style.display = 'block'; }
-  const q = new URLSearchParams(location.search);
-  if (q.get('step')) cur = Number(q.get('step'));
-  if (q.get('preset')) preset = q.get('preset');
-  if (q.get('theme') === 'ink') document.documentElement.setAttribute('data-theme', 'ink');
-  render();
-  if (q.get('preset') === 'corp') setPreset('corp');
-  if (q.get('view') === 'cur') setView('cur');
-  if (q.get('upload')) { openUpload(); showConfirm(); }
+  const SCREENS = {
+    me: () => `${flowBar(FLOW, '내 정보 확인')}<h1>내 정보 확인</h1>
+      <div class="card"><div class="me-line"><img src="logo/costep-logo-horizontal-color.svg" alt=""><div class="who"><b>홍길동 경영컨설턴트</b><div>코스텝 · 대표 박○○ · 문서번호 COSTEP</div><div>010-1234-5678 · hong@example.com</div></div></div></div>
+      <div class="row"><button class="btn" onclick="show('meEdit')">수정</button><button class="btn dark" onclick="show('start')">맞아요, 시작</button></div>`,
+    meEdit: () => `${flowBar(FLOW, '내 정보 확인')}<h1>내 정보 수정</h1>
+      <div class="card"><h2>소속 펌</h2><div class="grid">${f('상호', '코스텝')}${f('문서번호 접두어', 'COSTEP')}${f('대표', '박○○')}</div></div>
+      <div class="card"><h2>내 정보</h2><div class="grid">${f('이름', '홍길동')}${f('직함', '경영컨설턴트')}${f('전화', '010-1234-5678')}${f('메일', 'hong@example.com')}</div></div>
+      ${nav('', 'me', '저장')}`,
+    start: () => `${flowBar(FLOW, '고객사 시작')}<h1>고객사 시작</h1>
+      <div class="choice">
+        <button onclick="mode='docs';show('upload')"><b>서류 올리고 시작</b><small>사업자등록증명·재무제표·부가세 증명 등을 올리면 자동으로 채우고, 빠진 것만 묻습니다</small></button>
+        <button onclick="mode='direct';show('ceo')"><b>직접 입력</b><small>대표자 → 사업장 → 매출·비용 → 대출·세금 → 앞으로 계획 순서로 입력합니다</small></button>
+      </div>`,
+    ceo: () => `${flowBar(FLOW, '대표자')}<h1>대표자</h1>
+      <div class="card"><div class="grid">${f('대표자 성명')}${f('생년월일')}${sel('사업자 구분', ['개인', '법인'])}${f('주주 지분 (대표 %)')}${f('동종 경력 (년)')}${f('연락처')}</div></div>
+      ${nav('start', 'site')}`,
+    site: () => `${flowBar(FLOW, '사업장')}<h1>사업장</h1>
+      <div class="card"><div class="grid">${f('상호')}${f('사업자등록번호')}${f('개업일')}${f('업태·종목')}${f('사업장 주소', '', '', true)}${sel('사업장', ['임차', '자가'])}${f('상시근로자 (명)')}</div></div>
+      ${nav('ceo', 'money')}`,
+    money: () => `${flowBar(FLOW, '매출·비용')}<h1>매출·비용</h1>
+      <div class="card"><div class="grid">${f('월평균 매출 (만원)')}${f('전년 매출 (만원)')}${f('임차료 (만원/월)')}${f('인건비 (만원/월)')}${f('관리비·공과금 (만원/월)')}${f('통신·렌탈 (만원/월)')}</div></div>
+      ${nav('site', 'debt')}`,
+    debt: () => `${flowBar(FLOW, '대출·세금')}<h1>대출·세금</h1>
+      <div class="card"><h2>대출</h2><div class="grid">${f('금융기관')}${f('잔액 (만원)')}${f('금리 (%)')}${f('만기일')}</div><p class="note" style="margin:12px 0 0">+ 대출 추가</p></div>
+      <div class="card"><div class="grid">${sel('국세·지방세', ['완납', '체납 있음'])}${sel('보증 이용', ['없음', '있음'])}</div></div>
+      ${nav('money', 'plan')}`,
+    plan: () => `${flowBar(FLOW, '앞으로 계획')}<h1>앞으로 계획</h1>
+      <div class="card"><div class="grid">${f('가장 급한 고민', '', '', true)}${f('필요 자금 (만원)')}${f('채용 계획 (명)')}${f('1년 목표 매출 (만원)', '', '', true)}</div></div>
+      ${nav('debt', 'report', '리포트 만들기')}`,
+    upload: () => `${flowBar(DOC_FLOW, '서류 올리기')}<h1>서류 올리기</h1>
+      <div class="drop">여기에 서류를 한꺼번에 끌어다 놓거나 <button class="btn" style="flex:none;padding:8px 14px;margin-left:6px">파일 찾기</button></div>
+      <div class="card files">${DOCS.map(([n, fields, got]) => `<div><span><b>${n}</b><br><small style="color:var(--sub)">${fields}</small></span><span class="${got ? 'ok' : 'no'}">${got ? '읽음' : '없음'}</span></div>`).join('')}</div>
+      ${nav('start', 'missing')}`,
+    missing: () => `${flowBar(DOC_FLOW, '빠진 것만 채우기')}<h1>빠진 것만 채우기</h1>
+      <p class="note">서류로 23칸을 채웠습니다. 아래 6칸만 입력하면 리포트가 나옵니다.</p>
+      <div class="card"><div class="grid">${f('대표자 연락처')}${f('상시근로자 (명)')}${f('임차료 (만원/월)')}${f('인건비 (만원/월)')}${f('가장 급한 고민', '', '', true)}${f('필요 자금 (만원)')}</div></div>
+      <div class="card"><h2>서류에서 채운 값 (확인만)</h2><div class="grid">${f('상호', '한빛분식', 'filled')}${f('사업자등록번호', '123-45-67890', 'filled')}${f('개업일', '2018-03-02', 'filled')}${f('월평균 매출 (만원)', '1,850', 'filled')}</div></div>
+      ${nav('upload', 'report', '리포트 만들기')}`,
+    report: () => `${flowBar(mode === 'docs' ? DOC_FLOW : FLOW, '리포트')}<h1>리포트</h1>
+      <div class="card report">
+        <div><span>행정시행문</span><button>PDF 저장</button></div>
+        <div><span>진단 결과보고서</span><button>PDF 저장</button></div>
+        <div><span>실행안내서·구비서류</span><button>PDF 저장</button></div>
+        <div><span>사업계획 개요서</span><button>PDF 저장</button></div>
+      </div>
+      <div class="row"><button class="btn" onclick="show('start')">다른 고객사</button><button class="btn dark">전체 PDF 저장</button></div>`
+  };
+  function show(id) { document.getElementById('app').innerHTML = SCREENS[id](); window.scrollTo(0, 0); }
+  const q = new URLSearchParams(location.search).get('s');
+  if (q === 'upload' || q === 'missing') mode = 'docs';
+  show(q || 'me');
 </script>
 </body>
 </html>
