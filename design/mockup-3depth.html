@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3단 입력 목업</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #F6F5F1; --card: #FFFFFF; --line: #E4E2DB; --text: #0A0B0F; --sub: #66635C; --teal: #00A898; --navy: #0E1B33; --gold-soft: #FFF6D6; --gold-line: #E8C34A; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+  .app { display: grid; grid-template-columns: 220px minmax(440px, 1fr) minmax(380px, 46%); height: 100vh; }
+
+  /* 1뎁스 · 스텝 사이드바 */
+  .side { background: var(--navy); color: #fff; display: flex; flex-direction: column; padding: 20px 14px; }
+  .side img { height: 24px; margin: 0 6px 26px; filter: brightness(0) invert(1); align-self: flex-start; }
+  .steps { list-style: none; margin: 0; padding: 0; position: relative; }
+  .steps::before { content: ''; position: absolute; left: 19px; top: 14px; bottom: 14px; width: 2px; background: rgba(255,255,255,.12); }
+  .steps li { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 8px; border-radius: 10px; cursor: pointer; font-size: 14px; color: rgba(255,255,255,.55); }
+  .steps li:hover { background: rgba(255,255,255,.06); }
+  .steps .n { width: 24px; height: 24px; border-radius: 50%; background: #1E2C47; border: 2px solid rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; flex: none; position: relative; z-index: 1; }
+  .steps li.done { color: rgba(255,255,255,.85); }
+  .steps li.done .n { background: var(--teal); border-color: var(--teal); }
+  .steps li.now { background: rgba(255,255,255,.1); color: #fff; font-weight: 700; }
+  .steps li.now .n { background: #fff; color: var(--navy); border-color: #fff; }
+  .side .me { margin-top: auto; font-size: 12px; color: rgba(255,255,255,.55); padding: 0 6px; }
+
+  /* 2뎁스 · 입력 (스텝마다 한 화면, 스크롤하면 다음 스텝) */
+  .input { overflow-y: auto; scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+  .step { height: 100vh; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; padding: 32px 40px; }
+  .step-in { max-width: 620px; width: 100%; margin: 0 auto; }
+  .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 22px; }
+  .head span { font-size: 13px; font-weight: 700; color: var(--teal); }
+  h2 { font-size: 24px; font-weight: 900; margin: 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+  input, select { width: 100%; border: 1px solid #C9CED8; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; background: #fff; }
+  input:focus, select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,168,152,.2); }
+  .f.filled input, .f.filled select { background: var(--gold-soft); border-color: var(--gold-line); }
+  .go { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+  .btn { padding: 11px 22px; border-radius: 12px; border: 1px solid #C9CED8; background: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn.dark { background: var(--text); color: #fff; border-color: var(--text); }
+  .me-line { display: flex; align-items: center; gap: 16px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .me-line img { height: 36px; }
+  .me-line b { font-size: 17px; } .me-line div div { color: var(--sub); font-size: 14px; margin-top: 2px; }
+  .drop { border: 2px dashed #D6D3CA; border-radius: 16px; padding: 34px 16px; text-align: center; color: var(--sub); background: #fff; }
+  .drop b { display: block; font-size: 17px; color: var(--text); margin-bottom: 8px; }
+  .files { margin-top: 12px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; }
+  .files div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .files div:last-child { border: 0; }
+  .ok-t { color: var(--teal); font-weight: 700; }
+  .result { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--gold-soft); border: 1px solid var(--gold-line); font-size: 14px; }
+
+  /* 3뎁스 · 출력 미리보기 */
+  .preview { background: #DCDAD3; display: flex; flex-direction: column; min-width: 0; }
+  .ptabs { display: flex; align-items: center; gap: 4px; padding: 12px 16px; background: #EFEDE7; border-bottom: 1px solid #D0CDC4; }
+  .ptabs button { border: 0; background: none; padding: 7px 12px; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 700; color: var(--sub); cursor: pointer; }
+  .ptabs button.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .ptabs .pdf { margin-left: auto; background: var(--text); color: #fff; }
+  .stage { flex: 1; overflow: hidden; display: flex; justify-content: center; padding: 20px; }
+  .paper-wrap { width: 794px; flex: none; transform-origin: top center; }
+  .a4 { width: 794px; height: 1123px; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.15); padding: 56px 60px; font-size: 13px; color: #111; }
+  .a4 h1 { text-align: center; font-size: 26px; font-weight: 900; letter-spacing: 6px; margin: 0 0 6px; }
+  .a4 .docno { text-align: center; color: #777; font-size: 12px; margin-bottom: 26px; }
+  .blk { border-radius: 6px; padding: 6px; margin: 0 -6px 14px; transition: background .3s, box-shadow .3s; }
+  .blk.hl { background: rgba(0,168,152,.07); box-shadow: 0 0 0 2px rgba(0,168,152,.5); }
+  .blk h3 { font-size: 14px; font-weight: 900; margin: 0 0 6px; padding-left: 8px; border-left: 4px solid var(--navy); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { border: 1px solid #C8C8C8; padding: 6px 8px; text-align: left; }
+  th { background: #F1F3F6; width: 18%; font-weight: 700; }
+  .nums td, .nums th { text-align: center; width: auto; }
+  .empty { color: #BDBDBD; }
+  .bars { display: flex; align-items: flex-end; gap: 26px; height: 90px; padding: 0 30px; border-bottom: 1px solid #ccc; margin-top: 8px; }
+  .bars div { flex: 1; background: linear-gradient(#00A898, #0E1B33); border-radius: 4px 4px 0 0; transition: height .3s; position: relative; }
+  .bars span { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: 11px; color: #333; }
+  .sign { position: absolute; }
+  .foot { margin-top: 18px; text-align: right; font-weight: 700; }
+  @media (max-width: 1100px) { .app { grid-template-columns: 64px 1fr minmax(320px, 44%); } .steps li span.t, .side .me { display: none; } .side img { display: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <img src="logo/costep-logo-horizontal-color.svg" alt="로고">
+    <ul class="steps" id="steps"></ul>
+    <div class="me">코스텝 · 홍길동</div>
+  </aside>
+  <main class="input" id="input"></main>
+  <section class="preview">
+    <div class="ptabs" id="ptabs"></div>
+    <div class="stage" id="stage"><div class="paper-wrap" id="paper"><div class="a4" id="a4"></div></div></div>
+  </section>
+</div>
+<script>
+  // 칸: [id, 라벨, 서류로 채울 값, 넓게]
+  const STEPS = [
+    { id: 'me', name: '내 정보', body: () => `<div class="me-line"><img src="logo/costep-logo-horizontal-color.svg" alt=""><div><b>홍길동 경영컨설턴트</b><div>코스텝 · 대표 박○○ · 문서번호 COSTEP</div><div>010-1234-5678 · hong@example.com</div></div></div>`, next: '맞아요' },
+    { id: 'docs', name: '서류', body: () => `<div class="drop" ondragover="event.preventDefault();this.style.borderColor='#00A898'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';dropped()">
+        <b>가지고 있는 서류를 전부 여기에 끌어다 놓으세요</b>종류·순서 상관없이 한꺼번에 · <button class="btn" style="padding:7px 14px" onclick="dropped()">파일 찾기</button></div><div id="got"></div>`, alt: '서류 없이 직접 입력' },
+    { id: 'ceo', name: '대표자', fields: [['ceo', '대표자 성명', '김대성'], ['birth', '생년월일', '1979-05-12'], ['kind', '사업자 구분', '법인', 0, ['', '개인', '법인']], ['share', '대표 지분 (%)', '60'], ['career', '동종 경력 (년)'], ['phone', '연락처']] },
+    { id: 'site', name: '사업장', fields: [['name', '상호', '(주)한빛정밀'], ['bizno', '사업자등록번호', '123-81-45678'], ['open', '개업일', '2016-04-01'], ['item', '업태·종목', '제조 / 금속가공'],
+      ['addr', '사업장 주소', '경기 화성시 동탄기흥로 27', 1], ['own', '사업장', '임차', 0, ['', '임차', '자가']], ['rent', '보증금·월세 (만원)', '3,000 / 250'], ['emp', '상시근로자 (명)', '18'], ['cap', '자본금 (만원)', '5,000']] },
+    { id: 'money', name: '매출·비용', fields: [['s3', '재작년 매출 (백만원)', '2150'], ['s2', '작년 매출 (백만원)', '2520'], ['s1', '올해 매출 (백만원)', '2850'], ['op', '영업이익 (백만원)', '180'],
+      ['debt', '부채총계 (백만원)', '585'], ['eq', '자본총계 (백만원)', '620'], ['labor', '인건비 (만원/월)'], ['fix', '관리비·공과금 (만원/월)']] },
+    { id: 'loan', name: '대출·세금', fields: [['bank', '금융기관'], ['bal', '잔액 (만원)'], ['rate', '금리 (%)'], ['due', '만기일'], ['tax', '국세·지방세', '', 0, ['', '완납', '체납 있음']], ['guar', '보증 이용', '', 0, ['', '없음', '있음']]] },
+    { id: 'plan', name: '앞으로 계획', fields: [['worry', '가장 급한 고민', '', 1], ['need', '필요 자금 (만원)'], ['hire', '채용 계획 (명)'], ['goal', '1년 목표 매출 (백만원)', '', 1]], next: '리포트 완성' }
+  ];
+  const V = {};            // 지금 입력값
+  let docs = false, cur = 0, sheet = 1;
+
+  const fieldHtml = ([id, l, dv, full, opts]) => {
+    const v = V[id] || '', filled = docs && dv && v === dv;
+    const ctl = opts ? `<select data-id="${id}">${opts.map(o => `<option ${o === v ? 'selected' : ''} value="${o}">${o || '선택'}</option>`).join('')}</select>` : `<input data-id="${id}" value="${v}">`;
+    return `<div class="f ${filled ? 'filled' : ''} ${full ? 'full' : ''}"><label>${l}</label>${ctl}</div>`;
+  };
+  function renderInput() {
+    document.getElementById('input').innerHTML = STEPS.map((s, i) => `<div class="step" id="step_${i}"><div class="step-in">
+      <div class="head"><span>${i + 1} / ${STEPS.length}</span><h2>${s.name}</h2></div>
+      ${s.fields ? `<div class="grid">${s.fields.map(fieldHtml).join('')}</div>` : s.body()}
+      <div class="go">${s.alt ? `<button class="btn" onclick="go(${i + 1})">${s.alt}</button>` : ''}<button class="btn dark" onclick="go(${i + 1})">${s.next || '다음'}</button></div>
+    </div></div>`).join('');
+    if (docs) showGot();
+    observe();
+  }
+  function renderSteps() {
+    document.getElementById('steps').innerHTML = STEPS.map((s, i) => `<li class="${i < cur ? 'done' : i === cur ? 'now' : ''}" onclick="go(${i})"><span class="n">${i < cur ? '✓' : i + 1}</span><span class="t">${s.name}</span></li>`).join('');
+  }
+  function go(i) { if (i < STEPS.length) document.getElementById('step_' + i).scrollIntoView(); }
+
+  // 스크롤 위치로 지금 스텝을 정한다
+  let io;
+  function observe() {
+    io && io.disconnect();
+    io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { cur = Number(e.target.id.split('_')[1]); renderSteps(); renderA4(); } }), { root: document.getElementById('input'), threshold: 0.6 });
+    document.querySelectorAll('.step').forEach(el => io.observe(el));
+  }
+  document.addEventListener('input', e => { const id = e.target.dataset.id; if (!id) return; V[id] = e.target.value; e.target.closest('.f').classList.remove('filled'); renderA4(); });
+
+  // 서류를 넣으면 종류를 알아서 나누고 칸을 채운다 (목업: 예시 결과)
+  const SORTED = [['사업자등록증명원.pdf', '사업자등록증명'], ['표준재무제표.pdf', '표준재무제표 3개년'], ['부가세과세표준증명원.pdf', '부가세 과세표준증명원'],
+    ['4대보험가입자명부.pdf', '4대보험 가입자명부'], ['주주명부.pdf', '주주명부'], ['법인등기부등본.pdf', '법인등기부등본'], ['임대차계약서.pdf', '임대차계약서']];
+  function showGot() {
+    document.getElementById('got').innerHTML = `<div class="files">${SORTED.map(([n, t]) => `<div><span>${n}</span><span><b>${t}</b> · <span class="ok-t">읽음</span></span></div>`).join('')}</div>
+      <div class="result">서류로 <b>${countFilled()}칸</b>을 채웠어요 (노란 칸).</div>`;
+  }
+  const countFilled = () => STEPS.flatMap(s => s.fields || []).filter(f => f[2]).length;
+  function dropped() { docs = true; STEPS.flatMap(s => s.fields || []).forEach(([id, , dv]) => { if (dv && !V[id]) V[id] = dv; }); renderInput(); renderA4(); }
+
+  // 3뎁스 · 미리보기 — 입력값을 그대로 그린다. 지금 스텝에 해당하는 부분을 표시
+  const SHEETS = ['행정시행문', '진단 결과보고서', '실행안내서', '사업계획 개요서'];
+  const v = (id, unit = '') => V[id] ? V[id] + unit : '<span class="empty">—</span>';
+  const hl = (...ids) => ids.includes(STEPS[cur].id) ? 'hl' : '';
+  function renderA4() {
+    document.getElementById('ptabs').innerHTML = SHEETS.map((t, i) => `<button class="${i === sheet ? 'on' : ''}" onclick="sheet=${i};renderA4()">${t}</button>`).join('') + `<button class="pdf">PDF 저장</button>`;
+    const n = k => Number(String(V[k] || '').replace(/,/g, '')) || 0, mx = Math.max(n('s3'), n('s2'), n('s1'), 1);
+    const bar = (k, t) => `<div style="height:${n(k) / mx * 80 + 2}px"><span>${t} ${V[k] ? Number(n(k)).toLocaleString() : ''}</span></div>`;
+    document.getElementById('a4').innerHTML = `
+      <h1>${SHEETS[sheet] === '진단 결과보고서' ? '경영진단 결과보고서' : SHEETS[sheet]}</h1>
+      <div class="docno">문서번호 COSTEP-2026-1013-001 · 작성 코스텝 홍길동</div>
+      <div class="blk ${hl('ceo', 'site', 'docs')}"><h3>1. 기업 기본정보</h3><table>
+        <tr><th>상호</th><td>${v('name')}</td><th>대표자</th><td>${v('ceo')}</td></tr>
+        <tr><th>사업자번호</th><td>${v('bizno')}</td><th>구분</th><td>${v('kind')}</td></tr>
+        <tr><th>개업일</th><td>${v('open')}</td><th>업태·종목</th><td>${v('item')}</td></tr>
+        <tr><th>주소</th><td colspan="3">${v('addr')}</td></tr>
+        <tr><th>사업장</th><td>${v('own')} ${V.rent ? '(' + V.rent + ')' : ''}</td><th>상시근로자</th><td>${v('emp', '명')}</td></tr></table></div>
+      <div class="blk ${hl('money', 'docs')}"><h3>2. 매출 추이 (백만원)</h3><div class="bars">${bar('s3', '재작년')}${bar('s2', '작년')}${bar('s1', '올해')}</div>
+        <table class="nums" style="margin-top:10px"><tr><th>영업이익</th><th>부채총계</th><th>자본총계</th><th>부채비율</th></tr>
+        <tr><td>${v('op')}</td><td>${v('debt')}</td><td>${v('eq')}</td><td>${n('eq') ? Math.round(n('debt') / n('eq') * 100) + '%' : '<span class="empty">—</span>'}</td></tr></table></div>
+      <div class="blk ${hl('loan')}"><h3>3. 대출·세금</h3><table class="nums"><tr><th>금융기관</th><th>잔액(만원)</th><th>금리</th><th>만기</th><th>세금</th></tr>
+        <tr><td>${v('bank')}</td><td>${v('bal')}</td><td>${v('rate', '%')}</td><td>${v('due')}</td><td>${v('tax')}</td></tr></table></div>
+      <div class="blk ${hl('plan')}"><h3>4. 앞으로 계획</h3><table>
+        <tr><th>급한 고민</th><td colspan="3">${v('worry')}</td></tr>
+        <tr><th>필요 자금</th><td>${v('need', '만원')}</td><th>채용</th><td>${v('hire', '명')}</td></tr>
+        <tr><th>1년 목표</th><td colspan="3">${v('goal', ' 백만원')}</td></tr></table></div>
+      <div class="foot ${hl('me')}">코스텝 경영지원센터 · 컨설턴트 홍길동</div>`;
+    fit();
+  }
+  // A4를 오른쪽 칸 크기에 맞게 줄인다
+  function fit() {
+    const st = document.getElementById('stage'), s = Math.min((st.clientWidth - 40) / 794, (st.clientHeight - 40) / 1123);
+    const p = document.getElementById('paper'); p.style.transform = `scale(${s})`; p.style.marginBottom = `${-1123 * (1 - s)}px`;
+  }
+  addEventListener('resize', fit);
+  if (new URLSearchParams(location.search).get('docs')) dropped(); else { renderInput(); renderA4(); }
+  renderSteps();
+</script>
+</body>
+</html>
