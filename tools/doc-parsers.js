@@ -328,6 +328,12 @@
       const d = r.filter(c => /^\d{4}\/\d{2}\/\d{2}$/.test(c));
       if (d.length >= 2) { const i = r.indexOf(d[1]); const total = signed(r[i + 1] || ''); if (total !== null) periods.push({ from: d[0], to: d[1], total }); }
     });
+    // 같은 기간이 겹치면(예정 ⊂ 확정) 긴 기간 하나만 남긴다
+    const key = d => d.replace(/\//g, '');
+    for (let i = periods.length - 1; i >= 0; i--) {
+      const p = periods[i];
+      if (periods.some((q, j) => j !== i && key(q.from) <= key(p.from) && key(q.to) >= key(p.to) && (key(q.from) !== key(p.from) || key(q.to) !== key(p.to) || j < i))) periods.splice(i, 1);
+    }
     periods.sort((a, b) => (a.to < b.to ? 1 : -1));
     const months = p => { const a = p.from.split('/').map(Number), b = p.to.split('/').map(Number); return (b[0] - a[0]) * 12 + (b[1] - a[1]) + 1; };
     let m = 0, sum = 0;

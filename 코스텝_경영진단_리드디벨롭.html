@@ -808,66 +808,43 @@
         </div>
       </div>
 
-      <!-- Card 3: Financial Institutions Detailed Debt Breakdown (상세 금융부채 명세란) -->
-      <div class="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2.5">
-          <div class="flex items-center space-x-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
-            <h3 class="text-sm font-extrabold text-slate-900">금융기관별 여신·차입금 세부 현황표 (차입처 및 약정조건)</h3>
-          </div>
-          <button type="button" onclick="addDebtRow()" class="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer">
-            <span>+ 차입 내역 추가</span>
-          </button>
+      <!-- Card 3: 금융기관 대출 현황 (보고서의 차입금 표·이자·고금리 판정이 이 표를 읽는다) -->
+      <div id="debt_card" class="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+          <h3 class="text-sm font-extrabold text-slate-900 mr-auto">금융기관 대출 현황</h3>
+          <button type="button" onclick="openDocsModal && openDocsModal()" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold cursor-pointer">서류로 채우기</button>
+          <button type="button" onclick="addDebtRow()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer">+ 대출 추가</button>
         </div>
-        <p class="text-[11px] text-slate-500">
-          금융기관별 차입처, 차입금액, 약정금리 및 상환방법을 기재하여 이자보상배율 산출 및 저리 대환·이차보전 적격 여부를 검토합니다.
-        </p>
 
-        <!-- Debt Items Table -->
         <div class="overflow-x-auto">
-          <table class="w-full text-xs border-collapse border border-slate-200">
+          <table class="debt-table w-full text-xs border-collapse">
+            <colgroup><col style="width:18%"><col style="width:23%"><col style="width:12%"><col style="width:9%"><col style="width:10%"><col style="width:23%"><col style="width:5%"></colgroup>
             <thead>
-              <tr class="bg-slate-100 font-bold text-slate-700 text-center">
-                <th class="p-2 border border-slate-200">금융기관명</th>
-                <th class="p-2 border border-slate-200">여신 과목 / 차입 성격</th>
-                <th class="p-2 border border-slate-200">차입금 잔액 (만원)</th>
-                <th class="p-2 border border-slate-200">약정 금리 (연 %)</th>
-                <th class="p-2 border border-slate-200">월 금융이자 (만원)</th>
-                <th class="p-2 border border-slate-200">상환방법 및 만기일</th>
-                <th class="p-2 border border-slate-200 w-16">관리</th>
+              <tr>
+                <th>금융기관</th>
+                <th>과목 · 성격</th>
+                <th class="r">잔액 <small>만원</small></th>
+                <th class="r">금리 <small>연%</small></th>
+                <th class="r">월이자 <small>만원</small></th>
+                <th>상환방법 · 만기</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="debt_tbody">
-              <!-- Dynamically populated rows -->
+              <!-- renderDebtTable() 이 채운다 -->
             </tbody>
           </table>
         </div>
 
-        <!-- Real-time Debt Summary & Warning Alert -->
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
-          <div class="md:col-span-8 bg-slate-900 text-white rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div>
-              <span class="text-slate-400 block text-[10px]">총 금융차입금 잔액 합계:</span>
-              <strong id="debt_total_balance" class="text-base font-black text-amber-300">58,500만원</strong>
-              <span id="debt_total_balance_kr" class="text-slate-400 text-[11px] ml-1"></span>
-            </div>
-            <div>
-              <span class="text-slate-400 block text-[10px]">가중평균 약정금리:</span>
-              <strong id="debt_avg_rate" class="text-base font-black text-emerald-300">연 4.68%</strong>
-            </div>
-            <div>
-              <span class="text-slate-400 block text-[10px]">월간 금융비용(이자) 합계:</span>
-              <strong id="debt_total_monthly_interest" class="text-base font-black text-white">228만원</strong>
-            </div>
-          </div>
-          <div id="debt_high_rate_alert" class="md:col-span-4 bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 flex flex-col justify-center space-y-1">
-            <span class="font-bold flex items-center space-x-1">
-              <span>연 7% 이상 고금리 채무 확인 (이차보전 지원 대상)</span>
-            </span>
-            <p class="text-[11px] text-amber-800 leading-tight" id="debt_alert_text">
-              연 7% 이상 차입금 보유에 따라, 신용보증재단 특례보증 및 지자체 중소기업육성자금 이차보전(연 1.5%~2.5%p 금리 지원) 신청 적격 대상으로 분류됩니다.
-            </p>
-          </div>
+        <!-- 합계 (보고서와 같은 값) -->
+        <div class="debt-sum">
+          <div><span>잔액 합계</span><strong id="debt_total_balance">0만원</strong><em id="debt_total_balance_kr"></em></div>
+          <div><span>가중평균 금리</span><strong id="debt_avg_rate">연 0.00%</strong></div>
+          <div><span>월 이자 합계</span><strong id="debt_total_monthly_interest">0만원</strong></div>
+        </div>
+        <div id="debt_high_rate_alert" class="hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <b>연 7% 이상 고금리 대출 있음</b> · <span id="debt_alert_text"></span>
         </div>
       </div>
 
@@ -3165,28 +3142,33 @@
       const tbody = document.getElementById('debt_tbody');
       if (!tbody) return;
 
+      if (!window.appState.debtItems.length) {
+        tbody.innerHTML = `<tr class="debt-empty"><td colspan="7"><b>등록된 대출이 없어요</b>차입금 원장·채권자변동조회를 올리면 채워지고, 직접 추가할 수도 있어요.</td></tr>`;
+        calcDebtTotals();
+        return;
+      }
       tbody.innerHTML = window.appState.debtItems.map((item, idx) => `
         <tr class="border-b border-slate-200 hover:bg-slate-50">
           <td class="p-2 border border-slate-200">
-            <input type="text" value="${escapeHtml(item.institution)}" oninput="updateDebtItem(${idx}, 'institution', this.value)" class="form-input-control text-xs font-bold">
+            <input type="text" value="${escapeHtml(item.institution)}" placeholder="금융기관" title="금융기관" oninput="updateDebtItem(${idx}, 'institution', this.value)" class="form-input-control text-xs font-bold">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="text" value="${escapeHtml(item.type)}" oninput="updateDebtItem(${idx}, 'type', this.value)" class="form-input-control text-xs">
+            <input type="text" value="${escapeHtml(item.type)}" placeholder="과목 · 성격" title="과목 · 성격" oninput="updateDebtItem(${idx}, 'type', this.value)" class="form-input-control text-xs">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="number" min="0" value="${item.balance}" oninput="updateDebtItem(${idx}, 'balance', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold">
+            <input type="number" min="0" value="${item.balance}" placeholder="잔액(만원)" title="잔액(만원)" oninput="updateDebtItem(${idx}, 'balance', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="number" min="0" step="0.1" value="${item.rate}" oninput="updateDebtItem(${idx}, 'rate', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold text-blue-700">
+            <input type="number" min="0" step="0.1" value="${item.rate}" placeholder="금리(%)" title="금리(연 %)" oninput="updateDebtItem(${idx}, 'rate', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold text-blue-700">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="number" min="0" value="${item.monthlyInterest}" oninput="updateDebtItem(${idx}, 'monthlyInterest', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold text-amber-700">
+            <input type="number" min="0" value="${item.monthlyInterest}" placeholder="월이자(만원)" title="월이자(만원)" oninput="updateDebtItem(${idx}, 'monthlyInterest', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold text-amber-700">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="text" value="${escapeHtml(item.payback)}" oninput="updateDebtItem(${idx}, 'payback', this.value)" class="form-input-control text-xs">
+            <input type="text" value="${escapeHtml(item.payback)}" placeholder="상환방법 · 만기 (예: 원금균등 5년, 2027-06 만기)" oninput="updateDebtItem(${idx}, 'payback', this.value)" class="form-input-control text-xs">
           </td>
-          <td class="p-2 border border-slate-200 text-center">
-            <button type="button" onclick="deleteDebtRow(${idx})" class="text-rose-600 hover:text-rose-800 font-bold text-xs cursor-pointer">삭제</button>
+          <td class="del text-center">
+            <button type="button" onclick="deleteDebtRow(${idx})" aria-label="이 대출 삭제" title="삭제" class="cursor-pointer">×</button>
           </td>
         </tr>
       `).join('');
@@ -5844,6 +5826,22 @@
     #docs_modal .pt { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #33363D; margin-bottom: 5px; }
     #docs_modal .pb { height: 8px; border-radius: 4px; background: #EEECE6; overflow: hidden; }
     #docs_modal .pb i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00A898, #00E0C6); border-radius: 4px; transition: width .2s; }
+    /* 대출 현황 표 */
+    #debt_card .debt-table th { text-align: left; font-weight: 800; color: #64748B; background: #F8FAFC; padding: 8px 8px; border-bottom: 1px solid #E2E8F0; white-space: nowrap; }
+    #debt_card .debt-table th.r { text-align: right; }
+    #debt_card .debt-table th small { font-weight: 600; color: #94A3B8; font-size: 10px; }
+    #debt_card .debt-table td { padding: 5px 4px; border-bottom: 1px solid #F1F5F9; }
+    #debt_card .debt-table td .form-input-control { padding: 7px 8px; }
+    #debt_card .debt-table td.del button { width: 26px; height: 26px; border-radius: 8px; color: #94A3B8; font-size: 16px; line-height: 1; }
+    #debt_card .debt-table td.del button:hover { background: #FEF2F2; color: #DC2626; }
+    #debt_card .debt-empty td { padding: 22px 8px; text-align: center; color: #64748B; border-bottom: 0; }
+    #debt_card .debt-empty b { display: block; color: #0F172A; font-size: 13px; margin-bottom: 4px; }
+    #debt_card .debt-sum { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; }
+    #debt_card .debt-sum > div { padding: 10px 14px; background: #F8FAFC; }
+    #debt_card .debt-sum > div + div { border-left: 1px solid #E2E8F0; }
+    #debt_card .debt-sum span { display: block; font-size: 11px; color: #64748B; font-weight: 700; }
+    #debt_card .debt-sum strong { font-size: 17px; font-weight: 900; color: #0F172A; }
+    #debt_card .debt-sum em { font-style: normal; font-size: 11px; color: #64748B; margin-left: 4px; }
     .doc-filled { background: #FFF6D6 !important; border-color: #E8C34A !important; color: #0A0B0F !important; }
   </style>
   <div id="docs_modal" role="dialog" aria-modal="true" aria-labelledby="docs_modal_t">
@@ -6204,6 +6202,12 @@
       const d = r.filter(c => /^\d{4}\/\d{2}\/\d{2}$/.test(c));
       if (d.length >= 2) { const i = r.indexOf(d[1]); const total = signed(r[i + 1] || ''); if (total !== null) periods.push({ from: d[0], to: d[1], total }); }
     });
+    // 같은 기간이 겹치면(예정 ⊂ 확정) 긴 기간 하나만 남긴다
+    const key = d => d.replace(/\//g, '');
+    for (let i = periods.length - 1; i >= 0; i--) {
+      const p = periods[i];
+      if (periods.some((q, j) => j !== i && key(q.from) <= key(p.from) && key(q.to) >= key(p.to) && (key(q.from) !== key(p.from) || key(q.to) !== key(p.to) || j < i))) periods.splice(i, 1);
+    }
     periods.sort((a, b) => (a.to < b.to ? 1 : -1));
     const months = p => { const a = p.from.split('/').map(Number), b = p.to.split('/').map(Number); return (b[0] - a[0]) * 12 + (b[1] - a[1]) + 1; };
     let m = 0, sum = 0;
@@ -6826,6 +6830,44 @@
     #l3 .l3-step [id^="ind_btn_"] { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #l3 .l3-step .sm\:grid-cols-5 { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
     #l3 .l3-step .form-input-control { text-overflow: ellipsis; }
+    /* 3단 보기에서 나란히 놓으면 좁아지는 묶음은 위아래(1열)로: 소상공인 1·2, 4·5·6, 사업계획 6문항 */
+    #l3 .l3-step .md\:grid-cols-2, #l3 .l3-step .md\:grid-cols-3 { grid-template-columns: 1fr !important; }
+    /* 칸 여러 개 묶음은 폭에 맞춰 열 수 자동(칸이 좁아지면 줄을 늘림) */
+    #l3 .l3-step .sm\:grid-cols-3 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; }
+    #l3 .l3-step .sm\:grid-cols-4 { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; }
+    #l3 .l3-step .grid-cols-2:not([class*="sm:"]):not([class*="md:"]):not([class*="lg:"]) { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; }
+    #l3 .l3-step .l3-nowrap { white-space: nowrap !important; }
+    #l3 .l3-step .flex > input, #l3 .l3-step .flex > select { min-width: 0; }
+    #l3 #debt_card .debt-table { min-width: 600px; }
+    #l3 #debt_card .debt-table input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    #l3 #debt_card .debt-sum em { white-space: nowrap; }
+    #l3 .l3-step .l3-wide2 { grid-column: span 2 !important; }
+    #l3 .l3-step .l3-wideall { grid-column: 1 / -1 !important; }
+    /* 머리줄이 '이름 + 설명'으로 나란히 있으면 위아래로 */
+    #l3 .l3-step .l3-stack { flex-direction: column !important; align-items: flex-start !important; gap: 2px !important; }
+    #l3 .l3-step table th { white-space: nowrap; }
+    #l3 #smb_disp_sales_stat, #l3 #smb_disp_sales_stat * { white-space: nowrap; }
+    /* 2뎁스 스텝에 맞춰 3뎁스 미리보기가 따라가며 해당 부분을 잠깐 표시 */
+    #l3 .l3-hl { outline: 3px solid rgba(0,168,152,.65); outline-offset: 3px; border-radius: 4px; transition: outline-color .6s; }
+    @media print { .l3-hl { outline: none !important; } }
+    /* 대출표(3단 보기): 한 대출 = 두 줄 — 윗줄 기관·과목·잔액·금리·월이자·×, 아랫줄 상환방법·만기 */
+    #l3 #debt_card .debt-table { min-width: 0; }
+    #l3 #debt_card .debt-table colgroup { display: none; }
+    #l3 #debt_card .debt-table tr { display: grid; grid-template-columns: 1.15fr 1.45fr .85fr .6fr .75fr 30px; grid-template-areas: "a b c d e x" "f f f f f x"; column-gap: 6px; align-items: center; }
+    #l3 #debt_card .debt-table thead tr { grid-template-areas: "a b c d e x"; }
+    #l3 #debt_card .debt-table tr > :nth-child(1) { grid-area: a; } #l3 #debt_card .debt-table tr > :nth-child(2) { grid-area: b; }
+    #l3 #debt_card .debt-table tr > :nth-child(3) { grid-area: c; } #l3 #debt_card .debt-table tr > :nth-child(4) { grid-area: d; }
+    #l3 #debt_card .debt-table tr > :nth-child(5) { grid-area: e; } #l3 #debt_card .debt-table tr > :nth-child(6) { grid-area: f; }
+    #l3 #debt_card .debt-table tr > :nth-child(7) { grid-area: x; }
+    #l3 #debt_card .debt-table thead th:nth-child(6) { display: none; }
+    #l3 #debt_card .debt-table tbody tr { border-bottom: 1px solid #E2E8F0; padding: 6px 0; }
+    #l3 #debt_card .debt-table tbody td { border: 0; padding: 2px 0; }
+    #l3 #debt_card .debt-table tbody td:nth-child(6) input::placeholder { color: #94A3B8; }
+    #l3 #debt_card .debt-table tr.debt-empty { display: table-row; }
+    #l3 #debt_card .debt-table thead th { padding: 6px 0; background: none; }
+    /* 좁을 때(카드 폭 560px 미만): 한 대출 = 세 줄 — 기관·과목 / 잔액·금리·월이자 / 상환·만기 (머리줄 대신 칸 안 안내) */
+    #l3 #debt_card.narrow .debt-table thead { display: none; }
+    #l3 #debt_card.narrow .debt-table tr { grid-template-columns: 1fr 1fr 1fr 30px; grid-template-areas: "a b b x" "c d e x" "f f f x"; row-gap: 4px; }
     #l3 #screen_input > .l3-step > div[class*="p-5"] { padding: 14px 16px !important; }
     #l3 .l3-step .form-input-control { padding-top: 6px; padding-bottom: 6px; }
     #l3 .l3-step label.block { margin-bottom: 2px; }
@@ -6838,6 +6880,18 @@
     #l3 #client_bar .more { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; min-width: 180px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18); }
     #l3 #client_bar .more > * { text-align: left; border: 0 !important; }
     @media (max-width: 1180px) { #l3_brand .wm { display: none; } }
+    /* 사이드바 접기: 아이콘(로고 마크·스텝 번호·계정 동그라미)만 남김 */
+    #l3_fold { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; color: rgba(255,255,255,.55); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+    #l3_fold:hover { background: rgba(255,255,255,.1); color: #fff; }
+    #l3.folded { --l3a: 68px !important; }
+    #l3.folded #l3_steps { padding-left: 8px; padding-right: 8px; }
+    #l3.folded #l3_brand { flex-direction: column; gap: 10px; margin-left: 0; margin-right: 0; }
+    #l3.folded #l3_brand .wm, #l3.folded #l3_steps .t, #l3.folded #l3_acct .who { display: none; }
+    #l3.folded #l3_fold { margin-left: 0; transform: rotate(180deg); }
+    #l3.folded #l3_steps li { justify-content: center; padding: 9px 0; }
+    #l3.folded #l3_steps ol::before { left: 50%; margin-left: -1px; }
+    #l3.folded #l3_acct { flex-direction: column; padding: 8px 4px; gap: 6px; }
+    #l3.folded #l3_menu { left: 0; right: auto; width: 180px; }
     body.l3-on { overflow: hidden; }
     #l3_steps { background: var(--t-panel, #0A1F44); color: var(--t-panel-text, #fff); padding: 18px 12px; overflow-y: auto; }
     #l3_steps ol { list-style: none; margin: 0; padding: 0; position: relative; }
@@ -6905,7 +6959,7 @@
         ['고객사 정보', ['l3_cchoice', 'client_bar', 'docs_card', ':basic']],
         ['진단 대상', ['case_card', ':tier']],
         ['거래처·인증', [':trade']],
-        ['대출', [':debt']],
+        ['대출', ['debt_card']],
         ['실태·재무', ['section_smb_input', 'section_sme_input']],
         ['업종 특화', ['section_ind_spec']],
         ['사업계획', [':bplan', ':action']]
@@ -6915,7 +6969,7 @@
         const kids = [...scr.children];
         // id 없는 카드는 원래 순서로 찾는다: 대상 구분, 기본정보, 거래처, 대출 … 사업계획, 버튼 줄
         const noId = kids.filter(k => !k.id);
-        const named = { ':tier': noId[0], ':basic': noId[1], ':trade': noId[2], ':debt': noId[3], ':bplan': noId[noId.length - 2], ':action': noId[noId.length - 1] };
+        const named = { ':tier': noId[0], ':basic': noId[1], ':trade': noId[2], ':bplan': noId[noId.length - 2], ':action': noId[noId.length - 1] };
         const pick = k => named[k] || document.getElementById(k);
 
         // 내 정보: 소속 펌(로고·상호·접두어·대표·주소·전화)과 나(이름·직함·휴대폰·메일). 계정별로 이 PC에 저장, 서식 발신란에 반영
@@ -6936,6 +6990,42 @@
           '<div><h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 mb-3 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span><span>나</span></h3>' +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="l3_me_person">' + fld('mobile', '휴대폰', '010-0000-0000') + fld('email', '메일', 'name@example.com') + '</div></div>';
         scr.insertBefore(meCard, scr.firstChild);
+
+        // 짧은 글(만원·명·태그·버튼 이름 등 10자 이하)은 한 줄로 — 좁은 칸에서 '만/원'처럼 갈라지지 않게
+        scr.querySelectorAll('span, label, button, th, strong, b').forEach(el => {
+          // 나중에 글이 채워지는 칸(id 있음·지금 비어 있음)은 제외 — 긴 안내문이 한 줄로 넘치지 않게
+          const len = el.textContent.trim().length;
+          if (el.children.length === 0 && !el.id && len > 0 && len <= 10) el.classList.add('l3-nowrap');
+        });
+
+        // 제목·이름 끝의 긴 괄호 설명은 마우스를 올리면 보이게(title) 하고 화면에서는 뺀다 — 좁은 칸에서 줄바꿈 방지
+        scr.querySelectorAll('h2, h3, h4, label, span, th').forEach(el => {
+          if (el.children.length) return;
+          const t = el.textContent.trim(), m = t.match(/^(.{6,}?)\s*\(([^()]{7,})\)$/);
+          if (m) { el.title = t; el.textContent = m[1]; }
+        });
+        const SHORT = {
+          '수진기업 기본 정보 및 대표자·주주 인적사항': '기업 기본 정보 · 대표자',
+          '기업 규모 및 한국표준산업분류(KSIC) 주업종 지정': '기업 규모 · 주업종',
+          '② 한국표준산업분류 주업종 구분': '② 주업종 구분',
+          '거래처 구조, 지식재산권(특허) 및 기업인증 현황': '거래처 · 특허 · 인증',
+          '소상공인 사업장 현황 실태조사서': '소상공인 사업장 실태',
+          '중소기업 최근 3개년 표준재무제표 및 대표자 신용평점': '3개년 재무 · 대표자 신용',
+          '공공 지원사업 신청 대비 사업계획 개요서 (표준 서식)': '사업계획 개요서',
+          '2. 주요 원부자재 조달단가 변동 및 공급가액 반영 여부': '2. 원부자재 단가 · 판매가 반영',
+          '1. 최근 월평균 매출액': '1. 최근 월평균 매출액',
+          '서류가 있으면 여기에 끌어다 놓으세요': '서류를 여기에 끌어다 놓으세요'
+        };
+        scr.querySelectorAll('h2, h3, h4, label, span, div').forEach(el => {
+          if (el.children.length) return;
+          const t = el.textContent.trim();
+          if (SHORT[t] && SHORT[t] !== t) { el.title = el.title || t; el.textContent = SHORT[t]; }
+        });
+        // '이름 + 설명'이 한 줄에 나란한 머리줄(예: ② 주업종 구분 · 안내 문구)은 위아래로
+        scr.querySelectorAll('.flex.items-center.justify-between').forEach(el => {
+          if (el.querySelector('input,select,button,textarea')) return;
+          if (el.children.length === 2 && el.textContent.trim().length > 40) el.classList.add('l3-stack');
+        });
 
         // 고객사 정보 첫 화면: 기존 고객 불러오기 / 새 고객 작성 중 하나를 고른다
         const choice = document.createElement('div');
@@ -7088,7 +7178,18 @@
           document.getElementById('l3_brand').innerHTML =
             '<svg class="mk" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="url(#mscg)"/><defs><linearGradient id="mscg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00A898"/><stop offset="1" stop-color="#00E0C6"/></linearGradient></defs>' +
             '<rect x="7" y="17" width="4" height="8" rx="1" fill="#0A1F44"/><rect x="14" y="12" width="4" height="13" rx="1" fill="#0A1F44"/><rect x="21" y="7" width="4" height="18" rx="1" fill="#FFC300"/></svg>' +
-            '<span class="wm"><b>MSC</b> report<small>powered by COSTEP</small></span>';
+            '<span class="wm"><b>MSC</b> report<small>powered by COSTEP</small></span>' +
+            '<button type="button" id="l3_fold" aria-label="사이드바 접기" title="사이드바 접기/펴기"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
+          document.getElementById('l3_fold').onclick = () => setFold(!shell.classList.contains('folded'));
+        }
+        // 사이드바 접기 상태는 이 PC에 기억
+        const FOLD_KEY = 'MSC_L3_FOLD_V1';
+        function setFold(on) {
+          shell.classList.toggle('folded', on);
+          try { localStorage.setItem(FOLD_KEY, on ? '1' : '0'); } catch (e) { /* 저장 불가 */ }
+          const b = document.getElementById('l3_fold'); if (b) b.setAttribute('aria-label', on ? '사이드바 펴기' : '사이드바 접기');
+          document.querySelectorAll('#l3_steps li').forEach(li => li.title = on ? li.querySelector('.t').textContent : '');
+          setTimeout(layout, 0);
         }
 
         const ol = document.querySelector('#l3_steps ol');
@@ -7097,10 +7198,47 @@
         ol.innerHTML = STEPS.map(([n], i) => '<li data-i="' + i + '"><span class="n">' + (i + 1) + '</span><span class="t">' + n + '</span></li>').join('');
         // scrollIntoView 는 바깥 화면까지 같이 굴려 사이드바가 말려 올라간다 → 입력 칸만 굴린다
         ol.addEventListener('click', e => { const li = e.target.closest('li'); if (li) box.scrollTo({ top: secs[li.dataset.i].offsetTop, behavior: 'smooth' }); });
+        // 스텝 → 미리보기 위치(서식 안의 해당 부분). 글자로 찾으므로 서식을 다시 그려도 맞는다
+        const ANCHOR = [
+          ['print_target_official', null],                 // 내 정보 → 서식1 머리·발신
+          ['print_target_report', 'table'],                // 고객사 정보 → 결과보고서 기업 기초 제원 표
+          ['print_target_official', /주요 권고 과제/],      // 진단 대상 → 서식1 제목·권고 과제
+          ['print_target_report', /매출처|특허|인증/],     // 거래처·인증
+          ['print_target_report', /금융기관별 차입금/],    // 대출
+          ['print_target_report', /표준재무제표|실태|수지|손익분기/],  // 실태·재무
+          ['print_target_guide', null],                    // 업종 특화 → 실행안내서
+          ['print_target_bplan', null]                     // 사업계획 → 사업계획 개요서
+        ];
+        function anchorEl(i) {
+          const [id, what] = ANCHOR[i] || [];
+          const card = id && document.getElementById(id);
+          if (!card) return null;
+          if (!what) return card;
+          if (what === 'table') return card.querySelector('table') || card;
+          const w = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+          for (let n = w.nextNode(); n; n = w.nextNode()) if (what.test(n.textContent)) return n.parentElement.closest('div,table') || n.parentElement;
+          return card;
+        }
+        let lastSynced = -1, hlTimer = null;
+        function syncPreview(i, force) {
+          if (!force && i === lastSynced) return;
+          lastSynced = i;
+          if (document.getElementById('l3_preview').classList.contains('radar')) return;
+          const el = anchorEl(i); if (!el) return;
+          const st = document.getElementById('l3_stage');
+          const top = st.scrollTop + el.getBoundingClientRect().top - st.getBoundingClientRect().top - 16;
+          st.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+          document.querySelectorAll('#l3 .l3-hl').forEach(x => x.classList.remove('l3-hl'));
+          if (el.classList && !el.classList.contains('a4-page-card')) {
+            el.classList.add('l3-hl');
+            clearTimeout(hlTimer); hlTimer = setTimeout(() => el.classList.remove('l3-hl'), 1600);
+          }
+        }
         function markStep() {
           const y = box.scrollTop + box.clientHeight * 0.35;
           let cur = 0;
           secs.forEach((s, i) => { if (s.offsetTop <= y) cur = i; });
+          syncPreview(cur);
           [...ol.children].forEach((li, i) => { li.className = i < cur ? 'done' : i === cur ? 'now' : ''; li.querySelector('.n').textContent = i < cur ? String.fromCharCode(10003) : i + 1; });
         }
         box.addEventListener('scroll', () => requestAnimationFrame(markStep));
@@ -7193,6 +7331,7 @@
           const r = shell.getBoundingClientRect(), side = document.getElementById('l3_steps').getBoundingClientRect(), pv = document.getElementById('l3_preview').getBoundingClientRect();
           guts.forEach(g => { g.style.top = r.top + 'px'; g.style.display = shell.classList.contains('hidden') ? 'none' : ''; });
           guts[0].style.left = side.right + 'px'; guts[1].style.left = pv.left + 'px';
+          if (shell.classList.contains('folded')) guts[0].style.display = 'none';   // 접힌 사이드바는 폭 조절 안 함
         }
         guts.forEach(g => {
           g.addEventListener('pointerdown', e => {
@@ -7208,8 +7347,28 @@
           });
           g.addEventListener('dblclick', () => { if (g.dataset.k === '0') delete size.a; else delete size.c; applySize(size); try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (e) { /* 저장 불가 */ } layout(); });
         });
+        function fitWide() {
+          const dc = document.getElementById('debt_card');
+          if (dc && dc.offsetParent) dc.classList.toggle('narrow', dc.clientWidth < 560);
+          scr.querySelectorAll('.l3-wide2, .l3-wideall').forEach(c => c.classList.remove('l3-wide2', 'l3-wideall'));
+          scr.querySelectorAll('.l3-step input[type=text], .l3-step input:not([type]), .l3-step select').forEach(el => {
+            if (!el.offsetParent || el.closest('table')) return;
+            const cell = el.closest('.grid > div'); if (!cell) return;
+            const grid = cell.parentElement;
+            const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+            if (cols < 2) return;
+            let need;
+            if (el.tagName === 'SELECT') { const cv = fitWide.cv || (fitWide.cv = document.createElement('canvas').getContext('2d')); const cs = getComputedStyle(el); cv.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; need = cv.measureText(el.options[el.selectedIndex]?.text || '').width + 34 > el.clientWidth; }
+            else need = el.scrollWidth > el.clientWidth + 1;
+            if (need) cell.classList.add(cols >= 3 ? 'l3-wide2' : 'l3-wideall');
+          });
+        }
+        let fitT = null;
+        scr.addEventListener('input', () => { clearTimeout(fitT); fitT = setTimeout(fitWide, 300); });
+        scr.addEventListener('change', () => { clearTimeout(fitT); fitT = setTimeout(fitWide, 300); });
         function layout() {
           shell.style.top = '0px';
+          fitWide();
           placeGuts(); placeNav();
           box.style.setProperty('--l3h', box.clientHeight + 'px');
           fit(); markStep();
@@ -7219,12 +7378,17 @@
           clearTimeout(t);
           t = setTimeout(() => {
             calcSmbMetrics(); calcDebtTotals();
+            const keep = document.getElementById('l3_stage').scrollTop;
             renderReportButtons(); renderReportKeyChips(); renderActiveReport(); fit();
+            document.getElementById('l3_stage').scrollTop = keep;
           }, 150);
         }
         ['input', 'change', 'click'].forEach(ev => scr.addEventListener(ev, live));
         addEventListener('resize', layout);
         new ResizeObserver(fit).observe(document.getElementById('active_report_render_area'));
+        // 대출표는 카드 폭에 따라 두 줄/세 줄 배치
+        const debtCard = document.getElementById('debt_card');
+        if (debtCard) new ResizeObserver(() => debtCard.classList.toggle('narrow', debtCard.clientWidth < 560)).observe(debtCard);
 
         // 화면 전환: 입력·서식은 3단 화면 하나로, 지원사업은 따로
         const orig = window.switchMainScreen;
@@ -7239,7 +7403,7 @@
         window.generateAndOpenReports = live;
         generateAndOpenReports = live;
         if (!window.appState.activeSheet) window.appState.activeSheet = 'all';
-        setTimeout(() => { fillMe(); renderAcct(); renderBrand(); window.switchMainScreen('input'); }, 0);
+        setTimeout(() => { fillMe(); renderAcct(); renderBrand(); let f = false; try { f = localStorage.getItem(FOLD_KEY) === '1'; } catch (e) { f = false; } if (f) setFold(true); window.switchMainScreen('input'); }, 0);
       });
     })();
   </script>
