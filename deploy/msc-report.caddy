@@ -1,0 +1,15 @@
+# MSC Report Generator (코스텝 경영진단) — 정적 파일. 공용 Caddyfile 에서 import 한 줄로 연결
+www.costepmsc-report.com {
+	redir https://costepmsc-report.com{uri} permanent
+}
+
+costepmsc-report.com {
+	root * /var/www/msc-report
+	encode gzip
+	file_server
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
