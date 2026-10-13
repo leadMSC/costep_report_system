@@ -11,7 +11,8 @@ const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>\s*(?=<\/body>|<!-
 const store = {};
 const el = () => ({ value: '', innerText: '', innerHTML: '', checked: false, className: '', classList: { add() {}, remove() {} }, setAttribute() {}, addEventListener() {} });
 const ctx = {
-  document: { getElementById: el, querySelectorAll: () => [], querySelector: () => null, addEventListener() {}, body: { appendChild() {}, removeChild() {} } },
+  document: { getElementById: el, querySelectorAll: () => [], querySelector: () => null, addEventListener() {}, body: { appendChild() {}, removeChild() {} },
+    documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k] || null; } } },
   localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
   console, alert() {}, setTimeout, scrollTo() {},
   location: { hostname: 'localhost', search: '', origin: 'http://localhost', pathname: '/' }, URLSearchParams,
