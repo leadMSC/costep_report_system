@@ -428,7 +428,7 @@
             <div>
               <span class="text-slate-400 block text-[10px]">총 금융차입금 잔액 합계:</span>
               <strong id="debt_total_balance" class="text-base font-black text-amber-300">58,500만원</strong>
-              <span class="text-slate-400 text-[11px] ml-1">(5억 8,500만원)</span>
+              <span id="debt_total_balance_kr" class="text-slate-400 text-[11px] ml-1"></span>
             </div>
             <div>
               <span class="text-slate-400 block text-[10px]">가중평균 약정금리:</span>
@@ -2844,6 +2844,12 @@
       const elAlertText = document.getElementById('debt_alert_text');
 
       if (elTotBal) elTotBal.innerText = totalBal.toLocaleString() + '만원';
+      // 억 단위 읽기 보조: 1억 이상일 때만 실제 합계로 표시 (예: 58,500만원 → (5억 8,500만원))
+      const elTotBalKr = document.getElementById('debt_total_balance_kr');
+      if (elTotBalKr) {
+        const eok = Math.floor(totalBal / 10000), rest = Math.round(totalBal % 10000);
+        elTotBalKr.innerText = eok > 0 ? `(${eok}억${rest ? ' ' + rest.toLocaleString() + '만원' : '원'})` : '';
+      }
       if (elAvgRate) elAvgRate.innerText = `연 ${avgRate}%`;
       if (elTotInt) elTotInt.innerText = totalMonthlyInt.toLocaleString() + '만원';
 
