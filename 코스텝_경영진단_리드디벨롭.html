@@ -7412,7 +7412,9 @@
     #l3_head .l3-print { margin-left: auto; padding: 6px 12px; border-radius: 9px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); font-size: 11px; font-weight: 800; white-space: nowrap; cursor: pointer; }
     #l3_stage { flex: 1; overflow: auto; padding: 16px 0; }
     /* [8] 미리보기 배율: − 100% + 맞춤 (Ctrl+휠로도) */
-    #l3 .l3-zoom { display: inline-flex; align-items: center; gap: 2px; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; }
+    #l3 .l3-zoom { position: absolute; right: 22px; bottom: 18px; z-index: 6; display: inline-flex; align-items: center; gap: 2px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
+    #l3_preview.radar .l3-zoom { display: none; }
+    @media print { #l3 .l3-zoom { display: none !important; } }
     #l3 .l3-zoom button { min-width: 26px; height: 24px; padding: 0 6px; border-radius: 7px; font-size: 13px; font-weight: 800; color: var(--t-text-2, #33363D); cursor: pointer; }
     #l3 .l3-zoom button:hover { background: var(--t-surface, #fff); }
     #l3 .l3-zoom .pct { min-width: 46px; font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -7623,7 +7625,8 @@
         const zbox = document.createElement('div');
         zbox.className = 'l3-zoom';
         zbox.innerHTML = '<button type="button" data-z="-" title="축소 (Ctrl+휠)" aria-label="축소">−</button><button type="button" class="pct" id="l3_zoom_pct" data-z="100" title="실제 크기(100%)">100%</button><button type="button" data-z="+" title="확대 (Ctrl+휠)" aria-label="확대">+</button><button type="button" class="fitb" id="l3_zoom_fit" data-z="fit" title="미리보기 폭에 맞춤">맞춤</button>';
-        row2.appendChild(zbox);
+        // 배율 버튼은 미리보기 칸 안 오른쪽 아래에 떠 있게(문서를 가리지 않도록 작게)
+        document.getElementById('l3_preview').appendChild(zbox);
         row2.appendChild(sheetBox);
         const pr = document.createElement('button');
         pr.type = 'button'; pr.className = 'l3-print'; pr.textContent = '전체 인쇄·PDF';
