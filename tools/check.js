@@ -6,13 +6,16 @@ let fail = 0;
 const ok = (cond, msg) => { console.log((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) fail++; };
 
 // 1. 문법 + 실행 시뮬레이션 (DOM·alert·localStorage 대체)
-const script = html.substring(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+// 인라인 <script> 블록 전부 (src 있는 외부 스크립트 제외) — 본 스크립트 + 2단계 로그인 스크립트
+const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>\s*(?=<\/body>|<!--|<script)/g)].map(m => m[1]).join('\n;\n');
 const store = {};
 const el = () => ({ value: '', innerText: '', innerHTML: '', checked: false, className: '', classList: { add() {}, remove() {} }, setAttribute() {}, addEventListener() {} });
 const ctx = {
   document: { getElementById: el, querySelectorAll: () => [], querySelector: () => null, addEventListener() {}, body: { appendChild() {}, removeChild() {} } },
   localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
-  console, alert() {}, setTimeout, scrollTo() {}
+  console, alert() {}, setTimeout, scrollTo() {},
+  location: { hostname: 'localhost', search: '', origin: 'http://localhost', pathname: '/' }, URLSearchParams,
+  sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} }, navigator: { userAgent: 'node' }
 };
 ctx.window = ctx;
 try {
@@ -32,7 +35,7 @@ try {
 // 3. JS가 참조하는 ID가 HTML에 모두 존재
 const defined = new Set([...html.matchAll(/\bid="([^"$]+)"/g)].map(m => m[1]));
 const used = new Set([...html.matchAll(/(?:getElementById|getOptTxt|setVal)\(['"]([^'"]+)['"]/g)].map(m => m[1]));
-const missing = [...used].filter(x => !defined.has(x));
+const missing = [...used].filter(x => !defined.has(x) && !x.endsWith('_'));   // 'auth_state_' + 상태 처럼 이어 붙이는 접두어 제외
 ok(missing.length === 0, '참조 ID 누락 0개' + (missing.length ? ' → ' + missing.join(', ') : ''));
 
 // 4. 금지어·이모지

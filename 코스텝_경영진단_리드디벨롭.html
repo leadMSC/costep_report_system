@@ -128,6 +128,84 @@
 </head>
 <body class="min-h-screen text-slate-900 pb-16">
 
+  <!-- ================= 로그인 관문 (2단계: 구글 로그인 · 승인 대기 · 차단) ================= -->
+  <div id="auth_gate" class="no-print fixed inset-0 z-[100] bg-slate-50 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-8 space-y-5 text-center">
+      <div class="w-12 h-12 mx-auto rounded-xl bg-[#169aa8] flex items-center justify-center text-white font-black text-2xl shadow-sm">C</div>
+      <div class="space-y-1">
+        <h2 class="text-lg font-black text-slate-900">코스텝 경영진단 및 행정지원 연계시스템</h2>
+        <p class="text-xs text-slate-500">MSC Report Generator · 승인된 컨설턴트 전용</p>
+      </div>
+      <div id="auth_state_loading" class="text-sm text-slate-600">로그인 상태를 확인하고 있습니다…</div>
+      <div id="auth_state_signin" class="hidden space-y-3">
+        <button type="button" onclick="authSignIn()" class="w-full px-4 py-3 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 shadow-xs transition-all cursor-pointer flex items-center justify-center space-x-2">
+          <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          <span>구글 계정으로 로그인</span>
+        </button>
+        <p class="text-[11px] text-slate-500 leading-relaxed">처음 로그인하면 관리자 승인 후 이용할 수 있습니다.<br>초대받은 계정은 바로 시작됩니다.</p>
+      </div>
+      <div id="auth_state_pending" class="hidden space-y-3">
+        <div class="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900 font-bold">승인 대기 중입니다</div>
+        <p class="text-xs text-slate-600 leading-relaxed"><strong id="auth_pending_email" class="text-slate-900"></strong> 계정으로 가입 요청이 접수되었습니다.<br>소속 컨설팅펌 관리자가 승인하면 바로 이용할 수 있습니다.</p>
+        <div class="flex gap-2 justify-center">
+          <button type="button" onclick="authRefresh()" class="px-4 py-2 bg-[#169aa8] hover:bg-[#138491] text-white rounded-lg text-xs font-bold cursor-pointer">승인 여부 다시 확인</button>
+          <button type="button" onclick="authSignOut()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold border border-slate-300 cursor-pointer">로그아웃</button>
+        </div>
+      </div>
+      <div id="auth_state_blocked" class="hidden space-y-3">
+        <div class="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-800 font-bold">이용이 제한된 계정입니다</div>
+        <p class="text-xs text-slate-600">관리자에게 문의해 주세요.</p>
+        <button type="button" onclick="authSignOut()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold border border-slate-300 cursor-pointer">로그아웃</button>
+      </div>
+      <div id="auth_state_error" class="hidden space-y-3">
+        <div class="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800" id="auth_error_text">연결에 실패했습니다.</div>
+        <button type="button" onclick="authRefresh()" class="px-4 py-2 bg-[#169aa8] hover:bg-[#138491] text-white rounded-lg text-xs font-bold cursor-pointer">다시 시도</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 관리 화면 (펌 관리자·운영자) ================= -->
+  <div id="admin_modal" class="no-print hidden fixed inset-0 z-[90] bg-slate-900/50 flex items-start sm:items-center justify-center p-3 overflow-y-auto">
+    <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-slate-200">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+        <div class="flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
+          <h3 class="text-sm font-black text-slate-900">구성원·접속 관리</h3>
+          <span id="admin_scope_label" class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-[#0f766e] border border-teal-200"></span>
+        </div>
+        <button type="button" onclick="closeAdmin()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 border border-slate-300 cursor-pointer">닫기</button>
+      </div>
+      <div class="px-5 pt-3 flex gap-1.5 text-xs font-bold">
+        <button type="button" id="admin_tab_members" onclick="adminTab('members')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">구성원</button>
+        <button type="button" id="admin_tab_invites" onclick="adminTab('invites')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">사전 등록(초대)</button>
+        <button type="button" id="admin_tab_logs" onclick="adminTab('logs')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">접속·작업 기록</button>
+      </div>
+      <div class="p-5 text-xs">
+        <div id="admin_msg" class="hidden mb-3 px-3 py-2 rounded-lg text-xs font-bold"></div>
+        <div id="admin_pane_members"></div>
+        <div id="admin_pane_invites" class="hidden space-y-3">
+          <div class="flex flex-wrap items-end gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div class="flex-1 min-w-[200px]">
+              <label class="font-bold text-slate-700 block mb-1">구글 이메일</label>
+              <input type="email" id="invite_email" placeholder="name@gmail.com" class="form-input-control">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">역할</label>
+              <select id="invite_role" class="form-input-control"><option value="consultant">컨설턴트</option><option value="org_admin">펌 관리자</option></select>
+            </div>
+            <div id="invite_org_wrap">
+              <label class="font-bold text-slate-700 block mb-1">소속 펌</label>
+              <select id="invite_org" class="form-input-control"></select>
+            </div>
+            <button type="button" onclick="adminInvite()" class="px-4 py-2 bg-[#169aa8] hover:bg-[#138491] text-white rounded-lg font-bold cursor-pointer">등록</button>
+          </div>
+          <div id="admin_invite_list"></div>
+        </div>
+        <div id="admin_pane_logs" class="hidden"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= TOP HEADER (NO-PRINT) ================= -->
   <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
@@ -170,6 +248,14 @@
         <div class="hidden xl:flex items-center space-x-1.5 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs whitespace-nowrap">
           <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
           <span class="font-extrabold text-blue-900" id="top_consultant_badge">박수혁 경영컨설턴트</span>
+        </div>
+        <div id="auth_user_box" class="hidden items-center space-x-1.5">
+          <div class="flex flex-col items-end leading-tight px-2">
+            <span id="auth_user_name" class="text-xs font-extrabold text-slate-900 whitespace-nowrap"></span>
+            <span id="auth_user_role" class="text-[10px] font-bold text-[#0f766e] whitespace-nowrap"></span>
+          </div>
+          <button type="button" id="auth_admin_btn" onclick="openAdmin()" class="hidden px-3 py-2 bg-teal-50 hover:bg-teal-100 text-[#0f766e] rounded-xl text-xs font-bold border border-teal-200 cursor-pointer whitespace-nowrap">관리</button>
+          <button type="button" onclick="authSignOut()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 cursor-pointer whitespace-nowrap">로그아웃</button>
         </div>
       </div>
     </div>
@@ -4955,6 +5041,274 @@
       updateCategoryCounts();
       renderRadarAnnouncements();
     });
+  </script>
+  <!-- ================= 2단계: 로그인·승인·접속 기록 (Supabase) ================= -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script>
+    // 공개용 연결값(publishable key)은 브라우저에 노출되는 값이다. 데이터는 DB 행 단위 권한(RLS)으로 보호된다.
+    const MSC_AUTH = {
+      url: 'https://yddencwikwzllnsoalbg.supabase.co',
+      key: 'sb_publishable_xuAfRW1_ARpYH25N0mYm5A_IOL2Y1mp',
+      // 운영 주소에서만 로그인을 요구한다. 로컬 검증 도구(시나리오·PDF 점검)는 로그인 없이 돈다. ?auth=1 이면 로컬에서도 켠다.
+      enabled: location.hostname === 'costepmsc-report.com' || new URLSearchParams(location.search).get('auth') === '1'
+    };
+    const ROLE_LABEL = { pending: '승인 대기', consultant: '컨설턴트', org_admin: '펌 관리자', operator: '운영자', blocked: '차단' };
+    window.appState = window.appState || {};
+    window.appState.auth = { user: null, profile: null, org: null };
+    let sb = null;
+
+    function authShow(state) {
+      const gate = document.getElementById('auth_gate');
+      ['loading', 'signin', 'pending', 'blocked', 'error'].forEach(s => document.getElementById('auth_state_' + s)?.classList.toggle('hidden', s !== state));
+      gate.classList.toggle('hidden', state === 'ready');
+    }
+
+    async function authLog(action, detail) {
+      if (!sb || !window.appState.auth.user) return;
+      try {
+        await sb.from('audit_logs').insert({ user_id: window.appState.auth.user.id, org_id: window.appState.auth.profile?.org_id || null, action, detail: detail || null });
+      } catch (e) { /* 기록 실패는 작업을 막지 않는다 */ }
+    }
+    window.authLog = authLog;
+
+    let authBusy = null;
+    function authRefresh() { if (!authBusy) authBusy = authRefreshInner().finally(() => { authBusy = null; }); return authBusy; }
+    async function authRefreshInner() {
+      if (!sb) return;
+      authShow('loading');
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { authShow('signin'); return; }
+        window.appState.auth.user = session.user;
+        const { data: profile, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+        if (error) throw error;
+        window.appState.auth.profile = profile;
+        if (profile.role === 'pending') { document.getElementById('auth_pending_email').innerText = profile.email; authShow('pending'); return; }
+        if (profile.role === 'blocked') { authShow('blocked'); return; }
+        if (profile.org_id) {
+          const { data: org } = await sb.from('orgs').select('*').eq('id', profile.org_id).single();
+          window.appState.auth.org = org || null;
+        }
+        authApplyUser();
+        authShow('ready');
+        // 같은 탭에서는 접속 기록을 한 번만 남긴다
+        let logged = false;
+        try { logged = sessionStorage.getItem('MSC_LOGIN_LOGGED') === session.user.id; } catch (e) {}
+        if (!logged) {
+          await authLog('login', { ua: navigator.userAgent.slice(0, 120) });
+          try { sessionStorage.setItem('MSC_LOGIN_LOGGED', session.user.id); } catch (e) {}
+        }
+      } catch (e) {
+        document.getElementById('auth_error_text').innerText = '연결에 실패했습니다: ' + (e.message || e);
+        authShow('error');
+      }
+    }
+    window.authRefresh = authRefresh;
+
+    function authApplyUser() {
+      const { profile, org } = window.appState.auth;
+      const box = document.getElementById('auth_user_box');
+      if (!box || !profile) return;
+      box.classList.remove('hidden');
+      box.classList.add('flex');
+      document.getElementById('auth_user_name').innerText = profile.name || profile.email;
+      document.getElementById('auth_user_role').innerText = (org ? org.name + ' · ' : '') + (ROLE_LABEL[profile.role] || profile.role);
+      document.getElementById('auth_admin_btn').classList.toggle('hidden', !['org_admin', 'operator'].includes(profile.role));
+      // 담당 컨설턴트 칸이 비어 있으면 로그인한 사람 이름으로 채운다
+      const cn = document.getElementById('consultant_name');
+      if (cn && !cn.value.trim() && profile.name) { cn.value = profile.name + (profile.title ? ' ' + profile.title : ''); cn.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+
+    async function authSignIn() {
+      if (!sb) return;
+      const redirectTo = location.origin + location.pathname + (location.search.includes('auth=1') ? '?auth=1' : '');
+      await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+    }
+    window.authSignIn = authSignIn;
+
+    async function authSignOut() {
+      if (!sb) return;
+      await authLog('logout');
+      try { sessionStorage.removeItem('MSC_LOGIN_LOGGED'); } catch (e) {}
+      await sb.auth.signOut();
+      window.appState.auth = { user: null, profile: null, org: null };
+      document.getElementById('auth_user_box')?.classList.add('hidden');
+      authShow('signin');
+    }
+    window.authSignOut = authSignOut;
+
+    // ---------------- 관리 화면 ----------------
+    let adminCache = { orgs: [], members: [] };
+    function adminMsg(text, ok) {
+      const el = document.getElementById('admin_msg');
+      el.className = 'mb-3 px-3 py-2 rounded-lg text-xs font-bold ' + (ok ? 'bg-teal-50 text-[#0f766e] border border-teal-200' : 'bg-red-50 text-red-800 border border-red-200');
+      el.innerText = text;
+      clearTimeout(adminMsg._t); adminMsg._t = setTimeout(() => el.classList.add('hidden'), 5000);
+    }
+    const isOperator = () => window.appState.auth.profile?.role === 'operator';
+
+    async function openAdmin() {
+      document.getElementById('admin_modal').classList.remove('hidden');
+      document.getElementById('admin_scope_label').innerText = isOperator() ? '운영자 · 전체 펌' : (window.appState.auth.org?.name || '') + ' 관리자';
+      const { data: orgs } = await sb.from('orgs').select('id,name').order('name');
+      adminCache.orgs = orgs || [];
+      document.getElementById('invite_org').innerHTML = adminCache.orgs.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+      document.getElementById('invite_org_wrap').classList.toggle('hidden', !isOperator());
+      document.getElementById('invite_role').querySelector('option[value="org_admin"]').disabled = !isOperator();
+      adminTab('members');
+    }
+    window.openAdmin = openAdmin;
+    function closeAdmin() { document.getElementById('admin_modal').classList.add('hidden'); }
+    window.closeAdmin = closeAdmin;
+
+    function adminTab(tab) {
+      ['members', 'invites', 'logs'].forEach(t => {
+        document.getElementById('admin_pane_' + t).classList.toggle('hidden', t !== tab);
+        const b = document.getElementById('admin_tab_' + t);
+        b.className = 'admin-tab px-3 py-1.5 rounded-lg cursor-pointer ' + (t === tab ? 'bg-[#169aa8] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200');
+      });
+      ({ members: adminLoadMembers, invites: adminLoadInvites, logs: adminLoadLogs })[tab]();
+    }
+    window.adminTab = adminTab;
+
+    const orgName = (id) => adminCache.orgs.find(o => o.id === id)?.name || '-';
+    const fmtTime = (t) => t ? new Date(t).toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+
+    async function adminLoadMembers() {
+      const pane = document.getElementById('admin_pane_members');
+      pane.innerHTML = '<p class="text-slate-500">불러오는 중…</p>';
+      const { data, error } = await sb.from('profiles').select('id,email,name,role,org_id,approved_at,created_at').order('created_at', { ascending: false });
+      if (error) { pane.innerHTML = `<p class="text-red-700">${escapeHtml(error.message)}</p>`; return; }
+      adminCache.members = data || [];
+      const me = window.appState.auth.profile.id;
+      const rows = adminCache.members.map(m => {
+        const acts = [];
+        if (m.id !== me) {
+          if (m.role === 'pending' || m.role === 'blocked') acts.push(`<button type="button" onclick="adminSetRole('${m.id}','consultant')" class="px-2 py-1 rounded bg-[#169aa8] text-white font-bold cursor-pointer">승인</button>`);
+          if (m.role === 'consultant' && isOperator()) acts.push(`<button type="button" onclick="adminSetRole('${m.id}','org_admin')" class="px-2 py-1 rounded bg-slate-100 border border-slate-300 font-bold cursor-pointer">관리자 지정</button>`);
+          if (m.role === 'org_admin' && isOperator()) acts.push(`<button type="button" onclick="adminSetRole('${m.id}','consultant')" class="px-2 py-1 rounded bg-slate-100 border border-slate-300 font-bold cursor-pointer">컨설턴트로</button>`);
+          if (m.role !== 'blocked' && m.role !== 'operator') acts.push(`<button type="button" onclick="adminSetRole('${m.id}','blocked')" class="px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 font-bold cursor-pointer">차단</button>`);
+        }
+        const roleCls = { pending: 'bg-amber-50 text-amber-800 border-amber-200', blocked: 'bg-red-50 text-red-700 border-red-200' }[m.role] || 'bg-teal-50 text-[#0f766e] border-teal-200';
+        return `<tr class="border-b border-slate-100">
+          <td class="p-2"><div class="font-bold text-slate-900">${escapeHtml(m.name || '-')}</div><div class="text-slate-500">${escapeHtml(m.email)}</div></td>
+          <td class="p-2">${escapeHtml(orgName(m.org_id))}</td>
+          <td class="p-2"><span class="px-2 py-0.5 rounded border font-bold ${roleCls}">${ROLE_LABEL[m.role] || m.role}</span></td>
+          <td class="p-2 text-slate-500">${fmtTime(m.created_at)}</td>
+          <td class="p-2"><div class="flex flex-wrap gap-1">${acts.join('')}</div></td></tr>`;
+      }).join('');
+      const pending = adminCache.members.filter(m => m.role === 'pending').length;
+      pane.innerHTML = `${pending ? `<p class="mb-2 font-bold text-amber-800">승인 대기 ${pending}명</p>` : ''}
+        <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="bg-slate-50 text-slate-600"><th class="p-2">이름·이메일</th><th class="p-2">소속</th><th class="p-2">역할</th><th class="p-2">가입</th><th class="p-2">조치</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="p-3 text-slate-500">구성원이 없습니다.</td></tr>'}</tbody></table></div>`;
+    }
+
+    async function adminSetRole(id, role) {
+      const m = adminCache.members.find(x => x.id === id);
+      if (!m) return;
+      const patch = { role };
+      // 소속이 없는 대기자를 승인할 때: 펌 관리자는 자기 펌으로, 운영자는 펌을 고른다
+      if (!m.org_id && role !== 'blocked') {
+        if (isOperator()) {
+          const names = adminCache.orgs.map((o, i) => `${i + 1}. ${o.name}`).join('\n');
+          const pick = prompt(`${m.email} 을(를) 어느 펌으로 승인할까요? 번호를 입력하세요.\n${names}`);
+          const org = adminCache.orgs[Number(pick) - 1];
+          if (!org) return;
+          patch.org_id = org.id;
+        } else {
+          patch.org_id = window.appState.auth.profile.org_id;
+        }
+      }
+      if (role === 'blocked' && !confirm(`${m.email} 을(를) 차단할까요? 차단하면 로그인해도 이용할 수 없습니다.`)) return;
+      const { error } = await sb.from('profiles').update(patch).eq('id', id);
+      if (error) { adminMsg('변경 실패: ' + error.message, false); return; }
+      adminMsg(`${m.email} → ${ROLE_LABEL[role]}`, true);
+      adminLoadMembers();
+    }
+    window.adminSetRole = adminSetRole;
+
+    async function adminLoadInvites() {
+      const list = document.getElementById('admin_invite_list');
+      const { data, error } = await sb.from('invites').select('*').order('created_at', { ascending: false });
+      if (error) { list.innerHTML = `<p class="text-red-700">${escapeHtml(error.message)}</p>`; return; }
+      list.innerHTML = `<table class="w-full text-left"><thead><tr class="bg-slate-50 text-slate-600"><th class="p-2">이메일</th><th class="p-2">역할</th><th class="p-2">소속</th><th class="p-2">상태</th><th class="p-2"></th></tr></thead><tbody>` +
+        ((data || []).map(v => `<tr class="border-b border-slate-100"><td class="p-2">${escapeHtml(v.email)}</td><td class="p-2">${ROLE_LABEL[v.role]}</td><td class="p-2">${escapeHtml(orgName(v.org_id))}</td>
+          <td class="p-2">${v.used_at ? '가입 완료 ' + fmtTime(v.used_at) : '첫 로그인 대기'}</td>
+          <td class="p-2">${v.used_at ? '' : `<button type="button" onclick="adminDeleteInvite('${escapeHtml(v.email)}')" class="px-2 py-1 rounded bg-slate-100 border border-slate-300 font-bold cursor-pointer">취소</button>`}</td></tr>`).join('') ||
+          '<tr><td colspan="5" class="p-3 text-slate-500">등록된 초대가 없습니다.</td></tr>') + '</tbody></table>';
+    }
+
+    async function adminInvite() {
+      const email = document.getElementById('invite_email').value.trim().toLowerCase();
+      const role = document.getElementById('invite_role').value;
+      const org_id = isOperator() ? document.getElementById('invite_org').value : window.appState.auth.profile.org_id;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { adminMsg('이메일 형식을 확인해 주세요.', false); return; }
+      if (!org_id) { adminMsg('소속 펌을 고를 수 없습니다.', false); return; }
+      const { error } = await sb.from('invites').insert({ email, role, org_id });
+      if (error) { adminMsg('등록 실패: ' + (error.code === '23505' ? '이미 등록된 이메일입니다.' : error.message), false); return; }
+      await authLog('invite', { email, role });
+      document.getElementById('invite_email').value = '';
+      adminMsg(`${email} 사전 등록 완료 — 이 계정은 첫 로그인 때 바로 ${ROLE_LABEL[role]}로 시작합니다.`, true);
+      adminLoadInvites();
+    }
+    window.adminInvite = adminInvite;
+
+    async function adminDeleteInvite(email) {
+      const { error } = await sb.from('invites').delete().eq('email', email);
+      if (error) { adminMsg('취소 실패: ' + error.message, false); return; }
+      adminLoadInvites();
+    }
+    window.adminDeleteInvite = adminDeleteInvite;
+
+    const LOG_LABEL = { login: '로그인', logout: '로그아웃', signup: '가입', role_change: '역할 변경', invite: '사전 등록', print: '출력', export: '문서 저장', save_client: '고객 저장' };
+    async function adminLoadLogs() {
+      const pane = document.getElementById('admin_pane_logs');
+      pane.innerHTML = '<p class="text-slate-500">불러오는 중…</p>';
+      const { data, error } = await sb.from('audit_logs').select('id,user_id,org_id,action,target_type,detail,created_at').order('created_at', { ascending: false }).limit(200);
+      if (error) { pane.innerHTML = `<p class="text-red-700">${escapeHtml(error.message)}</p>`; return; }
+      if (!adminCache.members.length) await adminLoadMembers();
+      const who = (id) => { const m = adminCache.members.find(x => x.id === id); return m ? (m.name || m.email) : '(알 수 없음)'; };
+      const desc = (l) => {
+        const d = l.detail || {};
+        if (l.action === 'role_change') return `${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to}`;
+        if (l.action === 'invite') return `${d.email || ''} (${ROLE_LABEL[d.role] || ''})`;
+        if (l.action === 'signup') return d.invited ? '초대로 가입' : '승인 대기로 가입';
+        return d.corp ? escapeHtml(d.corp) : '';
+      };
+      pane.innerHTML = `<p class="mb-2 text-slate-500">최근 200건 · ${isOperator() ? '전체 펌' : '우리 펌'}</p><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="bg-slate-50 text-slate-600"><th class="p-2">시각</th><th class="p-2">사용자</th><th class="p-2">작업</th><th class="p-2">내용</th></tr></thead><tbody>` +
+        ((data || []).map(l => `<tr class="border-b border-slate-100"><td class="p-2 whitespace-nowrap text-slate-500">${fmtTime(l.created_at)}</td><td class="p-2">${escapeHtml(who(l.user_id))}</td><td class="p-2 font-bold">${LOG_LABEL[l.action] || escapeHtml(l.action)}</td><td class="p-2">${desc(l)}</td></tr>`).join('') ||
+          '<tr><td colspan="4" class="p-3 text-slate-500">기록이 없습니다.</td></tr>') + '</tbody></table></div>';
+    }
+
+    // 출력·문서 저장·고객 저장을 접속 기록에 남긴다 (기존 함수를 감싸기만 하고 동작은 그대로)
+    function authWrapActions() {
+      const corp = () => (document.getElementById('corp_name')?.value || '').trim().slice(0, 60);
+      const wrap = (name, action, extra) => {
+        const fn = window[name];
+        if (typeof fn !== 'function' || fn.__mscWrapped) return;
+        const w = function (...args) { authLog(action, Object.assign({ corp: corp(), fn: name }, extra ? extra(args) : {})); return fn.apply(this, args); };
+        w.__mscWrapped = true;
+        window[name] = w;
+      };
+      wrap('printSingleSheet', 'print', a => ({ sheet: String(a[0] || '') }));
+      wrap('printAllReportsBatch', 'print', () => ({ sheet: 'all' }));
+      wrap('downloadSingleSheetDoc', 'export', a => ({ sheet: String(a[0] || '') }));
+      wrap('downloadAllSheetsDoc', 'export', () => ({ sheet: 'all' }));
+      wrap('saveClient', 'save_client');
+    }
+
+    // ---------------- 시작 ----------------
+    (function authInit() {
+      if (!MSC_AUTH.enabled) { document.getElementById('auth_gate').classList.add('hidden'); return; }   // 로컬 검증 모드: 로그인 없이 사용
+      authWrapActions();
+      if (!window.supabase?.createClient) { document.getElementById('auth_gate').classList.remove('hidden'); document.getElementById('auth_error_text').innerText = '로그인 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'; authShow('error'); return; }
+      sb = window.supabase.createClient(MSC_AUTH.url, MSC_AUTH.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
+      authShow('loading');
+      sb.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') setTimeout(authRefresh, 0);
+        if (event === 'SIGNED_OUT') authShow('signin');
+      });
+    })();
   </script>
 </body>
 </html>
