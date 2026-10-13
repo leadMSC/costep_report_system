@@ -1018,7 +1018,7 @@
           <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 flex items-center space-x-2">
             <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
             <span>중소기업 최근 3개년 표준재무제표 및 대표자 신용평점</span>
-            <button type="button" onclick="openDocsModal && openDocsModal()" class="no-print ml-auto px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-800 cursor-pointer">서류로 채우기</button>
+            <button type="button" onclick="openDocsModal && openDocsModal()" class="no-print ml-auto px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer">재무제표 올리기</button>
           </h3>
           <div class="overflow-x-auto">
             <table class="w-full text-xs border-collapse border border-slate-200">
@@ -1055,8 +1055,68 @@
                   <td class="p-1.5 border border-slate-200"><input type="text" id="sme_equity_2024" data-allow-negative value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-bold font-mono"></td>
                   <td class="p-1.5 border border-slate-200"><input type="text" id="sme_equity" data-allow-negative value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-bold font-mono"></td>
                 </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">당기순이익</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_net_2023" data-allow-negative value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_net_2024" data-allow-negative value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_net" data-allow-negative value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">자산총계</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_assets_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_assets_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_assets" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">자본금</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_capital_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_capital_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_capital" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">단기차입금</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_st_loan_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_st_loan_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_st_loan" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">장기차입금</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_lt_loan_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_lt_loan_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_lt_loan" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">당좌자산</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_quick_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_quick_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_quick" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">유동부채</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_cur_liab_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_cur_liab_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_cur_liab" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">이자비용</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_int_exp_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_int_exp_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_int_exp" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">이자수익</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_int_inc_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_int_inc_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_int_inc" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">매출채권</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_ar_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_ar_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_ar" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">재고자산</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_inv_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_inv_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_inv" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">매입채무</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_ap_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_ap_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_ap" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
+                <tr class="fin-more">
+                  <td class="p-2 border border-slate-200 font-bold text-slate-700 text-center">미지급금</td>
+                  <td class="p-1.5 border border-slate-200"><input type="text" id="sme_unpaid_2023" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_unpaid_2024" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td><td class="p-1.5 border border-slate-200"><input type="text" id="sme_unpaid" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-right font-mono"></td>
+                </tr>
               </tbody>
             </table>
+          </div>
+          <div id="fin_ind_box" class="fin-ind">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="text-xs font-extrabold text-slate-900 mr-auto">주요 재무지표 <span class="font-medium text-slate-500">(입력값으로 자동 계산)</span></span>
+              <label class="text-[11px] text-slate-600">당기 결산연도</label>
+              <input type="text" id="sme_fy_y1" value="" placeholder="예: 2025" maxlength="4" oninput="this.value=this.value.replace(/\D/g,''); syncCompanyData();" class="form-input-control !w-20 text-center font-mono text-xs">
+            </div>
+            <div id="fin_ind_table"></div>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div>
@@ -3810,6 +3870,71 @@
     const fmtPct = (v) => (Math.round(v * 10) / 10).toLocaleString() + '%';
     const fmtMil = (v) => Math.round(v).toLocaleString() + '백만원';
 
+    // 주요 재무지표 — 재무제표 분석 엑셀(서식 탭)과 같은 식. 연도별 [Y-3, Y-2, Y-1], 값이 없으면 null
+    function computeFinIndicators() {
+      const yr = id => [readNum(id + '_2023'), readNum(id + '_2024'), readNum(id)];
+      const S = yr('sme_sales'), OP = yr('sme_profit'), D = yr('sme_debt'), E = yr('sme_equity'), A = yr('sme_assets'), N = yr('sme_net');
+      const ST = yr('sme_st_loan'), LT = yr('sme_lt_loan'), Q = yr('sme_quick'), CL = yr('sme_cur_liab'), IE = yr('sme_int_exp'), II = yr('sme_int_inc');
+      const AR = yr('sme_ar'), INV = yr('sme_inv');
+      const ok = v => v !== null && isFinite(v);
+      const div = (a, b, k = 1) => (ok(a) && ok(b) && b !== 0) ? a / b * k : null;
+      const loans = [0, 1, 2].map(i => (ok(ST[i]) || ok(LT[i])) ? (ST[i] || 0) + (LT[i] || 0) : null);
+      const chg = (X, i) => i === 0 ? null : (ok(X[i]) && ok(X[i - 1]) && X[i - 1] !== 0 ? (X[i] - X[i - 1]) / Math.abs(X[i - 1]) * 100 : null);
+      const per = f => [0, 1, 2].map(f);
+      const fy = readNum('sme_fy_y1');
+      const isMfg = (window.appState.industryTrack || 'mfg') === 'mfg';
+      const rows = [
+        ['차입금 합계', per(i => loans[i]), '백만원'],
+        ['차입금 증감률', per(i => i === 0 ? null : (ok(loans[i]) && ok(loans[i - 1]) && loans[i] !== 0 ? (loans[i] - loans[i - 1]) / loans[i] * 100 : null)), '%'],
+        ['유동비율 (당좌자산 기준)', per(i => div(Q[i], CL[i], 100)), '%'],
+        ['부채비율', per(i => div(D[i], E[i], 100)), '%'],
+        ['자기자본비율', per(i => div(E[i], A[i], 100)), '%'],
+        ['당기순이익률', per(i => div(N[i], S[i], 100)), '%'],
+        ['매출 상승률', per(i => chg(S, i)), '%'],
+        ['매출 대비 차입금', per(i => div(loans[i], S[i], 100)), '%'],
+        ['이자보상비율', per(i => div(OP[i], IE[i])), '배'],
+        ['순이자보상비율', per(i => (ok(IE[i]) && ok(II[i])) ? div(OP[i], IE[i] - II[i]) : null), '배'],
+        ['당기순이익 상승률', per(i => chg(N, i)), '%'],
+        ['매출채권 / 매출', per(i => div(AR[i], S[i], 100)), '%'],
+        ['재고자산 / 매출', per(i => div(INV[i], S[i], 100)), '%'],
+        ['(매출채권+재고) / 매출', per(i => (ok(AR[i]) || ok(INV[i])) ? div((AR[i] || 0) + (INV[i] || 0), S[i], 100) : null), '%']
+      ];
+      const limit = ok(S[2]) ? S[2] / (isMfg ? 4 : 6) : null;
+      return { rows, years: fy ? [fy - 2, fy - 1, fy] : null, limit, limitRule: isMfg ? '제조업: 당기 매출 ÷ 4' : '그 외 업종: 당기 매출 ÷ 6' };
+    }
+    window.computeFinIndicators = computeFinIndicators;
+    const fmtInd = (v, u) => v === null ? '<span class="text-slate-400">—</span>' : (u === '배' ? (Math.round(v * 100) / 100).toLocaleString() + '배' : u === '%' ? (Math.round(v * 10) / 10).toLocaleString() + '%' : Math.round(v).toLocaleString() + (u === '백만원' ? '' : u));
+    function finIndTableHtml(compact) {
+      const m = computeFinIndicators();
+      if (compact) {
+        const KEY = ['부채비율', '자기자본비율', '유동비율 (당좌자산 기준)', '당기순이익률', '매출 상승률', '이자보상비율', '차입금 합계', '매출 대비 차입금'];
+        const items = m.rows.filter(r => KEY.includes(r[0]) && r[1][2] !== null)
+          .map(([n, v, u]) => `${n.replace(' (당좌자산 기준)', '')} <strong class="font-mono">${fmtInd(v[2], u)}${u === '백만원' ? '백만원' : ''}</strong>`);
+        if (m.limit !== null) items.push(`운전자금 한도 참고 <strong class="font-mono">${Math.round(m.limit).toLocaleString()}백만원</strong>`);
+        return items.length ? `<div class="text-[9.5px] text-slate-700 px-1.5 py-1 leading-snug"><span class="font-bold text-[#0f766e]">· 주요 재무지표(${m.years ? m.years[2] + '년' : '당기'}):</span> ${items.join(' · ')}</div>` : '';
+      }
+      const hdr = m.years ? m.years.map((y, i) => `${y}년${i === 2 ? ' (당기)' : ''}`) : ['Y-3 (전전기)', 'Y-2 (전기)', 'Y-1 (당기)'];
+      const rows = compact ? m.rows.filter(r => r[1].some(v => v !== null)) : m.rows;
+      if (compact && !rows.length && m.limit === null) return '';
+      const cls = compact ? 'p-1 border border-slate-300' : 'px-2 py-1.5 border border-slate-200';
+      return `<table class="w-full ${compact ? 'text-[9.5px]' : 'text-xs'} border-collapse text-center fin-ind-t"><thead><tr class="bg-slate-100 font-bold text-slate-800"><th class="${cls} text-left">${compact ? '주요 재무지표' : '지표'}</th>${hdr.map((h, i) => `<th class="${cls}${i === 2 ? ' text-[#0f766e]' : ''}">${h}</th>`).join('')}</tr></thead><tbody>` +
+        rows.map(([n, vals, u]) => `<tr><td class="${cls} text-left font-bold text-slate-700">${n}</td>${vals.map((v, i) => `<td class="${cls} font-mono${i === 2 ? ' font-black' : ''}">${fmtInd(v, u)}</td>`).join('')}</tr>`).join('') +
+        `<tr><td class="${cls} text-left font-bold text-slate-700">운전자금 한도 참고</td><td colspan="3" class="${cls} text-left">${m.limit === null ? '<span class="text-slate-400">—</span>' : Math.round(m.limit).toLocaleString() + '백만원'} <span class="text-slate-500">(${m.limitRule})</span></td></tr></tbody></table>`;
+    }
+    window.finIndTableHtml = finIndTableHtml;
+    function renderFinInd() {
+      const box = document.getElementById('fin_ind_table'); if (box) box.innerHTML = finIndTableHtml(false);
+      const m = computeFinIndicators();
+      const ths = document.querySelectorAll('#section_sme_input table thead th');
+      if (ths.length >= 4) ['Y-3 결산 (전전기)', 'Y-2 결산 (전기)', 'Y-1 결산 (당기)'].forEach((t, i) => { ths[i + 1].textContent = m.years ? `${m.years[i]}년 결산${i === 2 ? ' (당기)' : ''}` : t; });
+    }
+    window.renderFinInd = renderFinInd;
+    document.addEventListener('DOMContentLoaded', () => {
+      const sec = document.getElementById('section_sme_input'); if (!sec) return;
+      ['input', 'change'].forEach(t => sec.addEventListener(t, () => renderFinInd()));
+      setTimeout(renderFinInd, 0);
+    });
+
     // 2-3: 3개년 재무 지표 (단위 백만원). 값이 없으면 해당 지표는 null
     function computeSmeMetrics() {
       const s = [readNum('sme_sales_2023'), readNum('sme_sales_2024'), readNum('sme_sales')];
@@ -4007,11 +4132,13 @@
       const clients = escapeHtml(document.getElementById('corp_clients')?.value.trim()) || '-';
       const vendors = escapeHtml(document.getElementById('corp_vendors')?.value.trim()) || '-';
       const patents = escapeHtml(document.getElementById('corp_patents')?.value.trim()) || '-';
+      const finIndHtml = (typeof finIndTableHtml === 'function') ? finIndTableHtml(true) : '';
+      const finYears = (typeof computeFinIndicators === 'function') ? computeFinIndicators().years : null;
       let ipItems = [];
       try { ipItems = JSON.parse(document.getElementById('corp_ip_json')?.value || '[]'); } catch (e) { ipItems = []; }
       const ipListHtml = ipItems.length ? `<tr><td class="p-1 border border-slate-300 bg-slate-100 font-bold text-center">지식재산권 목록</td><td colspan="3" class="p-1 border border-slate-300 text-left pl-2 text-[9.5px] leading-snug">${
-        ipItems.slice(0, 6).map(x => `${escapeHtml(x.kind)} <span class="font-mono">${escapeHtml(x.regNo || x.appNo || '')}</span> ${escapeHtml(x.title || '')}${x.regDate ? ` (${escapeHtml(x.regDate.replace(/-/g, '.'))} 등록)` : ''}`).join('<br>')
-      }${ipItems.length > 6 ? `<br>외 ${ipItems.length - 6}건` : ''}</td></tr>` : '';
+        ipItems.slice(0, 3).map(x => `${escapeHtml(x.kind)} <span class="font-mono">${escapeHtml(x.regNo || x.appNo || '')}</span> ${escapeHtml(x.title || '')}`).join(' · ')
+      }${ipItems.length > 3 ? ` 외 ${ipItems.length - 3}건` : ''}</td></tr>` : '';
       const certs = escapeHtml(document.getElementById('corp_certs')?.value.trim()) || '-';
       const consultantName = escapeHtml(document.getElementById('consultant_name')?.value.trim()) || '담당 컨설턴트';
       // 담당자 칸에 직함까지 적힌 경우(예: '홍길동 경영컨설턴트') 직함이 두 번 찍히지 않게
@@ -4427,9 +4554,9 @@
                   <thead>
                     <tr class="bg-slate-100 font-bold text-slate-800">
                       <th class="p-1 border border-slate-300 w-1/4">결산 재무 항목</th>
-                      <th class="p-1 border border-slate-300 w-1/4">Y-3 결산 (전전기)</th>
-                      <th class="p-1 border border-slate-300 w-1/4">Y-2 결산 (전기)</th>
-                      <th class="p-1 border border-slate-300 w-1/4 bg-teal-50/50 text-[#0f766e]">Y-1 결산 (당기)</th>
+                      <th class="p-1 border border-slate-300 w-1/4">${finYears ? finYears[0] + '년 결산' : 'Y-3 결산 (전전기)'}</th>
+                      <th class="p-1 border border-slate-300 w-1/4">${finYears ? finYears[1] + '년 결산' : 'Y-2 결산 (전기)'}</th>
+                      <th class="p-1 border border-slate-300 w-1/4 bg-teal-50/50 text-[#0f766e]">${finYears ? finYears[2] + '년 결산 (당기)' : 'Y-1 결산 (당기)'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4460,6 +4587,7 @@
                   </tbody>
                 </table>
               </div>
+              ${finIndHtml}
               <div class="bg-white p-1 rounded border border-slate-200 text-[9px] text-slate-700">
                 <span class="font-bold text-[#0f766e]">· 주업종 특화 실태 진단 결과:</span>
                 <span class="ml-1">${indDetailsHtml}</span>
@@ -4711,7 +4839,8 @@
     // 서식은 PDF 로 저장해 고객에게 보내므로, 1쪽에 들어가는지는 인쇄 쪽 크기(폭 186mm, 높이 277mm)로 잰다.
     // 넘치면 본문을 조금씩 축소하고(최대 88%), 그래도 넘치면 원래 크기로 2쪽에 이어 인쇄한다
     // (작게 줄인 채 2쪽이 되면 2쪽에 서명만 남는 문제가 생김). 화면이 숨겨져 높이를 잴 수 없으면 건너뜀.
-    const A4_FIT_STEPS = [1, 0.96, 0.92, 0.88];
+    // 입력이 늘어 서식이 길어지면 한 장에 맞출 때까지 단계적으로 줄인다(84% 아래로는 글씨가 작아 2쪽으로 넘김)
+    const A4_FIT_STEPS = [1, 0.96, 0.92, 0.88, 0.84];
     const A4_PRINT_LIMIT_PX = 277 * 96 / 25.4 - 6;
     function a4PrintHeight(card) {
       card.classList.add('a4-measure');
@@ -5353,7 +5482,7 @@
     });
     // 예시 불러오기 · 고객 불러오기 · 새 고객(loadDemoData·applyFormData·resetFormToDefaults 안에서 직접 부름) 뒤에
     // 인증 체크와 지식재산권 표를 저장 칸(corp_certs·corp_ip_json) 값에 다시 맞춘다 — 이전 고객 내용이 남지 않게
-    function syncCertIpViews() { try { certFromText(); ipFromJson(); } catch (e) { /* 화면 없음 */ } }
+    function syncCertIpViews() { try { certFromText(); ipFromJson(); renderFinInd(); } catch (e) { /* 화면 없음 */ } }
 
 
     // =========================================================================
@@ -6052,6 +6181,9 @@
     .ip-row .ip-del { grid-area: x; width: 26px; height: 26px; border-radius: 8px; color: #94A3B8; font-size: 16px; }
     .ip-row .ip-del:hover { background: #FEF2F2; color: #DC2626; }
     .ip-row .form-input-control { padding: 6px 8px; font-size: 12px; min-width: 0; }
+    /* 주요 재무지표 */
+    .fin-ind { border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; background: #F8FAFC; }
+    .fin-ind-t td, .fin-ind-t th { white-space: nowrap; }
     .doc-filled { background: #FFF6D6 !important; border-color: #E8C34A !important; color: #0A0B0F !important; }
   </style>
   <div id="docs_modal" role="dialog" aria-modal="true" aria-labelledby="docs_modal_t">
@@ -6372,6 +6504,8 @@
   function fsTokens(rows) {
     return rows.flat().flatMap(c => c.split(/\s+(?=(?:[IVX]+|\d{1,2}|\(\d+\)|[가-하])\.)|(?<=\d)\s+(?=[^\d\s,(\-△])/)).map(norm).filter(Boolean);
   }
+  // 과목 이름 앞 번호(Ⅰ. · (1) · 1. · 가.)와 뒤 계산식 괄호는 무시하고 이름이 '맞게 시작'할 때만
+  const fsLabel = name => new RegExp('^(?:[IVXⅠ-Ⅻ]+\\.|\\(\\d+\\)|\\d+\\.|[가-하]\\.)?(?:' + name + ')(?:\\(.*\\))?$');
   function fsAmount(tokens, re) {
     for (let i = 0; i < tokens.length; i++) {
       if (!re.test(despace(tokens[i]))) continue;
@@ -6393,8 +6527,21 @@
       equity: fsAmount(tk, /^자본총계/),
       assets: fsAmount(tk, /^자산총계/),
       interest: fsAmount(tk, /^\d*\.?이자비용$/),
-      loanToCeo: fsAmount(tk, /^(?:\d+\.|[가-하]\.)?(?:주임종단기채권|가지급금)$/)
+      loanToCeo: fsAmount(tk, /^(?:\d+\.|[가-하]\.)?(?:주임종단기채권|가지급금)$/),
+      // 주요 재무지표(재무제표 분석 엑셀과 같은 항목)
+      net: fsAmount(tk, fsLabel('당기순(?:이익|손익)')),
+      capital: fsAmount(tk, fsLabel('자본금')),
+      stLoan: fsAmount(tk, fsLabel('단기차입금')),
+      ltLoan: fsAmount(tk, fsLabel('장기차입금')),
+      quick: fsAmount(tk, fsLabel('당좌자산')),
+      curLiab: fsAmount(tk, fsLabel('유동부채')),
+      intInc: fsAmount(tk, fsLabel('이자수익')),
+      ar: fsAmount(tk, fsLabel('매출채권|외상매출금')),
+      inv: fsAmount(tk, fsLabel('재고자산')),
+      ap: fsAmount(tk, fsLabel('매입채무|외상매입금')),
+      unpaid: fsAmount(tk, fsLabel('미지급금'))
     };
+    if (v.net === null) { const loss = fsAmount(tk, fsLabel('당기순손실')); if (loss !== null) v.net = -Math.abs(loss); }
     const f = {};
     const name = labelValue(rows, /^(?:상호|법인명)$/); if (name) f.corp_name = name;
     const no = bizNoOf(labelValue(rows, /^사업자등록번호$/)); if (no) f.corp_biz_no = no;
@@ -6657,7 +6804,11 @@
       put('sme_profit' + suf[k], v.profit, x);
       put('sme_debt' + suf[k], v.debt, x);
       put('sme_equity' + suf[k], v.equity, x);
-      if (k === 0 && v.loanToCeo) put('sme_loan_to_ceo', v.loanToCeo, x);
+      // 주요 재무지표 입력 칸(백만원)
+      [['sme_assets', 'assets'], ['sme_net', 'net'], ['sme_capital', 'capital'], ['sme_st_loan', 'stLoan'], ['sme_lt_loan', 'ltLoan'],
+        ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
+        ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
+      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
       if (k === 0 && v.sales) { f._monthlyFromFs = won2man(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;
@@ -6772,7 +6923,9 @@
         sme_sales: '매출액', sme_profit: '영업이익', sme_debt: '부채총계', sme_equity: '자본총계',
         sme_loan_to_ceo: '대표자 가지급금', sme_employees: '상시근로자 수', smb_monthly_sales: '월평균 매출',
         corp_ceo_birth: '대표자 생년월일', corp_house: '대표자 주택 소유형태', smb_cost_rent: '월 임차료',
-        smb_sales_cur: '연 매출', smb_sales_y1: '연 매출', smb_sales_y2: '연 매출', smb_sales_y3: '연 매출'
+        smb_sales_cur: '연 매출', smb_sales_y1: '연 매출', smb_sales_y2: '연 매출', smb_sales_y3: '연 매출',
+        sme_net: '당기순이익', sme_assets: '자산총계', sme_capital: '자본금', sme_st_loan: '단기차입금', sme_lt_loan: '장기차입금', sme_quick: '당좌자산',
+        sme_cur_liab: '유동부채', sme_int_exp: '이자비용', sme_int_inc: '이자수익', sme_ar: '매출채권', sme_inv: '재고자산', sme_ap: '매입채무', sme_unpaid: '미지급금', sme_fy_y1: '당기 결산연도'
       };
       const UNIT = { sme: '백만원', smb_monthly_sales: '만원' };
       const ORDER = ['corp_name', 'corp_biz_no', 'corp_form', 'corp_ceo', 'corp_ceo_birth', 'corp_house', 'corp_address', 'smb_cost_rent', 'corp_est_date', 'corp_biz_type', 'corp_ceo_share', 'sme_employees', 'smb_monthly_sales'];
@@ -6823,6 +6976,7 @@
             if (id.startsWith('_')) return;
             cands.push({ id, value: String(v), conf: fx._conf[id] ?? 0.9, valid: true, src: fx._src[id], year: yearOf(id), file: fsList.map(x => x.file).join(', '), note: (fx._conf[id] ?? 1) < 0.5 ? '자산 ≠ 부채+자본 — 원본 확인' : '' });
           });
+          if (fx._fsTopYear) cands.push({ id: 'sme_fy_y1', value: String(fx._fsTopYear), conf: 0.9, valid: true, file: fsList.map(x => x.file).join(', '), note: '재무제표 결산연도' });
           if (fx._monthlyFromFs && !cands.some(c => c.id === 'smb_monthly_sales')) cands.push({ id: 'smb_monthly_sales', value: String(fx._monthlyFromFs), conf: 0.6, valid: true, src: Math.round(fx._src._monthlyFromFs), note: '재무제표 연매출 ÷ 12', file: fsList[0].file });
         }
         derivedRows(cands).forEach(c => cands.push(c));
