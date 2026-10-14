@@ -7352,7 +7352,7 @@
 
   <!-- ================= 3단 보기: 스텝 | 입력 | 출력 미리보기 (?view=3d) ================= -->
   <style>
-    #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 224px) minmax(0, 1fr) var(--l3c, 50%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
+    #l3 { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: var(--l3a, 208px) minmax(0, 1fr) var(--l3c, 50%); grid-template-rows: minmax(0, 1fr); background: var(--t-bg, #F6F5F1); }
     #l3.hidden { display: none; }
     /* 3단 보기에서는 맨 위 머리글을 쓰지 않는다 — 로고는 사이드바, 계정은 왼쪽 아래, 지원사업은 미리보기 전환 */
     body.l3-on > header.no-print { display: none !important; }
@@ -7518,9 +7518,9 @@
        · 로고 높이 28px, 접기 버튼도 28px 로 같은 줄 가운데, 오른쪽 끝 = 스텝 줄 오른쪽 끝
        · 접기 버튼은 계정 상자 톱니바퀴와 같은 모양(테두리 없이, 올리면 옅은 바탕) */
     #l3 #l3_brand { display: flex; flex-direction: row; align-items: flex-start !important; gap: 8px; margin: 2px 0 20px; padding: 0 11px 0 6px; }   /* 오른쪽 11px: 접기 버튼 중심 = 계정 상자 톱니바퀴 중심 */
-    #l3 #l3_brand .lkbox { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-    #l3 #l3_brand .lk { height: 28px; width: auto; display: block; }
-    #l3 #l3_brand .pw { font-size: 10px; font-weight: 600; letter-spacing: .03em; color: rgba(255,255,255,.5); margin-top: 4px; padding-left: 35.5px; line-height: 1.2; white-space: nowrap; }
+    #l3 #l3_brand .lkbox { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; flex: 1 1 auto; max-width: 127px; container-type: inline-size; }   /* 127px = 높이 28px 일 때 로고 폭. 좁아지면 로고·부제가 같이 줄어든다 */
+    #l3 #l3_brand .lk { width: 100%; height: auto; display: block; }
+    #l3 #l3_brand .pw { font-size: 10px; font-weight: 600; letter-spacing: .03em; color: rgba(255,255,255,.5); margin-top: 4px; padding-left: 27.96cqi; line-height: 1.2; white-space: nowrap; font-size: min(10px, 7.6cqi); }   /* 27.96% = 로고 안 'MSC' 시작 위치 */
     #l3 #l3_fold { margin: 0 0 0 auto; width: 28px; height: 28px; border-radius: 8px; border: 0; box-shadow: none; background: transparent; color: rgba(255,255,255,.65); }
     #l3 #l3_fold:hover { background: rgba(255,255,255,.1); color: #fff; }
     #l3 #l3_fold svg { width: 17px; height: 17px; }
@@ -8094,7 +8094,6 @@
           const r = shell.getBoundingClientRect(), side = document.getElementById('l3_steps').getBoundingClientRect(), pv = document.getElementById('l3_preview').getBoundingClientRect();
           guts.forEach(g => { g.style.top = r.top + 'px'; g.style.display = shell.classList.contains('hidden') ? 'none' : ''; });
           guts[0].style.left = side.right + 'px'; guts[1].style.left = pv.left + 'px';
-          if (shell.classList.contains('folded')) guts[0].style.display = 'none';   // 접힌 사이드바는 폭 조절 안 함
         }
         guts.forEach(g => {
           g.addEventListener('pointerdown', e => {
@@ -8104,7 +8103,12 @@
             const apply = () => {
               raf = 0;
               const W = shell.clientWidth, side = document.getElementById('l3_steps').offsetWidth, pv = document.getElementById('l3_preview').offsetWidth;
-              if (g.dataset.k === '0') size.a = Math.round(Math.max(224, Math.min(360, W - pv - 360, lastX)));
+              // 사이드바: 기본 208px · 184px 까지 줄어든다. 160px 보다 더 끌면 접힌 모드, 다시 넓히면 펴진다
+              if (g.dataset.k === '0') {
+                const folded = shell.classList.contains('folded');
+                if (lastX < 160) { if (!folded) setFold(true); }
+                else { if (folded) setFold(false); size.a = Math.round(Math.max(184, Math.min(360, W - pv - 360, lastX))); }
+              }
               else size.c = Math.round(Math.max(300, Math.min(W - side - 360, W - lastX)));
               applySize(size); placeGuts(); placeNav(); fit();
               box.style.setProperty('--l3h', box.clientHeight + 'px'); fitWide();
@@ -8114,7 +8118,7 @@
             const up = () => { g.removeEventListener('pointermove', move); g.classList.remove('drag'); document.body.classList.remove('l3-dragging'); try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (e) { /* 저장 불가 */ } layout(); };
             g.addEventListener('pointermove', move); g.addEventListener('pointerup', up, { once: true });
           });
-          g.addEventListener('dblclick', () => { if (g.dataset.k === '0') delete size.a; else delete size.c; applySize(size); try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (e) { /* 저장 불가 */ } layout(); });
+          g.addEventListener('dblclick', () => { if (g.dataset.k === '0') { delete size.a; setFold(false); } else delete size.c; applySize(size); try { localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch (e) { /* 저장 불가 */ } layout(); });
         });
         function fitWide() {
           const dc = document.getElementById('debt_card');
