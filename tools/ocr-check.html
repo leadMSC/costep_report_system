@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>ocr-check</title></head>
+<body>
+<!-- 스캔 서류 글자 인식 점검: 앱과 같은 순서(pdf.js 로 쪽 그리기 → cleanScan → tesseract kor+eng → 해석기)로
+     쪽마다 읽어 결과를 <pre id="out"> 에 JSON 으로 넣는다. tools/ocr_check.py 가 --dump-dom 으로 받는다.
+     사용: ocr-check.html?f=../tests/pdf_sample/ip/s01.pdf  (실제 서류는 tests/pdf_sample/ — 저장소에 안 올라감) -->
+<pre id="st"></pre>
+<pre id="out"></pre>
+<script src="../vendor/pdfjs/pdf.min.js"></script>
+<script src="../tools/doc-parsers.js"></script>
+<script src="../vendor/ocr/tesseract.min.js"></script>
+<script>
+  (async () => {
+    const out = document.getElementById('out');
+    try {
+      const qs = new URLSearchParams(location.search);
+      const P = window.MSCDocParsers;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '../vendor/pdfjs/pdf.worker.min.js';
+      const base = new URL('../vendor/ocr/', location.href).href;
+      const worker = await Tesseract.createWorker(['kor', 'eng'], 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base + 'lang', gzip: true, logger: m => { document.getElementById('st').textContent = m.status + ' ' + Math.round((m.progress || 0) * 100) + '%'; } });
+      const res = [];
+      const raw = qs.get('raw') === '1';
+      // list=그림 목록(json): 쪽을 미리 그림으로 만들어 둔 경우(화면이 안 그려지는 환경에서도 돎)
+      if (qs.get('list')) {
+        const files = await (await fetch(qs.get('list'))).json();
+        const dir = qs.get('list').replace(/[^/]*$/, '');
+        for (const f of files) {
+          const im = new Image(); im.src = dir + f.replace(/^png\//, ''); await im.decode();
+          const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+          const ctx = c.getContext('2d'); ctx.drawImage(im, 0, 0);
+          if (qs.get('clean') !== '0') { const img = ctx.getImageData(0, 0, c.width, c.height); P.cleanScan(img.data, c.width, c.height); ctx.putImageData(img, 0, 0); }
+          const t0 = performance.now();
+          const { data } = await worker.recognize(c);
+          const text = P.redact(data.text);
+          res.push({ file: f, ms: Math.round(performance.now() - t0), text });
+          document.getElementById('st').textContent = res.length + '/' + files.length;
+        }
+        await worker.terminate();
+        window.__res = res;
+        out.textContent = 'OK:' + JSON.stringify(res.map(r => ({ file: r.file, ms: r.ms, len: r.text.length })));
+        return;
+      }
+      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await (await fetch(qs.get('f'))).arrayBuffer()), isEvalSupported: false }).promise;
+      for (let p = 1; p <= Math.min(doc.numPages, 20); p++) {
+        const page = await doc.getPage(p);
+        const vp0 = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: Math.min(3.5, 3000 / Math.max(vp0.width, vp0.height)) });
+        const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        const ctx = c.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        if (qs.get('clean') !== '0') { const img = ctx.getImageData(0, 0, c.width, c.height); P.cleanScan(img.data, c.width, c.height); ctx.putImageData(img, 0, 0); }
+        const t0 = performance.now();
+        const { data } = await worker.recognize(c);
+        const text = P.redact(data.text);
+        const ip = P.parseIP(text);
+        res.push({ page: p, ms: Math.round(performance.now() - t0), ip: ip.item, notes: ip.notes, text: raw ? text : undefined });
+      }
+      await worker.terminate();
+      out.textContent = 'OK:' + JSON.stringify(res);
+    } catch (e) { out.textContent = 'ERR:' + (e && e.message || e); }
+  })();
+</script>
+</body>
+</html>

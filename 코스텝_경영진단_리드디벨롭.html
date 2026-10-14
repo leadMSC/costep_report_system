@@ -747,7 +747,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">대표자 주택 소유형태</label>
             <select id="corp_house" onchange="syncCompanyData()" class="form-input-control">
-              <option value="자가 소유" selected>자가 소유</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="자가 소유">자가 소유</option>
               <option value="임차 거주 (전세)">임차 거주 (전세)</option>
               <option value="임차 거주 (월세)">임차 거주 (월세)</option>
               <option value="기타 거주">기타 거주</option>
@@ -790,7 +791,10 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">주요 판매 방식</label>
             <select id="corp_sales_channel" onchange="syncCompanyData()" class="form-input-control font-bold">
-              <option value="B2B 기업간 납품" selected>B2B 기업간 납품</option>
+              <option value="" selected>선택 (미확인)</option>
+                  <option value="매장 판매 (B2C)">매장 판매 (B2C)</option>
+                  <option value="매장·배달 병행 (B2C)">매장·배달 병행 (B2C)</option>
+              <option value="B2B 기업간 납품">B2B 기업간 납품</option>
               <option value="B2B 기업납품 및 공공조달">B2B 기업납품 및 공공조달</option>
               <option value="B2C 소비자 직판">B2C 소비자 직판</option>
               <option value="온라인 전자상거래">온라인 전자상거래</option>
@@ -905,7 +909,8 @@
               <div>
                 <span class="text-[11px] text-slate-600 block mb-1 font-semibold">원자재 조달단가 변동:</span>
                 <select id="smb_material_trend" onchange="calcSmbMetrics()" class="form-input-control text-xs">
-                  <option value="high" selected>원자재 조달단가 현저히 상승</option>
+                  <option value="" selected>선택 (미확인)</option>
+                  <option value="high">원자재 조달단가 현저히 상승</option>
                   <option value="mid">원자재 조달단가 완만히 상승</option>
                   <option value="flat">변동 없음</option>
                   <option value="down_mid">원자재 조달단가 완만히 하락</option>
@@ -915,7 +920,8 @@
               <div>
                 <span class="text-[11px] text-slate-600 block mb-1 font-semibold">판매단가 반영 여부:</span>
                 <select id="smb_price_reflect" onchange="calcSmbMetrics()" class="form-input-control text-xs">
-                  <option value="no" selected>판매단가 동결 (채산성 악화)</option>
+                  <option value="" selected>선택 (미확인)</option>
+                  <option value="no">판매단가 동결 (채산성 악화)</option>
                   <option value="part">원가 인상분 일부 반영</option>
                   <option value="full">원가 변동분 적정 반영</option>
                 </select>
@@ -991,25 +997,25 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
             <h5 class="font-bold text-slate-900 border-b pb-1">4. 납세 이행 및 신용보증 현황</h5>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_tax_ok" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>국세 및 지방세 완납 (체납 사실 없음)</span></label>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_cardloan" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span class="text-red-700 font-semibold">연 7% 이상 제2금융권 차입금 보유 (대환 대상)</span></label>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_bojeung" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>지역신용보증재단 보증서 기이용</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_tax_ok" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>국세 및 지방세 완납 (체납 사실 없음)</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_cardloan" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span class="text-red-700 font-semibold">연 7% 이상 제2금융권 차입금 보유 (대환 대상)</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_bojeung" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>지역신용보증재단 보증서 기이용</span></label>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
             <h5 class="font-bold text-slate-900 border-b pb-1">5. 사업장 시설 및 점포 환경 현황</h5>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_lease" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>유상 임대차 계약 체결 점포</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_lease" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>유상 임대차 계약 체결 점포</span></label>
             <div class="flex items-center space-x-1 pl-5">
               <span class="text-[11px] text-slate-500">전용면적:</span>
               <input type="number" min="0" id="smb_area_pyung" value="" placeholder="0" oninput="calcSmbMetrics()" class="w-16 form-input-control text-xs text-right py-0.5">
               <span class="text-[11px] text-slate-500">평 (점포철거지원금 산정 기준)</span>
             </div>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_signboard" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>옥외 간판 교체 또는 시설 환경개선 필요</span></label>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_smartorder" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>스마트 주문·결제기기 도입 희망</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_signboard" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>옥외 간판 교체 또는 시설 환경개선 필요</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_smartorder" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>스마트 주문·결제기기 도입 희망</span></label>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
             <h5 class="font-bold text-slate-900 border-b pb-1">6. 사업장 노무 및 홍보 관리 현황</h5>
             <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_map_reg" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>포털 지도 및 사업체 정보 정상 등록</span></label>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_delivery" checked onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>전자상거래 및 배달 플랫폼 입점 운용</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_delivery" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>전자상거래 및 배달 플랫폼 입점 운용</span></label>
             <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_contract" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>근로기준법상 서면 근로계약서 체결 및 교부 완료</span></label>
             <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_insurance" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>사회보험 가입 (두루누리 사회보험료 지원 대상)</span></label>
           </div>
@@ -1163,7 +1169,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">공장등록증 상태</label>
             <select id="mfg_reg" onchange="syncCompanyData()" class="form-input-control">
-              <option value="yes" selected>공장등록 완료 (공장등록증명서 보유)</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="yes">공장등록 완료 (공장등록증명서 보유)</option>
               <option value="small">500㎡ 미만 소기업 (적법 미등록)</option>
               <option value="no">미등록 (공장등록 추진 필요)</option>
             </select>
@@ -1171,14 +1178,16 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">직접생산확인 보유</label>
             <select id="mfg_direct" onchange="syncCompanyData()" class="form-input-control">
-              <option value="yes" selected>보유 완료 (조달청 입찰 적격)</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="yes">보유 완료 (조달청 입찰 적격)</option>
               <option value="need">미보유 (조달청 진입 희망)</option>
             </select>
           </div>
           <div>
             <label class="font-bold text-slate-700 block mb-1">위험성평가 실시</label>
             <select id="mfg_safety" onchange="syncCompanyData()" class="form-input-control">
-              <option value="yes" selected>실시 완료 (결과보고서 비치)</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="yes">실시 완료 (결과보고서 비치)</option>
               <option value="need">미실시 (도입 및 지도 희망)</option>
             </select>
           </div>
@@ -1189,7 +1198,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">기업부설연구소/전담부서</label>
             <select id="it_rd" onchange="syncCompanyData()" class="form-input-control">
-              <option value="lab" selected>기업부설연구소 인증 완료</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="lab">기업부설연구소 인증 완료</option>
               <option value="dept">연구개발전담부서 인증 완료</option>
               <option value="need">미보유 (설립 및 세액공제 희망)</option>
             </select>
@@ -1201,7 +1211,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">벤처·이노비즈 인증</label>
             <select id="it_cert" onchange="syncCompanyData()" class="form-input-control">
-              <option value="venture" selected>벤처기업 인증 유효</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="venture">벤처기업 인증 유효</option>
               <option value="inno">이노비즈 인증 유효</option>
               <option value="need">미보유 (인증 취득 희망)</option>
             </select>
@@ -1213,7 +1224,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">GMP 시설 및 인허가</label>
             <select id="bio_gmp" onchange="syncCompanyData()" class="form-input-control">
-              <option value="gmp_ok" selected>GMP 적합판정서 보유</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="gmp_ok">GMP 적합판정서 보유</option>
               <option value="gmp_ready">GMP 시설 구축 준비 중</option>
               <option value="iso13485">ISO 13485 의료기기 인증</option>
             </select>
@@ -1221,7 +1233,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">식약처 품목허가 단계</label>
             <select id="bio_step" onchange="syncCompanyData()" class="form-input-control">
-              <option value="approved" selected>품목허가 완료 및 시판 중</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="approved">품목허가 완료 및 시판 중</option>
               <option value="clinical">임상/비임상 시험 진행 중</option>
               <option value="plan">연구개발 및 시제품 단계</option>
             </select>
@@ -1241,14 +1254,16 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">법정 실질자본금 충족도</label>
             <select id="const_cap" onchange="syncCompanyData()" class="form-input-control">
-              <option value="ok" selected>충족 (실질자본금 적격)</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="ok">충족 (실질자본금 적격)</option>
               <option value="warn">연말 실질자본금 결손 우려</option>
             </select>
           </div>
           <div>
             <label class="font-bold text-slate-700 block mb-1">공제조합 출자 상태</label>
             <select id="const_union" onchange="syncCompanyData()" class="form-input-control">
-              <option value="ok" selected>전문건설공제조합 정상 출자</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="ok">전문건설공제조합 정상 출자</option>
               <option value="need">출자 좌수 확대 검토 중</option>
             </select>
           </div>
@@ -1267,7 +1282,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">물류 형태</label>
             <select id="dist_log" onchange="syncCompanyData()" class="form-input-control">
-              <option value="3pl" selected>3PL 풀필먼트 위탁</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="3pl">3PL 풀필먼트 위탁</option>
               <option value="self">자가 창고 직접 운영</option>
             </select>
           </div>
@@ -1282,14 +1298,16 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">위생등급 및 HACCP</label>
             <select id="food_haccp" onchange="syncCompanyData()" class="form-input-control">
-              <option value="yes" selected>HACCP 인증 완료</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="yes">HACCP 인증 완료</option>
               <option value="need">HACCP 컨설팅 희망</option>
             </select>
           </div>
           <div>
             <label class="font-bold text-slate-700 block mb-1">스마트 주문 기기</label>
             <select id="food_order" onchange="syncCompanyData()" class="form-input-control">
-              <option value="yes" selected>테이블오더/키오스크 도입 완료</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="yes">테이블오더/키오스크 도입 완료</option>
               <option value="need">국비 보조 도입 희망</option>
             </select>
           </div>
@@ -1300,7 +1318,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">화물운송사업 허가</label>
             <select id="logis_lic" onchange="syncCompanyData()" class="form-input-control">
-              <option value="general" selected>일반화물자동차 운송사업</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="general">일반화물자동차 운송사업</option>
               <option value="broker">화물자동차 운송주선사업</option>
               <option value="cold">콜드체인 특수화물 운송</option>
             </select>
@@ -1324,7 +1343,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">자체 제작 스튜디오</label>
             <select id="content_studio" onchange="syncCompanyData()" class="form-input-control">
-              <option value="own" selected>자체 촬영 스튜디오 및 편집실 보유</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="own">자체 촬영 스튜디오 및 편집실 보유</option>
               <option value="rent">외부 렌탈 스튜디오 이용</option>
             </select>
           </div>
@@ -1339,7 +1359,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">환경 관련 인허가</label>
             <select id="esg_lic" onchange="syncCompanyData()" class="form-input-control">
-              <option value="waste" selected>사업장폐기물 재활용업 허가</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="waste">사업장폐기물 재활용업 허가</option>
               <option value="air">대기/수질 배출시설 설치신고</option>
               <option value="energy">신재생에너지 발전사업 허가</option>
             </select>
@@ -1347,7 +1368,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">친환경·녹색인증 상태</label>
             <select id="esg_cert" onchange="syncCompanyData()" class="form-input-control">
-              <option value="green" selected>녹색인증/환경표지 인증</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="green">녹색인증/환경표지 인증</option>
               <option value="iso14001">ISO 14001 환경경영 인증</option>
               <option value="need">인증 준비 단계</option>
             </select>
@@ -1367,7 +1389,8 @@
           <div>
             <label class="font-bold text-slate-700 block mb-1">주요 고객 및 거래 형태</label>
             <select id="service_client" onchange="syncCompanyData()" class="form-input-control">
-              <option value="b2b_b2g" selected>공공기관(B2G) 및 일반기업(B2B)</option>
+              <option value="" selected>선택 (미확인)</option>
+              <option value="b2b_b2g">공공기관(B2G) 및 일반기업(B2B)</option>
               <option value="b2c">일반 소비자(B2C) 중심</option>
             </select>
           </div>
@@ -3274,24 +3297,15 @@
     window.renderDebtTable = renderDebtTable;
 
     function addDebtRow() {
-      window.appState.debtItems.push({
-        institution: '시중은행/기관',
-        type: '운전자금',
-        balance: 5000,
-        rate: 4.5,
-        monthlyInterest: Math.round(5000 * 4.5 / 100 / 12),
-        payback: '만기일시 (2년)'
-      });
+      // 새 행은 빈칸으로 — 예시 숫자가 실제 대출로 인쇄되지 않게(예시는 흐린 안내문으로만)
+      window.appState.debtItems.push({ institution: '', type: '', balance: '', rate: '', monthlyInterest: '', payback: '' });
       renderDebtTable();
+      const rows = document.querySelectorAll('#debt_tbody tr'); rows[rows.length - 1]?.querySelector('input')?.focus();
     }
     window.addDebtRow = addDebtRow;
 
     function deleteDebtRow(index) {
-      if (window.appState.debtItems.length <= 1) {
-        alert('최소 1개 이상의 대출 내역이 유지되어야 합니다.');
-        return;
-      }
-      window.appState.debtItems.splice(index, 1);
+      window.appState.debtItems.splice(index, 1);   // 마지막 한 건도 지울 수 있음(대출 없음 상태로)
       renderDebtTable();
     }
     window.deleteDebtRow = deleteDebtRow;
@@ -3304,6 +3318,9 @@
           const bal = window.appState.debtItems[index].balance || 0;
           const rt = window.appState.debtItems[index].rate || 0;
           window.appState.debtItems[index].monthlyInterest = Math.round(bal * rt / 100 / 12);
+          // 화면의 월이자 칸도 바로 바꿈(보고서 계산과 같게)
+          const mi = document.querySelectorAll('#debt_tbody tr')[index]?.querySelector('input[title="월이자(만원)"]');
+          if (mi) mi.value = window.appState.debtItems[index].monthlyInterest;
         }
         calcDebtTotals();
       }
@@ -3357,6 +3374,10 @@
       const smbIntInput = document.getElementById('smb_cost_interest');
       if (smbIntInput && totalBal > 0) {
         smbIntInput.value = totalMonthlyInt.toLocaleString();
+        window.__smbIntAuto = smbIntInput.value;
+      } else if (smbIntInput && !items.length && window.__smbIntAuto !== undefined && smbIntInput.value === window.__smbIntAuto) {
+        // 대출을 모두 지웠으면 대출표에서 채운 이자도 비움(직접 쓴 값은 둠)
+        smbIntInput.value = ''; window.__smbIntAuto = undefined;
       }
       calcSmbMetrics();
 
@@ -3437,7 +3458,7 @@
       const estDate = document.getElementById('corp_est_date')?.value || '';
       const track = window.appState.bizTrack || 'smb';
       const ind = window.appState.industryTrack || 'mfg';
-      const salesChannel = document.getElementById('corp_sales_channel')?.value || 'B2B 기업간 납품';
+      const salesChannel = document.getElementById('corp_sales_channel')?.value || '주요 판매 경로';
       const clients = document.getElementById('corp_clients')?.value.trim() || '주요 수요처 및 대형 바이어';
       const vendors = document.getElementById('corp_vendors')?.value.trim() || '원자재 전문 공급처';
       const patents = document.getElementById('corp_patents')?.value.trim() || '';
@@ -4187,8 +4208,10 @@
 
     // 소상공인 마진 판정 (원자재 단가 × 판매단가 반영)
     function smbMarginText() {
-      const trend = document.getElementById('smb_material_trend')?.value || 'flat';
-      const reflect = document.getElementById('smb_price_reflect')?.value || 'full';
+      const trend = document.getElementById('smb_material_trend')?.value || '';
+      const reflect = document.getElementById('smb_price_reflect')?.value || '';
+      if (!trend) return '원자재 단가 추이 미확인 — 면담 시 주요 품목 매입단가 변동 확인 필요';
+      if (!reflect && trend !== 'flat') return '원자재 단가 변동의 판매단가 반영 여부 미확인 — 품목별 마진 확인 필요';
       if (trend === 'flat') return '원자재 조달단가 변동 없음 — 현 판매단가의 마진 구조 유지 관리';
       if (trend === 'down_mid' || trend === 'down_high') {
         const dn = trend === 'down_high' ? '큰 폭 하락' : '하락';
@@ -4228,7 +4251,6 @@
     // 2-1·2-2·2-3·2-4: 보고서에 넣을 '입력 수치 기반 맞춤 진단' 절 (최대 5줄)
     function buildCompanyFindings(track, ind) {
       const items = [];
-      const chk = (id) => !!document.getElementById(id)?.checked;
       if (track === 'smb') {
         const costs = [['임차료', readNum('smb_cost_rent')], ['관리·공과금', readNum('smb_cost_util')], ['인건비', readNum('smb_cost_labor')], ['렌탈·통신', readNum('smb_cost_rental')], ['대출이자', readNum('smb_cost_interest')]]
           .filter(c => c[1] > 0);
@@ -4237,18 +4259,22 @@
           const top = costs.sort((a, b) => b[1] - a[1])[0];
           items.push(`고정비 구조: 월 ${total.toLocaleString()}만원 중 ${top[0]}가 ${fmtPct(top[1] / total * 100)}로 가장 큼 — 절감 협상 우선 대상`);
         }
-        if (!chk('smb_chk_tax_ok')) items.push('세금 체납 확인 필요 — 체납은 대부분의 정책자금·지원사업 제외 사유이므로 완납·분납 승인이 선행 과제');
-        if (chk('smb_chk_cardloan')) items.push('연 7% 이상 제2금융권 차입 보유 — 저금리 정책자금 대환으로 이자 부담 축소 우선 검토');
-        items.push(chk('smb_chk_bojeung') ? '지역신용보증재단 보증 기이용 — 잔여 보증한도 확인 후 추가 자금 계획 수립' : '보증 이용 이력 없음 — 지역신용보증재단 소상공인 보증 신규 이용 검토');
+        const t = triOf;   // 'yes' | 'no' | '' (미확인 — 결과물에 쓰지 않음)
+        if (t('smb_chk_tax_ok') === 'no') items.push('세금 체납 확인 필요 — 체납은 대부분의 정책자금·지원사업 제외 사유이므로 완납·분납 승인이 선행 과제');
+        // 고금리 차입: 체크했거나, 미확인이어도 대출표에 연 7% 이상이 있으면
+        const highDebt = (window.appState.debtItems || []).some(d => Number(d.rate) >= 7 || /고금리|카드론/.test(d.type || ''));
+        if (t('smb_chk_cardloan') === 'yes' || (t('smb_chk_cardloan') === '' && highDebt)) items.push('연 7% 이상 제2금융권 차입 보유 — 저금리 정책자금 대환으로 이자 부담 축소 우선 검토');
+        if (t('smb_chk_bojeung') === 'yes') items.push('지역신용보증재단 보증 기이용 — 잔여 보증한도 확인 후 추가 자금 계획 수립');
+        if (t('smb_chk_bojeung') === 'no') items.push('보증 이용 이력 없음 — 지역신용보증재단 소상공인 보증 신규 이용 검토');
         const sales = [];
-        if (chk('smb_chk_signboard')) sales.push('간판·시설 환경개선');
-        if (chk('smb_chk_smartorder')) sales.push('스마트 주문·결제기기');
-        if (!chk('smb_chk_map_reg')) sales.push('포털 지도 무료 등록(즉시)');
-        if (!chk('smb_chk_delivery')) sales.push('온라인·배달 판로 진입');
-        if (sales.length) items.push(`판로·시설 개선 과제: ${sales.join(' · ')}${chk('smb_chk_lease') ? ' (유상 임차 점포 — 임차 요건 지원사업 신청 가능)' : ''}`);
+        if (t('smb_chk_signboard') === 'yes') sales.push('간판·시설 환경개선');
+        if (t('smb_chk_smartorder') === 'yes') sales.push('스마트 주문·결제기기');
+        if (t('smb_chk_map_reg') === 'no') sales.push('포털 지도 무료 등록(즉시)');
+        if (t('smb_chk_delivery') === 'no') sales.push('온라인·배달 판로 진입');
+        if (sales.length) items.push(`판로·시설 개선 과제: ${sales.join(' · ')}${t('smb_chk_lease') === 'yes' ? ' (유상 임차 점포 — 임차 요건 지원사업 신청 가능)' : ''}`);
         const labor = [];
-        if (!chk('smb_chk_contract')) labor.push('서면 근로계약서');
-        if (!chk('smb_chk_insurance')) labor.push('사회보험 가입');
+        if (t('smb_chk_contract') === 'no') labor.push('서면 근로계약서');
+        if (t('smb_chk_insurance') === 'no') labor.push('사회보험 가입');
         if (labor.length) items.push(`노무 점검: ${labor.join('·')} 미비 — 과태료·분쟁 위험, 두루누리 보험료 지원 활용`);
       } else {
         const m = computeSmeMetrics();
@@ -4382,19 +4408,21 @@
       const corpName = escapeHtml(document.getElementById('corp_name')?.value.trim()) || '미기재 (상호 미지정)';
       const corpForm = escapeHtml(document.getElementById('corp_form')?.value) || '-';
       // 시행문 수신 직함: 법인은 대표이사, 개인사업자는 대표
-      const recipientTitle = corpForm.includes('개인') ? '대표' : '대표이사';
+      const recipientTitle = corpForm.includes('법인') ? '대표이사' : '대표';   // 구분을 아직 안 골랐으면 '대표'
       const bizNo = escapeHtml(document.getElementById('corp_biz_no')?.value.trim()) || '-';
       const regNo = escapeHtml(document.getElementById('corp_reg_no')?.value.trim()) || '-';
       const ceoName = escapeHtml(document.getElementById('corp_ceo')?.value.trim()) || '대표자';
-      const ceoBirth = escapeHtml(document.getElementById('corp_ceo_birth')?.value.trim()) || '-';
+      const ceoBirthRaw = (document.getElementById('corp_ceo_birth')?.value || '').trim();
+      const ceoAge = /만\s*\d/.test(ceoBirthRaw) ? null : ageOf(ceoBirthRaw);
+      const ceoBirth = (escapeHtml(ceoBirthRaw) || '-') + (ceoAge !== null ? ` (만 ${ceoAge}세)` : '');
       const estDate = escapeHtml(document.getElementById('corp_est_date')?.value) || '-';
       const address = escapeHtml(document.getElementById('corp_address')?.value.trim()) || '소재지 미기재';
       const factoryAddress = escapeHtml(document.getElementById('corp_factory_address')?.value.trim()) || '-';
       const bizType = escapeHtml(document.getElementById('corp_biz_type')?.value.trim()) || '업종 미지정';
       const mainBank = escapeHtml(document.getElementById('corp_main_bank')?.value.trim()) || '-';
       const ceoShare = escapeHtml(document.getElementById('corp_ceo_share')?.value.trim()) || '-';
-      const houseType = escapeHtml(document.getElementById('corp_house')?.value) || '-';
-      const salesChannel = escapeHtml(document.getElementById('corp_sales_channel')?.value) || '-';
+      const houseType = escapeHtml(document.getElementById('corp_house')?.value) || '미확인';
+      const salesChannel = escapeHtml(document.getElementById('corp_sales_channel')?.value) || '미확인';
       const clients = escapeHtml(document.getElementById('corp_clients')?.value.trim()) || '-';
       const vendors = escapeHtml(document.getElementById('corp_vendors')?.value.trim()) || '-';
       const patents = escapeHtml(document.getElementById('corp_patents')?.value.trim()) || '-';
@@ -4484,9 +4512,10 @@
       const rentalVal = parseNumber(escapeHtml(document.getElementById('smb_cost_rental')?.value) || 0);
       const intVal = parseNumber(escapeHtml(document.getElementById('smb_cost_interest')?.value) || 0);
       const areaPyung = escapeHtml(document.getElementById('smb_area_pyung')?.value.trim()) || '-';
-      const chkTax = document.getElementById('smb_chk_tax_ok')?.checked ? '국세·지방세 완납 (체납 없음)' : '체납 사실 확인 필요';
-      const chkContract = document.getElementById('smb_chk_contract')?.checked ? '서면 근로계약 체결 완료' : '근로계약 체결 요망';
-      const chkInsurance = document.getElementById('smb_chk_insurance')?.checked ? '4대 사회보험 가입 (두루누리 지원)' : '사회보험 미가입';
+      const tri3 = (id, y, n, u) => ({ yes: y, no: n })[triOf(id)] || u;
+      const chkTax = tri3('smb_chk_tax_ok', '국세·지방세 완납 (체납 없음)', '체납 사실 확인 필요', '납세 여부 미확인');
+      const chkContract = tri3('smb_chk_contract', '서면 근로계약 체결 완료', '근로계약 체결 요망', '근로계약 미확인');
+      const chkInsurance = tri3('smb_chk_insurance', '4대 사회보험 가입 (두루누리 지원)', '사회보험 미가입', '사회보험 미확인');
 
       // SME 3개년 정밀 재무수치
       const salesSme2023 = escapeHtml(document.getElementById('sme_sales_2023')?.value.trim()) || '-';
@@ -4514,6 +4543,7 @@
       const getOptTxt = (id) => {
         const el = document.getElementById(id);
         if (!el) return '-';
+        if (el.tagName === 'SELECT' && !el.value) return '미확인';
         if (el.selectedOptions && el.selectedOptions[0]) return escapeHtml(el.selectedOptions[0].text);
         return escapeHtml(el.value) || '-';
       };
@@ -5620,6 +5650,10 @@
       document.getElementById('bp_team').value = '대표자 정밀가공 경력 18년 / 사내 기술연구소 전담인력 4명(석사급 2명), 공장등록 완료(화성공장 450평), ISO9001 및 이노비즈 인증 보유';
       document.getElementById('bp_outcome').value = '1년 내 청년 기술인력 3명 신규 채용 / 연매출 28억원에서 42억원으로 50% 성장 달성, 공정 수율 향상에 따른 제조원가 18% 절감 기대';
 
+      // 확인 항목·선택칸도 예시 값으로(새 기본값은 '미확인')
+      Object.entries({ smb_chk_tax_ok: 'yes', smb_chk_cardloan: 'yes', smb_chk_bojeung: 'yes', smb_chk_lease: 'yes', smb_chk_signboard: 'yes', smb_chk_smartorder: 'yes', smb_chk_map_reg: 'no', smb_chk_delivery: 'yes', smb_chk_contract: 'no', smb_chk_insurance: 'no' }).forEach(([k, v]) => setTri(k, v, true));
+      setVal('smb_material_trend', 'high'); setVal('smb_price_reflect', 'no');
+      document.querySelectorAll('#section_ind_spec select').forEach(sel => { if (!sel.value && sel.options.length > 1) sel.selectedIndex = 1; });
       calcSmbMetrics();
       calcDebtTotals();
       syncCompanyData();
@@ -5783,6 +5817,121 @@
     let storageScope = 'local';
     const scopedKey = (base) => storageScope === 'local' ? base : base + ':' + storageScope;
 
+
+    // ===== 확인 칸 세 갈래(미확인 / 예 / 아니오) — 확인하지 않은 것을 결과물에 사실처럼 쓰지 않게 =====
+    const TRI_IDS = ['smb_chk_tax_ok', 'smb_chk_cardloan', 'smb_chk_bojeung', 'smb_chk_lease', 'smb_chk_signboard', 'smb_chk_smartorder', 'smb_chk_map_reg', 'smb_chk_delivery', 'smb_chk_contract', 'smb_chk_insurance'];
+    const TRI_TXT = { '': '미확인', yes: '예', no: '아니오' };
+    function triOf(id) {
+      const e = document.getElementById(id);
+      if (!e) return '';
+      return (e.dataset || {}).tri !== undefined ? e.dataset.tri : (e.checked ? 'yes' : 'no');
+    }
+    window.triOf = triOf;
+    function setTri(id, v, silent) {
+      const e = typeof id === 'string' ? document.getElementById(id) : id;
+      if (!e) return;
+      v = v === true ? 'yes' : v === false ? 'no' : (v === 'yes' || v === 'no' ? v : '');
+      if (!e.dataset) e.dataset = {};
+      e.dataset.tri = v; e.checked = v === 'yes';
+      const b = e.parentElement && e.parentElement.querySelector('.tri-btn');
+      if (b) { b.dataset.v = v; b.textContent = TRI_TXT[v]; b.setAttribute('aria-label', (e.closest('label')?.textContent.replace(TRI_TXT[v], '').trim() || '') + ': ' + TRI_TXT[v]); }
+      if (!silent) e.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    window.setTri = setTri;
+    document.addEventListener('DOMContentLoaded', () => {
+      TRI_IDS.forEach(id => {
+        const e = document.getElementById(id); if (!e || (e.dataset || {}).tri !== undefined) return;
+        e.classList.add('tri-src'); e.tabIndex = -1;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'tri-btn'; b.title = '누를 때마다 미확인 → 예 → 아니오';
+        e.insertAdjacentElement('afterend', b);
+        e.closest('label')?.addEventListener('click', ev => { ev.preventDefault(); setTri(e, { '': 'yes', yes: 'no', no: '' }[e.dataset.tri || '']); });
+        setTri(e, '', true);
+      });
+    });
+
+    // ===== 금액 칸 단위 안내: 만원·백만원 칸에 원 단위로 친 것 같으면 바꿔 주기 =====
+    // 칸마다 [단위, 이 값 이상이면 의심]. 월 금액은 10억/월, 연 금액은 100억(만원)·1조(백만원) 이상을 의심
+    const UNIT_RULES = [
+      [/^smb_(monthly_sales|cost_(rent|util|labor|rental|interest))$/, '만원', 100000],
+      [/^smb_sales_(cur|y1|y2|y3)$/, '만원', 1000000],
+      [/^sme_(sales|profit|debt|equity|net|assets|capital|st_loan|lt_loan|quick|cur_liab|int_exp|int_inc|ar|inv|ap|unpaid|loan_to_ceo)(_20\d\d)?$/, '백만원', 1000000]
+    ];
+    const korMan = man => { man = Math.round(man); const eok = Math.floor(Math.abs(man) / 10000), rest = Math.abs(man) % 10000; return (man < 0 ? '-' : '') + (eok ? eok.toLocaleString() + '억' + (rest ? ' ' + rest.toLocaleString() + '만원' : '원') : rest.toLocaleString() + '만원'); };
+    function unitRuleOf(el) {
+      if (!el) return null;
+      if (el.title === '잔액(만원)') return ['만원', 1000000];
+      for (const [re, u, lim] of UNIT_RULES) if (re.test(el.id || '')) return [u, lim];
+      return null;
+    }
+    function unitHint(el) {
+      const rule = unitRuleOf(el); if (!rule) return;
+      const [unit, lim] = rule;
+      const n = Number(String(el.value).replace(/[^\d.-]/g, ''));
+      // 안내는 칸 줄 아래 한 줄로(입력칸과 '만원'이 나란한 줄이면 그 줄 다음에)
+      let host = el.closest('td') || el.parentElement, after = null;
+      if (!el.closest('td') && /flex/.test(getComputedStyle(host).display)) { after = host; host = host.parentElement; }
+      let h = after ? (after.nextElementSibling && after.nextElementSibling.classList.contains('unit-hint') ? after.nextElementSibling : null) : host.querySelector(':scope > .unit-hint');
+      const div = unit === '만원' ? 10000 : 1000000;
+      const sus = isFinite(n) && Math.abs(n) >= lim && n % (div / 10) === 0;
+      if (!sus) { if (h) h.remove(); return; }
+      const fixed = Math.round(n / div);
+      if (!h) { h = document.createElement('div'); h.className = 'unit-hint no-print'; if (after) after.insertAdjacentElement('afterend', h); else host.appendChild(h); }
+      const asMan = unit === '만원' ? n : n * 100;
+      h.innerHTML = `원 단위로 입력하신 것 같아요. 이 칸은 <b>${unit}</b> 단위라 지금은 <b>${korMan(asMan)}</b>으로 읽혀요. <button type="button">${fixed.toLocaleString()}${unit}으로 바꾸기</button>`;
+      h.querySelector('button').onclick = () => {
+        el.value = el.type === 'number' ? String(fixed) : fixed.toLocaleString();
+        el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+        h.remove(); el.focus();
+      };
+    }
+    document.addEventListener('input', e => { if (e.target.matches && e.target.matches('input')) unitHint(e.target); });
+    window.unitHint = unitHint;
+
+    // ===== 생년월일: 8자리면 하이픈 넣고 만 나이 안내 =====
+    function ageOf(v, ref) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim()); if (!m) return null;
+      const r = ref || (document.getElementById('doc_date')?.value ? new Date(document.getElementById('doc_date').value + 'T00:00:00') : new Date());
+      const b = new Date(+m[1], +m[2] - 1, +m[3]); if (isNaN(b) || b > r || +m[2] > 12 || +m[3] > 31) return null;
+      let a = r.getFullYear() - b.getFullYear();
+      if (r.getMonth() < b.getMonth() || (r.getMonth() === b.getMonth() && r.getDate() < b.getDate())) a--;
+      return a;
+    }
+    window.ageOf = ageOf;
+    function fieldNote(el, html, kind) {
+      const host = el.parentElement;
+      let n = host.querySelector(':scope > .field-note');
+      if (!html) { if (n) n.remove(); return; }
+      if (!n) { n = document.createElement('div'); host.appendChild(n); }
+      n.className = 'field-note no-print ' + (kind || '');
+      n.innerHTML = html;
+    }
+    function birthAid(el) {
+      const d = el.value.replace(/\D/g, '');
+      if (/^\d{8}$/.test(d) && !/-/.test(el.value)) el.value = d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6);
+      const a = ageOf(el.value);
+      fieldNote(el, a !== null ? `만 ${a}세` : (el.value.trim() && !/만\s*\d/.test(el.value) ? '예: 1985-03-02 (숫자 8자리만 쳐도 됩니다)' : ''), a !== null ? 'ok' : 'warn');
+    }
+    // ===== 사업자번호: 10자리인데 검증식이 틀리면 안내 =====
+    function bizNoCheck(v) {
+      const d = String(v || '').replace(/\D/g, '').split('').map(Number);
+      if (d.length !== 10) return null;
+      const w = [1, 3, 7, 1, 3, 7, 1, 3, 5];
+      let sum = 0; for (let i = 0; i < 9; i++) sum += d[i] * w[i];
+      sum += Math.floor(d[8] * 5 / 10);
+      return (10 - (sum % 10)) % 10 === d[9];
+    }
+    window.bizNoCheck = bizNoCheck;
+    function bizAid(el) {
+      const ok = bizNoCheck(el.value);
+      fieldNote(el, ok === false ? '번호가 맞지 않아요 — 사업자등록증의 숫자를 다시 확인해 주세요(검증식 불일치)' : '', 'warn');
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const b = document.getElementById('corp_ceo_birth'), z = document.getElementById('corp_biz_no');
+      if (b) { b.addEventListener('input', () => birthAid(b)); b.addEventListener('change', () => birthAid(b)); }
+      if (z) { z.addEventListener('input', () => bizAid(z)); z.addEventListener('change', () => bizAid(z)); }
+    });
+
     function formFields() {
       return [...document.querySelectorAll('#screen_input input[id], #screen_input select[id], #screen_input textarea[id]')]
         .filter(el => !['client_select', 'client_import'].includes(el.id) && el.type !== 'file');
@@ -5790,7 +5939,7 @@
 
     function collectFormData() {
       const fields = {};
-      formFields().forEach(el => { fields[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+      formFields().forEach(el => { fields[el.id] = el.type === 'checkbox' ? ((el.dataset || {}).tri !== undefined ? el.dataset.tri : el.checked) : el.value; });
       return {
         version: FORM_DATA_VERSION,
         savedAt: new Date().toISOString(),
@@ -5812,7 +5961,7 @@
         if (!(el.id in data.fields)) return;
         let v = data.fields[el.id];
         if (el.id === 'corp_form') v = ({ '법인기업 (주식회사)': '법인 · 일반과세', '개인사업자': '개인 · 일반과세' })[v] || v;
-        if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
+        if (el.type === 'checkbox') { if ((el.dataset || {}).tri !== undefined) setTri(el, v, true); else el.checked = !!v; } else el.value = v ?? '';
       });
       window.appState.debtItems = Array.isArray(data.debtItems) ? data.debtItems : [];
       renderDebtTable();
@@ -5873,7 +6022,7 @@
 
     function resetFormToDefaults() {
       formFields().forEach(el => {
-        if (el.type === 'checkbox') el.checked = el.defaultChecked;
+        if (el.type === 'checkbox') { if ((el.dataset || {}).tri !== undefined) setTri(el, '', true); else el.checked = el.defaultChecked; }
         else if (el.tagName === 'SELECT') {
           const i = [...el.options].findIndex(o => o.defaultSelected);
           el.selectedIndex = i >= 0 ? i : 0;
@@ -6490,6 +6639,18 @@
     .sign-lg .sign-line { font-size: 15px; gap: 7px; }
     .sign-lg .sign-line img { height: 1.6rem; max-width: 7rem; }
     .sign-line .sign-tel { font-weight: 700; font-variant-numeric: tabular-nums; }
+    /* 확인 칸 세 갈래 */
+    .tri-src { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+    .tri-btn { flex: none; min-width: 46px; padding: 1px 7px; border-radius: 999px; border: 1px solid #cbd5e1; background: #f8fafc; color: #64748b; font-size: 10.5px; font-weight: 800; line-height: 1.6; cursor: pointer; text-align: center; transition: background .15s, color .15s, border-color .15s; }
+    .tri-btn[data-v="yes"] { background: #ccfbf1; color: #0f766e; border-color: #5eead4; }
+    .tri-btn[data-v="no"] { background: #ffe4e6; color: #be123c; border-color: #fda4af; }
+    .tri-btn:focus-visible { outline: 2px solid #0f766e; outline-offset: 1px; }
+    /* 금액 단위·입력 안내 */
+    .unit-hint, .field-note { margin-top: 4px; font-size: 11px; line-height: 1.45; border-radius: 8px; }
+    .unit-hint { padding: 6px 8px; background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; white-space: normal; }
+    .unit-hint button { margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: #f59e0b; color: #fff; font-weight: 800; cursor: pointer; }
+    .field-note.ok { color: #0f766e; font-weight: 700; }
+    .field-note.warn { color: #b45309; }
     .fin-ind { border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; background: #F8FAFC; }
     .fin-ind-t td, .fin-ind-t th { white-space: nowrap; }
     /* 내용 길이만큼 늘어나는 글 칸 */
@@ -7594,10 +7755,12 @@
     #l3 .l3-step .l3-cost5 .form-input-control { padding-left: 6px; padding-right: 6px; min-width: 0; }
     #l3 .l3-step .l3-cost5 span { font-size: 11px; white-space: nowrap; }
     /* [5] 4·5·6 체크 묶음은 세 칸 — 글씨 11px·자간 좁게, 문구는 짧게(원문은 마우스 올리면) */
-    #l3 .l3-step .l3-three { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+    #l3 .l3-step .l3-three { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important; gap: 8px !important; }
     #l3 .l3-step .l3-three > div { padding: 10px 10px !important; }
-    #l3 .l3-step .l3-three label, #l3 .l3-step .l3-three span, #l3 .l3-step .l3-three h4, #l3 .l3-step .l3-three h5 { font-size: 11px !important; letter-spacing: -0.02em; white-space: nowrap; }
-    #l3 .l3-step .l3-three input[type=text], #l3 .l3-step .l3-three input[type=number] { width: 52px !important; padding: 4px 6px !important; }
+    #l3 .l3-step .l3-three label, #l3 .l3-step .l3-three span, #l3 .l3-step .l3-three h4, #l3 .l3-step .l3-three h5 { font-size: 11px !important; letter-spacing: -0.02em; white-space: normal; line-height: 1.35; }
+    #l3 .l3-step .l3-three label { align-items: flex-start !important; }
+    #l3 .l3-step .l3-three .tri-btn { margin-top: 1px; }
+    #l3 .l3-step .l3-three input[type=text], #l3 .l3-step .l3-three input[type=number] { width: 64px !important; padding: 4px 6px !important; }
     /* 연 매출 4칸 */
     #l3 .l3-step #smb_years_box { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
     #l3 .l3-step #smb_years_box .form-input-control { padding-left: 6px; padding-right: 6px; min-width: 0; }
