@@ -6,7 +6,7 @@
   // PDF 저장 점검용: 개발본을 그대로 불러와 지정한 상태로 만든 뒤, 헤드리스 Chrome 으로 PDF 를 만든다.
   // 화면에 그려진 서식 글자(인쇄 제외 요소 빼고)를 <script type="text/x-expected"> 에 넣어 두면
   // tools/pdf_check.py 가 --dump-dom 결과와 PDF 글자를 대조해 잘린 글자를 찾는다.
-  // 사용: print-check.html?case=batch|single&track=smb|small|sme&data=demo|long|debt10|empty&ind=mfg&key=manage&sheet=report&src=dev|orig
+  // 사용: print-check.html?case=batch|single|export&track=smb|small|sme&data=demo|long|debt10|empty&ind=mfg&key=manage&sheet=report&src=dev|orig
   (async () => {
     const qs = new URLSearchParams(location.search);
     const src = qs.get('src') === 'orig' ? '../tests/_orig_copy.html' : '../코스텝_경영진단_리드디벨롭.html';
@@ -42,6 +42,16 @@
             const id = { official: 'print_target_official', report: 'print_target_report', guide: 'print_target_guide', bplan: 'print_target_bplan' }[CFG.sheet];
             window.setTimeout = () => 0;   // 인쇄 후 화면 복원 막기 (PDF 는 이 상태로 찍힘)
             printSingleSheet(id);
+          } else if (CFG.kase === 'export') {
+            // 내보내기 팝업: 인쇄 · 분야 전부 × 서식 1~3 · 양면용 빈 쪽 · 쪽 번호
+            openExport(); document.querySelector('.xp-pk[data-mode="print"]').click();
+            const xm = document.getElementById('xp_modal');
+            xm.querySelectorAll('input[data-g=f]').forEach(x => { x.checked = true; });
+            xm.querySelectorAll('input[data-g=s]').forEach(x => { x.checked = x.value !== 'bplan'; });
+            xm.querySelector('.xp-seg[data-k=duplex] button[data-opt="1"]').click();
+            xm.querySelector('.xp-seg[data-k=pno] button[data-opt="1"]').click();
+            window.setTimeout = () => 0;   // 인쇄 창·화면 복원 막기 (PDF 는 이 상태로 찍힘)
+            xm.querySelector('#xp_go').click(); window.renderActiveReport = () => {};
           } else {
             selectDocumentSheet('all'); printAllReportsBatch(); window.renderActiveReport = () => {};
           }

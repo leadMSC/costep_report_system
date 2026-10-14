@@ -371,6 +371,51 @@
     /* 펌이 올린 로고는 색을 알 수 없으므로 다크 화면에서는 흰 받침 위에 */
     :root[data-theme="ink"] img.firm-logo { background: #FFFFFF; border-radius: 10px; padding: 4px 10px; }
   </style>
+  <style>
+    /* 내보내기 팝업 (1단계 방식 → 2단계 리포트·옵션) */
+    #xp_modal { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(10,31,68,.38); font-family: inherit; }
+    #xp_modal[hidden] { display: none; }
+    #xp_modal .xp-dlg { width: 480px; max-width: 100%; max-height: calc(100vh - 32px); overflow: auto; background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); border: 1px solid var(--t-line, #E4E2DB); border-radius: 18px; box-shadow: 0 24px 60px rgba(10,31,68,.35); padding: 18px 20px; animation: xpIn .28s cubic-bezier(.2,.9,.3,1.2); }
+    @keyframes xpIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+    #xp_modal .xp-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    #xp_modal h3 { margin: 0; font-size: 16px; font-weight: 900; }
+    #xp_modal .xp-x { margin-left: auto; border: 0; background: none; font-size: 17px; color: var(--t-text-3, #66635C); cursor: pointer; width: 30px; height: 30px; border-radius: 8px; }
+    #xp_modal .xp-x:hover { background: var(--t-surface-3, #F1EFE9); }
+    #xp_modal .xp-back { border: 0; background: var(--t-surface-3, #F1EFE9); color: inherit; border-radius: 8px; padding: 4px 8px; font-family: inherit; font-weight: 800; font-size: 12px; cursor: pointer; }
+    #xp_modal .xp-steps { display: flex; gap: 6px; font-size: 11px; font-weight: 800; color: #94A3B8; margin: 0 0 14px; }
+    #xp_modal .xp-steps b.on { color: var(--t-accent-text, #00A898); }
+    #xp_modal .xp-ic { width: 34px; height: 34px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; flex: none; }
+    #xp_modal .xp-ic.pdf { background: #FDECEC; color: #B42318; } #xp_modal .xp-ic.doc { background: #E8F0FE; color: #1A56DB; } #xp_modal .xp-ic.print { background: #E7F7F4; color: #00796B; }
+    #xp_modal .xp-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    #xp_modal .xp-pk { border: 1.5px solid var(--t-line, #E4E2DB); background: var(--t-surface, #fff); color: inherit; border-radius: 14px; padding: 16px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; text-align: center; transition: border-color .15s, transform .15s; }
+    #xp_modal .xp-pk:hover, #xp_modal .xp-pk:focus-visible { border-color: var(--t-accent-text, #00A898); transform: translateY(-1px); outline: none; }
+    #xp_modal .xp-pk b { font-size: 14px; } #xp_modal .xp-pk small { font-size: 11px; color: var(--t-text-3, #66635C); line-height: 1.45; }
+    #xp_modal .xp-sec { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 900; margin: 12px 2px 6px; }
+    #xp_modal .xp-sec button { border: 0; background: none; font-family: inherit; font-weight: 800; font-size: 11px; color: var(--t-accent-text, #00A898); cursor: pointer; }
+    #xp_modal .xp-grp { border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; padding: 6px 10px; }
+    #xp_modal .xp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; }
+    #xp_modal .xp-ck { display: flex; align-items: center; gap: 8px; padding: 5px 4px; font-size: 12.5px; font-weight: 600; cursor: pointer; border-radius: 8px; }
+    #xp_modal .xp-ck:hover { background: var(--t-surface-2, #F6F5F1); }
+    #xp_modal .xp-ck input { width: 16px; height: 16px; accent-color: #0A1F44; flex: none; margin: 0; }
+    #xp_modal .xp-ck em { margin-left: auto; font-style: normal; font-size: 10px; font-weight: 800; color: var(--t-accent-text, #00A898); }
+    #xp_modal .xp-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 4px; font-size: 12.5px; font-weight: 600; border-bottom: 1px dashed var(--t-line, #E4E2DB); }
+    #xp_modal .xp-opt:last-child { border: 0; }
+    #xp_modal .xp-opt small { display: block; font-size: 10.5px; color: var(--t-text-3, #66635C); font-weight: 500; }
+    #xp_modal .xp-seg { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 8px; padding: 2px; flex: none; }
+    #xp_modal .xp-seg button { border: 0; background: none; color: var(--t-text-3, #66635C); padding: 4px 9px; border-radius: 6px; font-family: inherit; font-weight: 800; font-size: 11.5px; cursor: pointer; }
+    #xp_modal .xp-seg button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+    #xp_modal .xp-note { font-size: 11.5px; line-height: 1.5; color: var(--t-text-3, #66635C); margin: 10px 2px 0; }
+    #xp_modal .xp-foot { position: sticky; bottom: -18px; display: flex; align-items: center; gap: 8px; margin: 12px -20px -18px; padding: 12px 20px 16px; background: var(--t-surface, #fff); border-top: 1px solid var(--t-line, #E4E2DB); font-size: 12px; color: var(--t-text-3, #66635C); }
+    #xp_modal .xp-foot b { color: var(--t-text, #0A0B0F); }
+    #xp_modal .xp-go { margin-left: auto; border: 0; border-radius: 10px; padding: 9px 14px; font-family: inherit; font-weight: 800; font-size: 13px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); cursor: pointer; }
+    #xp_modal .xp-go:disabled { opacity: .35; cursor: default; }
+    @media (max-width: 520px) { #xp_modal .xp-pick { grid-template-columns: 1fr; } #xp_modal .xp-pk { flex-direction: row; justify-content: flex-start; text-align: left; } #xp_modal .xp-cols { grid-template-columns: 1fr; } }
+    @media (prefers-reduced-motion: reduce) { #xp_modal .xp-dlg { animation: none; } }
+    #xp_toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; z-index: 96; background: #0A0B0F; color: #fff; font-size: 12.5px; font-weight: 700; padding: 10px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.25); transition: opacity .2s, transform .2s; }
+    #xp_toast.on { opacity: 1; transform: translate(-50%, 0); }
+    .xp-pno { position: absolute; left: 0; right: 0; bottom: 5mm; text-align: center; font-size: 9pt; color: #64748b; }
+    @media print { #xp_modal, #xp_toast { display: none !important; } .xp-blank { border: 0 !important; box-shadow: none !important; } }
+  </style>
 </head>
 <body class="min-h-screen text-slate-900 pb-16">
 
@@ -1547,15 +1592,15 @@
               </button>
             </div>
             <p class="text-[10px] text-slate-500 leading-tight pt-1">
-              ※ 각 서식 상단 인쇄 버튼을 누르면 세로 A4 1장에 딱 맞게 낱개로 출력됩니다.
+              ※ 내보내기에서 분야·서식을 골라 PDF·Docs 로 저장하거나 인쇄합니다.
             </p>
           </div>
 
           <!-- Batch Print Card -->
           <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-2 text-center">
-            <button type="button" onclick="printAllReportsBatch()" class="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl text-xs shadow-sm transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+            <button type="button" onclick="openExport()" class="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl text-xs shadow-sm transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-              <span>전체 서류 일괄 인쇄 (A4 순차)</span>
+              <span>내보내기 (PDF · Docs · 인쇄)</span>
             </button>
           </div>
 
@@ -4597,16 +4642,6 @@
               <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
               <span class="px-2.5 py-0.5 rounded bg-teal-50 text-[#0f766e] border border-teal-200 font-extrabold text-xs">서식 1. 정식 행정시행문 (공문서 표준규격)</span>
             </div>
-            <div class="flex items-center space-x-2">
-              <button type="button" onclick="printSingleSheet('print_target_official')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                <span>출력 (인쇄/PDF)</span>
-              </button>
-              <button type="button" onclick="downloadSingleSheetDoc('official')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span>저장 (독스 다운로드)</span>
-              </button>
-            </div>
           </div>
 
           <!-- Document Main Frame -->
@@ -4696,16 +4731,6 @@
             <div class="flex items-center space-x-2">
               <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
               <span class="px-2.5 py-0.5 rounded bg-teal-50 text-[#0f766e] border border-teal-200 font-extrabold text-xs">서식 2. 경영진단 결과보고서 (A4 단일 규격)</span>
-            </div>
-            <div class="flex items-center space-x-2">
-              <button type="button" onclick="printSingleSheet('print_target_report')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                <span>출력 (인쇄/PDF)</span>
-              </button>
-              <button type="button" onclick="downloadSingleSheetDoc('report')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span>저장 (독스 다운로드)</span>
-              </button>
             </div>
           </div>
 
@@ -4930,16 +4955,6 @@
               <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
               <span class="px-2.5 py-0.5 rounded bg-teal-50 text-[#0f766e] border border-teal-200 font-extrabold text-xs">서식 3. 세부 실행안내서 및 구비서류 목록 (A4 단일 규격)</span>
             </div>
-            <div class="flex items-center space-x-2">
-              <button type="button" onclick="printSingleSheet('print_target_guide')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                <span>출력 (인쇄/PDF)</span>
-              </button>
-              <button type="button" onclick="downloadSingleSheetDoc('guide')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span>저장 (독스 다운로드)</span>
-              </button>
-            </div>
           </div>
 
           <!-- Document Content -->
@@ -5006,16 +5021,6 @@
             <div class="flex items-center space-x-2">
               <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
               <span class="px-2.5 py-0.5 rounded bg-teal-50 text-[#0f766e] border border-teal-200 font-extrabold text-xs">서식 4. 사업계획 개요서 (공모 제출용 공모 표준 서식)</span>
-            </div>
-            <div class="flex items-center space-x-2">
-              <button type="button" onclick="printSingleSheet('print_target_bplan')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                <span>출력 (인쇄/PDF)</span>
-              </button>
-              <button type="button" onclick="downloadSingleSheetDoc('bplan')" class="px-3 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span>저장 (독스 다운로드)</span>
-              </button>
             </div>
           </div>
 
@@ -5227,6 +5232,173 @@
       }, 100);
     }
     window.printAllReportsBatch = printAllReportsBatch;
+
+
+    // =========================================================================
+    // 내보내기: 1단계 방식(PDF·Docs·인쇄) → 2단계 분야별 리포트(최대 6) × 서식(4) 체크 + 출력 옵션
+    // 고른 분야마다 고른 서식을 차례로(분야 순서, 그 안에서 서식1→4) 한 번에 내보낸다
+    // =========================================================================
+    const XP_SHEETS = [['official', 'print_target_official', '서식1 행정시행문'], ['report', 'print_target_report', '서식2 결과보고서'], ['guide', 'print_target_guide', '서식3 실행안내서'], ['bplan', 'print_target_bplan', '서식4 사업계획 개요서']];
+    const XP_KEY = 'MSC_EXPORT_V1';
+    const XP_MODES = {
+      pdf: { ic: 'PDF', name: 'PDF', title: 'PDF로 내보내기', go: 'PDF 만들기', sub: '고객에게 보낼 파일', opts: ['duplex', 'seal', 'pno'] },
+      doc: { ic: 'DOC', name: 'Docs', title: 'Docs(Word)로 내보내기', go: '내려받기', sub: '한글·워드에서 고쳐 쓸 파일', opts: ['split', 'seal'] },
+      print: { ic: '인쇄', name: '인쇄', title: '인쇄하기', go: '인쇄하기', sub: '바로 프린터로', opts: ['duplex', 'seal', 'pno'] }
+    };
+    const XP_OPTS = {
+      split: ['파일 묶음', '', ['한 파일', '서식마다 따로']],
+      duplex: ['양면 인쇄용', '리포트마다 앞면에서 시작(빈 쪽 끼움)', ['아니오', '예']],
+      seal: ['직인', '서식 발신란의 펌 직인', ['넣기', '빼기']],
+      pno: ['쪽 번호', '아래 가운데 「1 / 8」', ['빼기', '넣기']]
+    };
+    function xpDb() {
+      const track = window.appState.bizTrack || 'smb';
+      return COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+    }
+    function xpLoad() { try { return JSON.parse(localStorage.getItem(XP_KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function xpSave(v) { try { localStorage.setItem(XP_KEY, JSON.stringify(v)); } catch (e) { /* 저장 불가 */ } }
+    let xpMode = 'pdf';
+    function xpModal() {
+      const m = document.getElementById('xp_modal');
+      if (m.dataset.ready) return m;
+      m.dataset.ready = '1';
+      m.innerHTML = '<div class="xp-dlg" role="dialog" aria-modal="true" aria-labelledby="xp_title">' +
+        '<div class="xp-p1"><div class="xp-h"><h3 id="xp_title">내보내기</h3><button type="button" class="xp-x" data-xp="close" aria-label="닫기">×</button></div>' +
+        '<div class="xp-steps"><b class="on">1 방식</b>›<b>2 리포트 · 옵션</b></div><div class="xp-pick">' +
+        Object.entries(XP_MODES).map(([k, v]) => '<button type="button" class="xp-pk" data-mode="' + k + '"><span class="xp-ic ' + k + '">' + v.ic + '</span><b>' + v.name + '</b><small>' + v.sub + '</small></button>').join('') +
+        '</div></div>' +
+        '<div class="xp-p2" hidden><div class="xp-h"><button type="button" class="xp-back" data-xp="back">‹ 방식</button><span class="xp-ic" id="xp_ic"></span><h3 id="xp_t2"></h3><button type="button" class="xp-x" data-xp="close" aria-label="닫기">×</button></div>' +
+        '<div class="xp-steps"><b>1 방식</b>›<b class="on">2 리포트 · 옵션</b></div>' +
+        '<div class="xp-sec">분야별 리포트<button type="button" data-all="f">전체 선택</button></div><div class="xp-grp" id="xp_f"></div>' +
+        '<div class="xp-sec">서식<button type="button" data-all="s">전체 선택</button></div><div class="xp-grp xp-cols" id="xp_s"></div>' +
+        '<div class="xp-sec">출력 옵션</div><div class="xp-grp" id="xp_o"></div>' +
+        '<p class="xp-note" id="xp_note"></p>' +
+        '<div class="xp-foot"><span id="xp_cnt"></span><button type="button" class="xp-go" id="xp_go"></button></div></div></div>';
+      m.addEventListener('click', e => {
+        if (e.target === m) return xpClose();
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.xp === 'close') xpClose();
+        else if (b.dataset.xp === 'back') xpStep(1);
+        else if (b.dataset.mode) { xpMode = b.dataset.mode; xpStep(2); }
+        else if (b.dataset.all) { const bs = [...m.querySelectorAll('input[data-g="' + b.dataset.all + '"]')], on = !bs.every(x => x.checked); bs.forEach(x => { x.checked = on; }); xpCount(); }
+        else if (b.dataset.opt) { b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }
+        else if (b.id === 'xp_go') xpRun();
+      });
+      m.addEventListener('change', xpCount);
+      m.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); xpClose(); } });
+      return m;
+    }
+    function xpStep(n) {
+      const m = xpModal();
+      m.querySelector('.xp-p1').hidden = n !== 1; m.querySelector('.xp-p2').hidden = n !== 2;
+      if (n === 1) { m.querySelector('.xp-pk').focus(); return; }
+      const md = XP_MODES[xpMode], last = xpLoad(), db = xpDb(), cur = window.appState.activeReportKey;
+      const ic = m.querySelector('#xp_ic'); ic.className = 'xp-ic ' + xpMode; ic.textContent = md.ic;
+      m.querySelector('#xp_t2').textContent = md.title;
+      m.querySelector('#xp_f').innerHTML = Object.entries(db).map(([k, r]) => '<label class="xp-ck"><input type="checkbox" data-g="f" value="' + k + '"' + (k === cur ? ' checked' : '') + '>' + escapeHtml(r.title || r.tabTitle || k) + (k === cur ? '<em>지금 보는 분야</em>' : '') + '</label>').join('');
+      const sheets = Array.isArray(last.sheets) && last.sheets.length ? last.sheets : XP_SHEETS.map(s => s[0]);
+      m.querySelector('#xp_s').innerHTML = XP_SHEETS.map(([k, , t]) => '<label class="xp-ck"><input type="checkbox" data-g="s" value="' + k + '"' + (sheets.includes(k) ? ' checked' : '') + '>' + t + '</label>').join('');
+      const ov = (last.opts && last.opts[xpMode]) || {};
+      m.querySelector('#xp_o').innerHTML = md.opts.map(k => { const [n2, h, c] = XP_OPTS[k], sel = ov[k] ?? 0; return '<div class="xp-opt"><div>' + n2 + (h ? '<small>' + h + '</small>' : '') + '</div><span class="xp-seg" data-k="' + k + '">' + c.map((x, i) => '<button type="button" data-opt="' + i + '" class="' + (i === sel ? 'on' : '') + '">' + x + '</button>').join('') + '</span></div>'; }).join('');
+      m.querySelector('#xp_note').textContent = xpMode === 'pdf' ? '「PDF 만들기」를 누르면 인쇄 창이 열립니다. 파일 이름은 미리 채워 두니 「대상」에서 「PDF로 저장」을 고르세요.'
+        : xpMode === 'print' ? '양면·컬러·부수는 인쇄 창의 「설정 더보기」에서 고르세요. 브라우저가 대신 켜 줄 수 없습니다.'
+        : '「서식마다 따로」면 파일이 여러 개 내려받아집니다. 브라우저가 여러 파일 받기를 물으면 「허용」을 누르세요.';
+      xpCount();
+      m.querySelector('#xp_go').focus();
+    }
+    function xpPicked() {
+      const m = xpModal();
+      const f = [...m.querySelectorAll('input[data-g="f"]:checked')].map(x => x.value);
+      const s = [...m.querySelectorAll('input[data-g="s"]:checked')].map(x => x.value);
+      const o = {}; m.querySelectorAll('.xp-seg').forEach(g => { o[g.dataset.k] = [...g.children].findIndex(b => b.classList.contains('on')); });
+      return { f, s, o };
+    }
+    function xpCount() {
+      const m = xpModal(), { f, s } = xpPicked(), k = f.length * s.length, go = m.querySelector('#xp_go');
+      m.querySelector('#xp_cnt').innerHTML = '<b>' + f.length + '</b>개 분야 × <b>' + s.length + '</b>개 서식 = <b>' + k + '장</b>';
+      go.textContent = XP_MODES[xpMode].go + (k ? ' (' + k + '장)' : ''); go.disabled = !k;
+    }
+    let xpPrev = null;
+    function openExport() {
+      const m = xpModal();
+      xpPrev = document.activeElement;
+      m.hidden = false; document.body.classList.add('xp-open');
+      xpStep(1);
+    }
+    function xpClose() {
+      const m = document.getElementById('xp_modal');
+      m.hidden = true; document.body.classList.remove('xp-open');
+      if (xpPrev && xpPrev.focus) xpPrev.focus({ preventScroll: true });
+    }
+    function xpToast(msg, ms) {
+      const t = document.getElementById('xp_toast');
+      t.textContent = msg; t.classList.add('on');
+      clearTimeout(xpToast.t); xpToast.t = setTimeout(() => t.classList.remove('on'), ms || 3200);
+    }
+    // 고른 분야 × 서식을 미리보기 자리에 차례로 그린다(복사본). 끝나면 restore() 로 원래 화면
+    function xpCompose(f, s, o) {
+      const area = document.getElementById('active_report_render_area');
+      const db = xpDb(), savedKey = window.appState.activeReportKey, savedSheet = window.appState.activeSheet;
+      const groups = [];
+      window.appState.activeSheet = 'all';
+      Object.keys(db).filter(k => f.includes(k)).forEach(k => {
+        window.appState.activeReportKey = k;
+        renderActiveReport();
+        const label = db[k].title || db[k].tabTitle || k;
+        const pages = XP_SHEETS.filter(x => s.includes(x[0])).map(([sk, id, t]) => {
+          const src = document.getElementById(id); if (!src) return null;
+          const c = src.cloneNode(true);
+          c.id = id + '__' + k; c.dataset.xpName = label + '_' + t;
+          c.querySelectorAll(':scope > .no-print').forEach(n => n.remove());
+          if (o.seal === 1) c.querySelectorAll('img[alt$="직인"]').forEach(n => n.remove());
+          return c;
+        }).filter(Boolean);
+        if (pages.length) groups.push({ label, pages });
+      });
+      area.innerHTML = '';
+      const all = [];
+      groups.forEach((g, gi) => {
+        g.pages.forEach(p => { area.appendChild(p); all.push(p); });
+        if (o.duplex === 1 && g.pages.length % 2 && gi < groups.length - 1) {
+          const b = document.createElement('div'); b.className = 'a4-page-card xp-blank'; area.appendChild(b); all.push(b);
+        }
+      });
+      if (o.pno === 1) all.forEach((p, i) => { const n = document.createElement('div'); n.className = 'xp-pno'; n.textContent = (i + 1) + ' / ' + all.length; p.appendChild(n); });
+      const restore = () => { window.appState.activeReportKey = savedKey; window.appState.activeSheet = savedSheet; renderActiveReport(); };
+      return { groups, pages: groups.flatMap(g => g.pages), restore };
+    }
+    function xpTail(f, s) {
+      const db = xpDb();
+      if (f.length !== 1) return '';
+      const label = db[f[0]].title || db[f[0]].tabTitle || '';
+      return s.length === 1 ? label + '_' + XP_SHEETS.find(x => x[0] === s[0])[2] : label;
+    }
+    function xpRun() {
+      const { f, s, o } = xpPicked();
+      if (!f.length || !s.length) return;
+      const last = xpLoad(); last.sheets = s; last.opts = Object.assign(last.opts || {}, { [xpMode]: o }); xpSave(last);
+      xpClose();
+      const mode = xpMode, tail = xpTail(f, s);
+      const job = xpCompose(f, s, o);
+      if (!job.pages.length) { job.restore(); alert('내보낼 서식이 없습니다.'); return; }
+      if (mode === 'doc') {
+        try {
+          if (o.split === 1) job.pages.forEach((p, i) => setTimeout(() => saveDocx([p], docxFileName(p.dataset.xpName)), i * 400));
+          else saveDocx(job.pages, docxFileName(tail));
+        } finally { setTimeout(job.restore, o.split === 1 ? job.pages.length * 400 + 200 : 0); }
+        xpToast('저장했어요 · ' + job.pages.length + '장' + (o.split === 1 ? ' (' + job.pages.length + '개 파일)' : ''));
+        return;
+      }
+      if (mode === 'pdf') xpToast('인쇄 창의 「대상」에서 「PDF로 저장」을 고르세요', 6000);
+      setTimeout(() => {
+        setPrintTitle();
+        if (tail) document.title += '_' + tail.replace(/[\\/:*?"<>|]/g, ' ');
+        window.print();
+        try { restorePrintTitle(); } catch (e) { /* 이미 되돌림 */ }
+        job.restore();
+      }, mode === 'pdf' ? 350 : 80);
+    }
+    window.openExport = openExport;
 
     // Helper: Dynamically Match Announcement for a Report Category based on Current Company Profile
     function getMatchedAnnouncementForCategory(repKey, track, indTrack) {
@@ -8175,8 +8347,8 @@
         document.addEventListener('click', e => { if (!e.target.closest('.l3-view')) setView(false); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape' && view.classList.contains('open')) { setView(false); viewBtn.focus({ preventScroll: true }); } });
         const pr = document.createElement('button');
-        pr.type = 'button'; pr.className = 'l3-print'; pr.textContent = '전체 인쇄·PDF';
-        pr.onclick = () => printAllReportsBatch();
+        pr.type = 'button'; pr.className = 'l3-print'; pr.textContent = '내보내기'; pr.setAttribute('aria-haspopup', 'dialog');
+        pr.onclick = () => openExport();
         row2.appendChild(pr);
         document.getElementById('l3_paper').appendChild(document.getElementById('active_report_render_area'));
         // 지원사업 연계 화면을 미리보기 칸 안으로
@@ -8521,5 +8693,8 @@
       });
     })();
   </script>
+  <!-- 내보내기 팝업·알림 자리 (내용은 xpModal 이 채움) -->
+  <div id="xp_modal" class="no-print" hidden></div>
+  <div id="xp_toast" class="no-print" role="status" aria-live="polite"></div>
 </body>
 </html>
