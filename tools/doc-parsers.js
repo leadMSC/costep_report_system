@@ -477,7 +477,8 @@
     if (c.kind === 'ip') { const ip = parseIP(text); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     if (c.kind === 'idcard') r = parseIdCard(text);
     else if (c.kind === 'lease') r = parseLease(text);
-    else if (c.kind === 'bizcert' || c.kind === 'bizreg') r = parseBizCert(rows);
+    else if (c.kind === 'bizcert') r = parseBizCert(rows);
+    else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
@@ -702,6 +703,120 @@
     return out;
   }
 
+  // ───────── 사업자등록증(등록증 본문 — '증명'과 칸 모양이 다름) ─────────
+  // 줄 예: '등록번호 : 123-45-67890' · '상 호 : OO' · '성 명 : OO  생년월일 : 1980 년 01 월 02 일' · '개업연월일 : 2019 년 04 월 01 일'
+  //        '사업장소재지 : …' · '사업의 종류 : 업태 제조업  종목 탁주'(두 줄로 이어지기도). 위치(x)가 있으면 업태·종목 칸을 나눠 읽는다
+  function parseBizReg(rows, pages) {
+    const f = {}, meta = {};
+    const lines = rows.map(r => r.join(' '));
+    const flat = despace(lines.join('|'));
+    const val = re => { for (const l of lines) { const d = l.replace(/\s+/g, ' '); const m = despace(d).match(re); if (m) return m; } return null; };
+    const no = bizNoOf((flat.match(/등록번호[:：]?(\d{3}-?\d{2}-?\d{5})/) || [])[1] || '');
+    const tax0 = flat.match(/\((일반과세자|간이과세자|면세사업자|법인사업자)\)/);
+    if (no) {
+      f.corp_biz_no = no;
+      if (!bizNoValid(no)) meta.corp_biz_no = { conf: 0.3, valid: false, note: '번호 검증식이 맞지 않아요 — 원본 확인' };
+      f.corp_form = formValue(isCorpNo(no) || (tax0 && tax0[1] === '법인사업자'), tax0 && tax0[1]);
+      meta.corp_form = { conf: tax0 ? 0.9 : 0.6 };
+    }
+    // 값은 띄어쓰기를 살려서: 라벨 다음 ':' 뒤부터 다음 라벨 전까지
+    const after = (labelRe, stopRe) => {
+      for (const l of lines) {
+        const s = l.replace(/\s+/g, ' ');
+        const m = s.match(new RegExp('(?:' + labelRe.source + ')\\s*[:：]\\s*(.+)$'));
+        if (m) { let v = m[1]; if (stopRe) v = v.split(stopRe)[0]; v = v.trim(); if (v) return v; }
+      }
+      return '';
+    };
+    const name = after(/상\s*호|법\s*인\s*명(?:\s*\(단체명\))?/, /\s+(?:성\s*명|대\s*표\s*자)\s*[:：]/); if (name) f.corp_name = name;
+    const ceo = after(/성\s*명|대\s*표\s*자/, /\s+생\s*년\s*월\s*일|\s+주민|\s+법인등록/); if (ceo) f.corp_ceo = ceo.replace(/\s+/g, '');
+    const birth = val(/생년월일[:：]?(\d{4})년(\d{1,2})월(\d{1,2})일/);
+    if (birth) { f.corp_ceo_birth = `${birth[1]}-${birth[2].padStart(2, '0')}-${birth[3].padStart(2, '0')}`; meta.corp_ceo_birth = { conf: 0.85 }; }
+    const open = val(/개업연월일[:：]?(\d{4})년(\d{1,2})월(\d{1,2})일/);
+    if (open) f.corp_est_date = `${open[1]}-${open[2].padStart(2, '0')}-${open[3].padStart(2, '0')}`;
+    const addr = after(/사\s*업\s*장\s*소\s*재\s*지/, /\s+본\s*점\s*소\s*재\s*지\s*[:：]/); if (addr) f.corp_address = addr;
+    // 업태·종목: 위치가 있으면 '업태'·'종목' 글자 아래·오른쪽 칸을 모은다
+    let up = '', jm = '';
+    const items = (pages || []).flat();
+    const lab = t => items.find(i => despace(i.s) === t);
+    const U = lab('업태'), J = lab('종목');
+    if (U && J) {
+      const band = i => i.y <= U.y + 4 && i.y >= U.y - 40;
+      up = items.filter(i => band(i) && i.x > U.x + 5 && i.x < J.x - 2 && despace(i.s) !== '업태').sort((a, b) => b.y - a.y || a.x - b.x).map(i => i.s.trim()).join(' ');
+      jm = items.filter(i => band(i) && i.x > J.x + 5 && despace(i.s) !== '종목').sort((a, b) => b.y - a.y || a.x - b.x).map(i => i.s.trim()).join(' ');
+    } else {
+      const l = lines.find(x => /업\s*태/.test(x) && /종\s*목/.test(x)) || '';
+      const m = l.replace(/\s+/g, ' ').match(/업\s*태\s*(.*?)\s*종\s*목\s*(.*)$/);
+      if (m) { up = m[1].trim(); jm = m[2].trim(); }
+    }
+    if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.75 }; }
+    return { fields: f, meta, notes: tax0 ? ['사업자등록증', tax0[1]] : ['사업자등록증'] };
+  }
+
+  // ───────── 상담 메모(텍스트 파일) — '● 라벨  값' 꼴 정리 메모 ─────────
+  // 비밀번호·아이디·계좌번호·주민번호 뒷자리·자택주소는 읽지 않고 버린다(앱 칸에도, 결과에도 남기지 않음)
+  const NOTE_SECRET = /비번|비밀번호|패스워드|password|\bpw\b|아이디|\bid\b|계좌|공동인증|인증서\s*비|자택|집\s*주소|기보\s*$/i;
+  function parseNotes(text, now) {
+    const f = {}, meta = {}, notes = [], debtItems = [], vatYears = {};
+    const yr = (now || new Date()).getFullYear();
+    const raw = redact(String(text || '')).replace(/\r/g, '');
+    const lines = raw.split('\n').map(l => l.replace(/ /g, ' ').trim());
+    const pairs = [];
+    for (const l of lines) {
+      const m = l.match(/^[●•○◎▶■□\-*]\s*([^\t]+?)(?:\t+|\s{2,})(.*)$/) || l.match(/^[●•○◎▶■□\-*]\s*(.+?)$/);
+      if (m) pairs.push([m[1].replace(/\s+/g, ' ').trim(), (m[2] || '').trim()]);
+    }
+    // 비밀 줄은 처음부터 뺀다: 라벨·값에 비번·아이디·계좌 등이 있거나, 값이 비밀번호처럼 생긴 것(특수문자 섞인 한 덩어리)
+    const looksSecret = v => /^\S{6,}$/.test(v) && /[!@#$%^&]/.test(v) && !/@[\w-]+\.[a-z]{2,}$/i.test(v);   // '*' 는 뺌(주민번호 가림 표시)
+    const safe = pairs.filter(([k, v]) => !NOTE_SECRET.test(k) && !NOTE_SECRET.test(v) && !looksSecret(v) && !v.split(/\s*\/\s*/).some(looksSecret));
+    const get = re => { const p = safe.find(([k, v]) => re.test(k) && v); return p ? p[1] : ''; };
+    const put = (id, v, conf, note) => { if (v === '' || v === null || v === undefined) return; f[id] = v; meta[id] = Object.assign({ conf: conf ?? 0.8 }, note ? { note } : {}); };
+    // 첫 줄: '상호 123-45-67890'
+    const first = lines.find(l => l && !/^[●•]/.test(l)) || '';
+    const fm = first.match(/^(.+?)\s*(\d{3}-\d{2}-\d{5})/);
+    if (fm) { put('corp_name', fm[1].trim(), 0.85); const no = bizNoOf(fm[2]); put('corp_biz_no', no, bizNoValid(no) ? 0.85 : 0.3, bizNoValid(no) ? '' : '번호 검증식이 맞지 않아요 — 원본 확인'); }
+    put('corp_ceo', get(/^대표자?$/).replace(/\s+/g, ''), 0.8);
+    const day = s => { const m = String(s).match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/); return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : ''; };
+    put('corp_est_date', day(get(/^개업일|^개업연월일|^설립일/)) || day(get(/^창업/)), 0.8);
+    put('corp_address', get(/^소재지$|^사업장\s*(주소|소재지)?$|^본점/), 0.75);
+    // 주민번호는 앞 6자리만(뒷자리는 redact 가 이미 지움) → 생년월일. 세기는 지금 연도 기준 추정
+    const rrn = (get(/주민/) || '').match(/(\d{2})(\d{2})(\d{2})/);
+    if (rrn) { const yy = +rrn[1]; const full = (yy > yr % 100 ? 1900 : 2000) + yy; put('corp_ceo_birth', `${full}-${rrn[2]}-${rrn[3]}`, 0.7, '주민번호 앞자리로 추정 — 확인'); }
+    put('corp_biz_type', get(/^업종$|^업태|^종목/), 0.7);
+    // 매출: 'NN년' 라벨의 원 단위 금액 → 연도별(올해 상반기 등은 올해 누적)
+    for (const [k, v] of safe) {
+      const y2 = k.match(/(\d{2,4})\s*년/); const won = (v.match(/([\d,]{5,})\s*원/) || [])[1];
+      if (/매출/.test(k + ' ' + v) || /상반기|하반기|분기|누적/.test(k)) {
+        if (y2 && won) { const y = y2[1].length === 2 ? 2000 + +y2[1] : +y2[1]; vatYears[y] = (vatYears[y] || 0) + Number(won.replace(/,/g, '')); }
+      }
+    }
+    // 신용점수 'K895/N885' · 'KCB 895 / NICE 885'
+    const cr = get(/신용\s*(점수|평점|등급)/) || get(/^신용$/);
+    const k = cr.match(/K(?:CB)?\s*[:：]?\s*(\d{3,4})/i), n = cr.match(/N(?:ICE)?\s*[:：]?\s*(\d{3,4})/i);
+    if (k) put('sme_kcb', k[1], 0.8); if (n) put('sme_nice', n[1], 0.8);
+    // 체납·4대보험: 'X/없음' 이면 체납 없음 → 완납 '예', 'O/있음' 이면 '아니오'
+    const yn = s => /^(x|없음|무|해당\s*없음|n|no)$/i.test(s.trim()) ? 'no' : /^(o|있음|유|y|yes)$/i.test(s.trim()) ? 'yes' : '';
+    const tax = yn(get(/체납/)); if (tax) put('smb_chk_tax_ok', tax === 'no' ? '예' : '아니오', 0.75, '메모의 체납 여부로 판단');
+    const ins = get(/4대\s*보험|사회\s*보험/);
+    const insYn = yn(ins); if (insYn) put('smb_chk_insurance', insYn === 'yes' ? '예' : '아니오', 0.6, '메모 기준 — 직원 사회보험 가입 확인');
+    const certs = get(/인증|벤처|이노/); if (certs) put('corp_certs', certs, 0.5, '메모 그대로 — 실제 인증서와 대조');
+    const bank = (get(/주거래/) || (lines.find(l => /주거래/.test(l)) || '').replace(/.*주거래\S*\s*/, '')).replace(/[\d-]{8,}.*/, '').trim();
+    if (bank && bank.length <= 15 && !NOTE_SECRET.test(bank)) put('corp_main_bank', bank, 0.6);
+    // 기존 대출: '농협2천(개인), 코로나정책자금 3천(기보)'
+    const loans = get(/대출|정책자금|차입/);
+    loans.split(/[,，、]/).forEach(part => {
+      const m = part.trim().match(/^(.*?)(\d+(?:\.\d+)?)\s*(억|천만?|백만|만)\s*원?\s*(?:\((.*?)\))?/);
+      if (!m) return;
+      const unit = { '억': 10000, '천': 1000, '천만': 1000, '백만': 100, '만': 1 }[m[3]] || 1;
+      const inst = (m[1] || '').trim() || (m[4] || '').trim();
+      if (!inst) return;
+      debtItems.push({ institution: inst, type: m[4] ? m[4].trim() : '', balance: Math.round(+m[2] * unit), rate: '', monthlyInterest: '', payback: '', _from: '상담 메모(추정)' });
+    });
+    const dropped = lines.filter(l => NOTE_SECRET.test(l)).length;
+    if (dropped) notes.push(`비밀번호·계정·계좌 같은 줄 ${dropped}개는 읽지 않았어요`);
+    return { fields: f, meta, debtItems, vatYears, notes };
+  }
+
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
   // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
   function parseDocument(pages, fileName, forceKind) {
@@ -714,6 +829,7 @@
     if (chars < 20) { out.status = 'scan'; out.notes.push('사진으로 된 서류 — 글자 인식(OCR) 다음 단계'); return out; }
     let r = null;
     if (c.kind === 'bizcert') r = parseBizCert(rows);
+    else if (c.kind === 'bizreg') r = parseBizReg(rows, pages);
     else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced }; }
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
@@ -758,6 +874,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

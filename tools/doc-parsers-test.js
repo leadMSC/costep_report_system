@@ -112,6 +112,34 @@ ok('지식재산권 날짜 — 월·일 글자가 숫자로 읽혀도, 영문 �
   [['20203 0481 139', '2020-04-13'], ['202593 08월 229', '2025-08-22'], ['202013 05월 28일', '2020-05-28'], ['2019 12가 03가', '2019-12-03']].forEach(([d, want]) => assert.strictEqual(P.parseIPPages([page(d)])[0].regDate, want, d));
   assert.strictEqual(P.parseTextDocument(['CERTIFICATE OF PATENT', '제 10-1111111 호', 'Patent Number', '제 10-2019-0011111 호', 'Application Number'].join('\n'), 'x.png').kind, 'ip');
 });
+ok('사업자등록증(등록증 본문) — 번호·상호·성명·생년월일·개업일·소재지·업태/종목', () => {
+  const it = (s, x, y) => ({ s, x, y, w: s.length * 8, h: 10 });
+  const pages = [[it('사업자등록증', 181, 722), it('(일반과세자)', 237, 699), it('등록번호 :', 202, 672), it('123-45-67890', 293, 672),
+    it('상 호 :', 51, 648), it('예시주조', 175, 648), it('성 명 :', 51, 625), it('홍길동', 175, 625), it('생 년 월 일 :', 325, 625), it('1980 년 01 월 02 일', 419, 625),
+    it('개 업 연 월 일 :', 51, 603), it('2019 년 04 월 01 일', 175, 603), it('사업장소재지 :', 51, 580), it('서울특별시 중구 시험로 1', 175, 580),
+    it('사업의종류 :', 51, 537), it('업태', 178, 539), it('제조업', 209, 538), it('종목', 354, 539), it('탁주', 385, 538), it('약주', 385, 521)]];
+  const r = P.parseDocument(pages, 'x.pdf');
+  assert.strictEqual(r.kind, 'bizreg'); assert.strictEqual(r.status, 'ok');
+  const f = r.fields;
+  assert.strictEqual(f.corp_biz_no, '123-45-67890'); assert.strictEqual(f.corp_name, '예시주조'); assert.strictEqual(f.corp_ceo, '홍길동');
+  assert.strictEqual(f.corp_ceo_birth, '1980-01-02'); assert.strictEqual(f.corp_est_date, '2019-04-01'); assert.strictEqual(f.corp_address, '서울특별시 중구 시험로 1');
+  assert.strictEqual(f.corp_biz_type, '탁주 약주 (제조업)'); assert.ok(/개인/.test(f.corp_form));
+});
+ok('상담 메모(텍스트) — 칸·연도 매출·신용·체납·대출, 비밀번호·계좌·주민 뒷자리·자택주소는 버림', () => {
+  const t = ['예시주조 123-45-67890', '● 대표자\t\t홍길동', '● 개업일\t\t2019 년 04 월 01 일', '● 소재지\t\t서울특별시 중구 시험로 1',
+    '● 주민등록번호\t\t800102-1234567', '● 자택주소\t\t서울특별시 중구 비밀로 9', '● 업종\t\t탁주 제조업', '● 매출 25년 얼마로 마감?\t\t100,000,000원',
+    '● 26년 상반기\t\t50,000,000원', '● 기존 기업신용 대출, 정책자금\t\t농협2천(개인), 정책자금 3천(기보)', '● 신용점수\t\tK895/N885',
+    '● 국세,지방세 체납\t\tX', '● 공동인증서 비번\t\tsecretpw1!', '● 기보\t\tmyid / mypw2!', '주거래가 농협', '301-0000-0000-11', '아이디', 'ID0000'].join('\n');
+  const r = P.parseNotes(t, new Date('2026-10-15'));
+  const f = r.fields;
+  assert.strictEqual(f.corp_name, '예시주조'); assert.strictEqual(f.corp_biz_no, '123-45-67890'); assert.strictEqual(f.corp_ceo, '홍길동');
+  assert.strictEqual(f.corp_est_date, '2019-04-01'); assert.strictEqual(f.corp_ceo_birth, '1980-01-02');
+  assert.strictEqual(r.vatYears[2025], 100000000); assert.strictEqual(r.vatYears[2026], 50000000);
+  assert.strictEqual(f.sme_kcb, '895'); assert.strictEqual(f.sme_nice, '885'); assert.strictEqual(f.smb_chk_tax_ok, '예'); assert.strictEqual(f.corp_main_bank, '농협');
+  assert.strictEqual(r.debtItems.length, 2); assert.strictEqual(r.debtItems[0].balance, 2000);
+  const all = JSON.stringify(r);
+  assert.ok(!/secretpw|mypw|myid|비밀로|1234567|301-0000|ID0000/.test(all), '비밀값이 결과에 남음');
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);
