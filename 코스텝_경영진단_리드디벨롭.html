@@ -4315,7 +4315,8 @@
     window.fmtTel = fmtTel;
     function personSignHtml(label, b) {
       const tel = b.mobile ? fmtTel(b.mobile) : '';
-      return `<span>담당 ${label}</span>${tel ? `<span class="sign-tel">${escapeHtml(tel)}</span>` : ''}`;
+      // 이름이 비어 기본 문구('담당 컨설턴트')면 '담당'을 한 번만
+      return `<span>${/^담당/.test(label) ? label : '담당 ' + label}</span>${tel ? `<span class="sign-tel">${escapeHtml(tel)}</span>` : ''}`;
     }
     function makeDocNo(base, bizNo, corpName) {
       const year = new Date().getFullYear();
