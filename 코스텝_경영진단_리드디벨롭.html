@@ -372,46 +372,114 @@
     :root[data-theme="ink"] img.firm-logo { background: #FFFFFF; border-radius: 10px; padding: 4px 10px; }
   </style>
   <style>
-    /* 내보내기 팝업 (1단계 방식 → 2단계 리포트·옵션) */
-    #xp_modal { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(10,31,68,.38); font-family: inherit; }
+    /* 내보내기 팝업 (1단계 방식 → 2단계 리포트·옵션) — 떠 있는 막대(#l3_head)와 같은 유리 질감. 글자는 모두 한 줄 */
+    #xp_modal {
+      --x-bg: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.92)); --x-edge: rgba(255,255,255,.9); --x-hair: rgba(15,23,42,.10); --x-hl: rgba(255,255,255,.95);
+      --x-chip: rgba(15,23,42,.045); --x-hover: rgba(15,23,42,.06); --x-thumb: #fff; --x-ink: #0f172a; --x-mute: #64748b; --x-line: rgba(15,23,42,.08);
+      --x-acc: #0f766e; --x-acc-soft: rgba(15,118,110,.09); --x-acc-line: rgba(15,118,110,.38); --x-go: #0f172a; --x-go-ink: #fff;
+      --x-ease: cubic-bezier(.16,1,.3,1);
+      position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: 16px;
+      background: rgba(15,23,42,.30); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); font-family: inherit;
+      opacity: 1; transition: opacity .22s ease; }
+    :root[data-theme="ink"] #xp_modal {
+      --x-bg: linear-gradient(180deg, rgba(40,43,54,.96), rgba(26,28,36,.94)); --x-edge: rgba(255,255,255,.12); --x-hair: rgba(0,0,0,.5); --x-hl: rgba(255,255,255,.08);
+      --x-chip: rgba(255,255,255,.06); --x-hover: rgba(255,255,255,.08); --x-thumb: rgba(255,255,255,.16); --x-ink: #f1f5f9; --x-mute: #94a3b8; --x-line: rgba(255,255,255,.10);
+      --x-acc: #5eead4; --x-acc-soft: rgba(94,234,212,.12); --x-acc-line: rgba(94,234,212,.45); --x-go: #5eead4; --x-go-ink: #00241F; background: rgba(0,0,0,.45); }
     #xp_modal[hidden] { display: none; }
-    #xp_modal .xp-dlg { width: 480px; max-width: 100%; max-height: calc(100vh - 32px); overflow: auto; background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); border: 1px solid var(--t-line, #E4E2DB); border-radius: 18px; box-shadow: 0 24px 60px rgba(10,31,68,.35); padding: 18px 20px; animation: xpIn .28s cubic-bezier(.2,.9,.3,1.2); }
-    @keyframes xpIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
-    #xp_modal .xp-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    #xp_modal h3 { margin: 0; font-size: 16px; font-weight: 900; }
-    #xp_modal .xp-x { margin-left: auto; border: 0; background: none; font-size: 17px; color: var(--t-text-3, #66635C); cursor: pointer; width: 30px; height: 30px; border-radius: 8px; }
-    #xp_modal .xp-x:hover { background: var(--t-surface-3, #F1EFE9); }
-    #xp_modal .xp-back { border: 0; background: var(--t-surface-3, #F1EFE9); color: inherit; border-radius: 8px; padding: 4px 8px; font-family: inherit; font-weight: 800; font-size: 12px; cursor: pointer; }
-    #xp_modal .xp-steps { display: flex; gap: 6px; font-size: 11px; font-weight: 800; color: #94A3B8; margin: 0 0 14px; }
-    #xp_modal .xp-steps b.on { color: var(--t-accent-text, #00A898); }
-    #xp_modal .xp-ic { width: 34px; height: 34px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; flex: none; }
-    #xp_modal .xp-ic.pdf { background: #FDECEC; color: #B42318; } #xp_modal .xp-ic.doc { background: #E8F0FE; color: #1A56DB; } #xp_modal .xp-ic.print { background: #E7F7F4; color: #00796B; }
-    #xp_modal .xp-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    #xp_modal .xp-pk { border: 1.5px solid var(--t-line, #E4E2DB); background: var(--t-surface, #fff); color: inherit; border-radius: 14px; padding: 16px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; text-align: center; transition: border-color .15s, transform .15s; }
-    #xp_modal .xp-pk:hover, #xp_modal .xp-pk:focus-visible { border-color: var(--t-accent-text, #00A898); transform: translateY(-1px); outline: none; }
-    #xp_modal .xp-pk b { font-size: 14px; } #xp_modal .xp-pk small { font-size: 11px; color: var(--t-text-3, #66635C); line-height: 1.45; }
-    #xp_modal .xp-sec { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 900; margin: 12px 2px 6px; }
-    #xp_modal .xp-sec button { border: 0; background: none; font-family: inherit; font-weight: 800; font-size: 11px; color: var(--t-accent-text, #00A898); cursor: pointer; }
-    #xp_modal .xp-grp { border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; padding: 6px 10px; }
-    #xp_modal .xp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; }
-    #xp_modal .xp-ck { display: flex; align-items: center; gap: 8px; padding: 5px 4px; font-size: 12.5px; font-weight: 600; cursor: pointer; border-radius: 8px; }
-    #xp_modal .xp-ck:hover { background: var(--t-surface-2, #F6F5F1); }
-    #xp_modal .xp-ck input { width: 16px; height: 16px; accent-color: #0A1F44; flex: none; margin: 0; }
-    #xp_modal .xp-ck em { margin-left: auto; font-style: normal; font-size: 10px; font-weight: 800; color: var(--t-accent-text, #00A898); }
-    #xp_modal .xp-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 4px; font-size: 12.5px; font-weight: 600; border-bottom: 1px dashed var(--t-line, #E4E2DB); }
-    #xp_modal .xp-opt:last-child { border: 0; }
-    #xp_modal .xp-opt small { display: block; font-size: 10.5px; color: var(--t-text-3, #66635C); font-weight: 500; }
-    #xp_modal .xp-seg { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 8px; padding: 2px; flex: none; }
-    #xp_modal .xp-seg button { border: 0; background: none; color: var(--t-text-3, #66635C); padding: 4px 9px; border-radius: 6px; font-family: inherit; font-weight: 800; font-size: 11.5px; cursor: pointer; }
-    #xp_modal .xp-seg button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
-    #xp_modal .xp-note { font-size: 11.5px; line-height: 1.5; color: var(--t-text-3, #66635C); margin: 10px 2px 0; }
-    #xp_modal .xp-foot { position: sticky; bottom: -18px; display: flex; align-items: center; gap: 8px; margin: 12px -20px -18px; padding: 12px 20px 16px; background: var(--t-surface, #fff); border-top: 1px solid var(--t-line, #E4E2DB); font-size: 12px; color: var(--t-text-3, #66635C); }
-    #xp_modal .xp-foot b { color: var(--t-text, #0A0B0F); }
-    #xp_modal .xp-go { margin-left: auto; border: 0; border-radius: 10px; padding: 9px 14px; font-family: inherit; font-weight: 800; font-size: 13px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); cursor: pointer; }
-    #xp_modal .xp-go:disabled { opacity: .35; cursor: default; }
-    @media (max-width: 520px) { #xp_modal .xp-pick { grid-template-columns: 1fr; } #xp_modal .xp-pk { flex-direction: row; justify-content: flex-start; text-align: left; } #xp_modal .xp-cols { grid-template-columns: 1fr; } }
-    @media (prefers-reduced-motion: reduce) { #xp_modal .xp-dlg { animation: none; } }
-    #xp_toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; z-index: 96; background: #0A0B0F; color: #fff; font-size: 12.5px; font-weight: 700; padding: 10px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.25); transition: opacity .2s, transform .2s; }
+    #xp_modal.out { opacity: 0; }
+    #xp_modal * { box-sizing: border-box; }
+    #xp_modal .xp-dlg { position: relative; width: 620px; max-width: 100%; max-height: calc(100vh - 32px); overflow: auto; overscroll-behavior: contain;
+      background: var(--x-bg); color: var(--x-ink); border: 1px solid var(--x-edge); border-radius: 24px; padding: 20px 22px 0;
+      -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+      box-shadow: inset 0 1px 0 var(--x-hl), 0 0 0 .5px var(--x-hair), 0 32px 72px -24px rgba(15,23,42,.45), 0 6px 16px -6px rgba(15,23,42,.14);
+      animation: xpIn .42s var(--x-ease); white-space: nowrap; }
+    #xp_modal.out .xp-dlg { transform: translateY(6px) scale(.97); transition: transform .2s ease; }
+    @keyframes xpIn { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+    #xp_modal .xp-p1, #xp_modal .xp-p2 { animation: xpFade .32s var(--x-ease); }
+    @keyframes xpFade { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+    #xp_modal .xp-p2 { padding-bottom: 0; }
+    #xp_modal .xp-h { display: flex; align-items: center; gap: 10px; }
+    #xp_modal h3 { margin: 0; font-size: 17px; font-weight: 900; letter-spacing: -.01em; }
+    #xp_modal .xp-x { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 10px; background: transparent; color: var(--x-mute); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
+    #xp_modal .xp-x:hover { background: var(--x-hover); color: var(--x-ink); }
+    #xp_modal .xp-back { display: inline-flex; align-items: center; gap: 2px; height: 30px; padding: 0 10px 0 6px; border: 0; border-radius: 10px; background: var(--x-chip); color: var(--x-ink); font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+    #xp_modal .xp-back:hover { background: var(--x-hover); }
+    #xp_modal .xp-steps { display: flex; align-items: center; gap: 6px; margin: 6px 0 16px; font-size: 11px; font-weight: 800; color: var(--x-mute); }
+    #xp_modal .xp-steps i { width: 18px; height: 2px; border-radius: 2px; background: var(--x-line); }
+    #xp_modal .xp-steps b { display: inline-flex; align-items: center; gap: 5px; }
+    #xp_modal .xp-steps b::before { content: attr(data-n); width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; background: var(--x-chip); color: var(--x-mute); }
+    #xp_modal .xp-steps b.on { color: var(--x-acc); } #xp_modal .xp-steps b.on::before { background: var(--x-acc); color: #fff; }
+    #xp_modal .xp-steps b.done::before { background: var(--x-acc-soft); color: var(--x-acc); }
+    /* 1단계: 큰 카드 셋 */
+    #xp_modal .xp-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-bottom: 22px; }
+    #xp_modal .xp-pk { --tint: #fdecec; --tc: #b42318; position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 10px 18px; min-width: 0;
+      border: 1px solid var(--x-line); border-radius: 18px; background: var(--x-thumb); color: var(--x-ink); font-family: inherit; cursor: pointer; text-align: center;
+      box-shadow: 0 1px 2px rgba(15,23,42,.05); transition: transform .35s var(--x-ease), box-shadow .3s, border-color .2s; }
+    #xp_modal .xp-pk[data-mode="doc"] { --tint: #e8f0fe; --tc: #1a56db; } #xp_modal .xp-pk[data-mode="print"] { --tint: #e3f6f3; --tc: #0f766e; }
+    :root[data-theme="ink"] #xp_modal .xp-pk { --tint: rgba(248,113,113,.14); --tc: #fca5a5; } :root[data-theme="ink"] #xp_modal .xp-pk[data-mode="doc"] { --tint: rgba(96,165,250,.14); --tc: #93c5fd; } :root[data-theme="ink"] #xp_modal .xp-pk[data-mode="print"] { --tint: rgba(94,234,212,.12); --tc: #5eead4; }
+    #xp_modal .xp-pk:hover, #xp_modal .xp-pk:focus-visible { transform: translateY(-3px); border-color: var(--x-acc-line); box-shadow: 0 14px 28px -14px rgba(15,23,42,.35); outline: none; }
+    #xp_modal .xp-pk:active { transform: translateY(-1px) scale(.985); }
+    #xp_modal .xp-art { width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; background: var(--tint); color: var(--tc); }
+    #xp_modal .xp-art svg { width: 26px; height: 26px; }
+    #xp_modal .xp-pk b { font-size: 15px; font-weight: 900; }
+    #xp_modal .xp-pk small { font-size: 11.5px; font-weight: 600; color: var(--x-mute); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    /* 2단계 */
+    #xp_modal .xp-mi { width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+    #xp_modal .xp-mi svg { width: 17px; height: 17px; }
+    #xp_modal .xp-sec { display: flex; align-items: center; justify-content: space-between; margin: 14px 2px 8px; font-size: 12px; font-weight: 900; color: var(--x-ink); }
+    #xp_modal .xp-sec span { color: var(--x-mute); font-weight: 700; margin-left: 6px; }
+    #xp_modal .xp-sec button { border: 0; background: none; padding: 2px 4px; font-family: inherit; font-size: 11.5px; font-weight: 800; color: var(--x-acc); cursor: pointer; border-radius: 6px; }
+    #xp_modal .xp-sec button:hover { background: var(--x-acc-soft); }
+    #xp_modal .xp-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    #xp_modal .xp-chip { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 9px 11px; border-radius: 12px; border: 1px solid var(--x-line); background: var(--x-thumb); cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--x-ink); transition: border-color .15s, background .15s, box-shadow .15s; }
+    #xp_modal .xp-chip:hover { border-color: var(--x-acc-line); }
+    #xp_modal .xp-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+    #xp_modal .xp-chip .bx { width: 18px; height: 18px; flex: none; border-radius: 6px; border: 1.5px solid rgba(100,116,139,.45); display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: background .15s, border-color .15s, color .15s; }
+    #xp_modal .xp-chip .bx svg { width: 12px; height: 12px; }
+    #xp_modal .xp-chip .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #xp_modal .xp-chip .tx b { font-weight: 900; margin-right: 4px; }
+    #xp_modal .xp-chip em { margin-left: auto; flex: none; font-style: normal; font-size: 10px; font-weight: 800; color: var(--x-acc); background: var(--x-acc-soft); padding: 2px 6px; border-radius: 999px; }
+    #xp_modal .xp-chip:has(input:checked) { border-color: var(--x-acc-line); background: var(--x-acc-soft); }
+    #xp_modal .xp-chip:has(input:checked) .bx { background: var(--x-acc); border-color: var(--x-acc); color: #fff; }
+    #xp_modal .xp-chip:has(input:focus-visible) { box-shadow: 0 0 0 2px var(--x-acc); }
+    #xp_modal .xp-opts { border: 1px solid var(--x-line); border-radius: 14px; background: var(--x-thumb); padding: 2px 12px; }
+    #xp_modal .xp-opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; padding: 6px 0; border-bottom: 1px solid var(--x-line); }
+    #xp_modal .xp-opt:last-child { border-bottom: 0; }
+    #xp_modal .xp-opt > div { min-width: 0; font-size: 12.5px; font-weight: 800; }
+    #xp_modal .xp-opt small { display: block; margin-top: 1px; font-size: 11px; font-weight: 600; color: var(--x-mute); overflow: hidden; text-overflow: ellipsis; }
+    #xp_modal .xp-seg { display: inline-flex; flex: none; padding: 3px; border-radius: 10px; background: var(--x-chip); }
+    #xp_modal .xp-seg button { border: 0; background: transparent; padding: 5px 11px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 800; color: var(--x-mute); cursor: pointer; transition: background .2s, color .2s, box-shadow .2s; }
+    #xp_modal .xp-seg button.on { background: var(--x-thumb); color: var(--x-ink); box-shadow: 0 1px 2px rgba(15,23,42,.12), 0 2px 6px -2px rgba(15,23,42,.12); }
+    :root[data-theme="ink"] #xp_modal .xp-seg button.on { background: rgba(255,255,255,.14); }
+    #xp_modal .xp-note { display: flex; align-items: center; gap: 6px; margin: 12px 2px 0; font-size: 11.5px; font-weight: 600; color: var(--x-mute); overflow: hidden; text-overflow: ellipsis; }
+    #xp_modal .xp-note svg { width: 14px; height: 14px; flex: none; color: var(--x-acc); }
+    #xp_modal .xp-foot { position: sticky; bottom: 0; display: flex; align-items: center; gap: 12px; margin: 16px -22px 0; padding: 14px 22px 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0), var(--x-foot, rgba(255,255,255,.96)) 28%); border-top: 1px solid var(--x-line); }
+    :root[data-theme="ink"] #xp_modal .xp-foot { --x-foot: rgba(28,30,38,.97); }
+    #xp_modal .xp-sum { min-width: 0; line-height: 1.15; }
+    #xp_modal .xp-sum b { display: block; font-size: 20px; font-weight: 900; letter-spacing: -.02em; color: var(--x-ink); }
+    #xp_modal .xp-sum small { display: block; font-size: 11px; font-weight: 700; color: var(--x-mute); overflow: hidden; text-overflow: ellipsis; }
+    #xp_modal .xp-go { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border: 0; border-radius: 13px; background: var(--x-go); color: var(--x-go-ink);
+      font-family: inherit; font-size: 13.5px; font-weight: 900; cursor: pointer; box-shadow: 0 1px 2px rgba(15,23,42,.2), inset 0 1px 0 rgba(255,255,255,.14), 0 10px 22px -12px rgba(15,23,42,.6); transition: transform .2s var(--x-ease), filter .2s, opacity .2s; }
+    #xp_modal .xp-go svg { width: 16px; height: 16px; }
+    #xp_modal .xp-go:hover { filter: brightness(1.15); } #xp_modal .xp-go:active { transform: scale(.97); }
+    #xp_modal .xp-go:disabled { opacity: .35; cursor: default; filter: none; transform: none; }
+    #xp_modal button:focus-visible { outline: 2px solid var(--x-acc); outline-offset: 2px; }
+    @media (max-width: 620px) {
+      #xp_modal { align-items: flex-end; padding: 0; }
+      #xp_modal .xp-dlg { width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0; padding: 18px 16px 0; }
+      #xp_modal .xp-foot { margin: 14px -16px 0; padding: 12px 16px 16px; }
+      #xp_modal .xp-pick { grid-template-columns: 1fr; gap: 8px; }
+      #xp_modal .xp-pk { flex-direction: row; gap: 14px; padding: 12px 14px; text-align: left; }
+      #xp_modal .xp-pk > span:last-child { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+      #xp_modal .xp-art { width: 42px; height: 42px; border-radius: 12px; flex: none; }
+      #xp_modal .xp-chips { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 621px) { #xp_modal .xp-pk > span:last-child { display: contents; } }
+    @media (prefers-reduced-motion: reduce) { #xp_modal, #xp_modal .xp-dlg, #xp_modal .xp-p1, #xp_modal .xp-p2 { animation: none !important; transition: none !important; } }
+    #xp_toast { position: fixed; left: 50%; bottom: 26px; z-index: 96; display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 32px); padding: 11px 18px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background: rgba(15,23,42,.88); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: #fff; font-size: 12.5px; font-weight: 800;
+      box-shadow: 0 0 0 .5px rgba(255,255,255,.12) inset, 0 16px 36px -14px rgba(15,23,42,.6); transform: translate(-50%, 14px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .42s cubic-bezier(.16,1,.3,1); }
     #xp_toast.on { opacity: 1; transform: translate(-50%, 0); }
     .xp-pno { position: absolute; left: 0; right: 0; bottom: 5mm; text-align: center; font-size: 9pt; color: #64748b; }
     @media print { #xp_modal, #xp_toast { display: none !important; } .xp-blank { border: 0 !important; box-shadow: none !important; } }
@@ -5241,14 +5309,26 @@
     const XP_SHEETS = [['official', 'print_target_official', '서식1 행정시행문'], ['report', 'print_target_report', '서식2 결과보고서'], ['guide', 'print_target_guide', '서식3 실행안내서'], ['bplan', 'print_target_bplan', '서식4 사업계획 개요서']];
     const XP_KEY = 'MSC_EXPORT_V1';
     const XP_MODES = {
-      pdf: { ic: 'PDF', name: 'PDF', title: 'PDF로 내보내기', go: 'PDF 만들기', sub: '고객에게 보낼 파일', opts: ['duplex', 'seal', 'pno'] },
-      doc: { ic: 'DOC', name: 'Docs', title: 'Docs(Word)로 내보내기', go: '내려받기', sub: '한글·워드에서 고쳐 쓸 파일', opts: ['split', 'seal'] },
-      print: { ic: '인쇄', name: '인쇄', title: '인쇄하기', go: '인쇄하기', sub: '바로 프린터로', opts: ['duplex', 'seal', 'pno'] }
+      pdf: { name: 'PDF', title: 'PDF로 내보내기', go: 'PDF 만들기', sub: '고객에게 보낼 파일', opts: ['duplex', 'seal', 'pno'] },
+      doc: { name: 'Docs', title: 'Word(.docx)로 내보내기', go: '내려받기', sub: '워드에서 고쳐 쓸 파일', opts: ['split', 'seal'] },
+      print: { name: '인쇄', title: '인쇄하기', go: '인쇄하기', sub: '바로 프린터로', opts: ['duplex', 'seal', 'pno'] }
+    };
+    // 선 아이콘(24 격자, 1.8 굵기) — 막대·사이드바 아이콘과 같은 결
+    const XP_SVG = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+    const XP_ICON = {
+      pdf: XP_SVG('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>'),
+      doc: XP_SVG('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m8.5 12 1.2 5 1.8-4 1.8 4 1.2-5"/>'),
+      print: XP_SVG('<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/><path d="M17.5 12h.01"/>'),
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+      x: XP_SVG('<path d="M6 6l12 12M18 6 6 18"/>'),
+      back: XP_SVG('<path d="m15 18-6-6 6-6"/>'),
+      info: XP_SVG('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
+      go: XP_SVG('<path d="M5 12h14M13 6l6 6-6 6"/>')
     };
     const XP_OPTS = {
       split: ['파일 묶음', '', ['한 파일', '서식마다 따로']],
-      duplex: ['양면 인쇄용', '리포트마다 앞면에서 시작(빈 쪽 끼움)', ['아니오', '예']],
-      seal: ['직인', '서식 발신란의 펌 직인', ['넣기', '빼기']],
+      duplex: ['양면 인쇄용', '리포트마다 앞면부터 (빈 쪽 끼움)', ['아니오', '예']],
+      seal: ['직인', '발신란의 펌 직인', ['넣기', '빼기']],
       pno: ['쪽 번호', '아래 가운데 「1 / 8」', ['빼기', '넣기']]
     };
     function xpDb() {
@@ -5262,18 +5342,18 @@
       const m = document.getElementById('xp_modal');
       if (m.dataset.ready) return m;
       m.dataset.ready = '1';
+      const steps = n => '<div class="xp-steps"><b data-n="1" class="' + (n === 1 ? 'on' : 'done') + '">방식</b><i></i><b data-n="2" class="' + (n === 2 ? 'on' : '') + '">리포트 · 옵션</b></div>';
+      const xBtn = '<button type="button" class="xp-x" data-xp="close" aria-label="닫기">' + XP_ICON.x + '</button>';
       m.innerHTML = '<div class="xp-dlg" role="dialog" aria-modal="true" aria-labelledby="xp_title">' +
-        '<div class="xp-p1"><div class="xp-h"><h3 id="xp_title">내보내기</h3><button type="button" class="xp-x" data-xp="close" aria-label="닫기">×</button></div>' +
-        '<div class="xp-steps"><b class="on">1 방식</b>›<b>2 리포트 · 옵션</b></div><div class="xp-pick">' +
-        Object.entries(XP_MODES).map(([k, v]) => '<button type="button" class="xp-pk" data-mode="' + k + '"><span class="xp-ic ' + k + '">' + v.ic + '</span><b>' + v.name + '</b><small>' + v.sub + '</small></button>').join('') +
+        '<div class="xp-p1"><div class="xp-h"><h3 id="xp_title">내보내기</h3>' + xBtn + '</div>' + steps(1) + '<div class="xp-pick">' +
+        Object.entries(XP_MODES).map(([k, v]) => '<button type="button" class="xp-pk" data-mode="' + k + '"><span class="xp-art">' + XP_ICON[k] + '</span><span><b>' + v.name + '</b><small>' + v.sub + '</small></span></button>').join('') +
         '</div></div>' +
-        '<div class="xp-p2" hidden><div class="xp-h"><button type="button" class="xp-back" data-xp="back">‹ 방식</button><span class="xp-ic" id="xp_ic"></span><h3 id="xp_t2"></h3><button type="button" class="xp-x" data-xp="close" aria-label="닫기">×</button></div>' +
-        '<div class="xp-steps"><b>1 방식</b>›<b class="on">2 리포트 · 옵션</b></div>' +
-        '<div class="xp-sec">분야별 리포트<button type="button" data-all="f">전체 선택</button></div><div class="xp-grp" id="xp_f"></div>' +
-        '<div class="xp-sec">서식<button type="button" data-all="s">전체 선택</button></div><div class="xp-grp xp-cols" id="xp_s"></div>' +
-        '<div class="xp-sec">출력 옵션</div><div class="xp-grp" id="xp_o"></div>' +
-        '<p class="xp-note" id="xp_note"></p>' +
-        '<div class="xp-foot"><span id="xp_cnt"></span><button type="button" class="xp-go" id="xp_go"></button></div></div></div>';
+        '<div class="xp-p2" hidden><div class="xp-h"><button type="button" class="xp-back" data-xp="back">' + XP_ICON.back.replace('<svg ', '<svg width="16" height="16" ') + '방식</button><span class="xp-mi" id="xp_ic"></span><h3 id="xp_t2"></h3>' + xBtn + '</div>' + steps(2) +
+        '<div class="xp-sec"><div>분야별 리포트<span id="xp_fn"></span></div><button type="button" data-all="f">전체 선택</button></div><div class="xp-chips" id="xp_f"></div>' +
+        '<div class="xp-sec"><div>서식<span id="xp_sn"></span></div><button type="button" data-all="s">전체 선택</button></div><div class="xp-chips" id="xp_s"></div>' +
+        '<div class="xp-sec"><div>출력 옵션</div></div><div class="xp-opts" id="xp_o"></div>' +
+        '<p class="xp-note">' + XP_ICON.info + '<span id="xp_note"></span></p>' +
+        '<div class="xp-foot"><div class="xp-sum" id="xp_cnt"></div><button type="button" class="xp-go" id="xp_go"></button></div></div></div>';
       m.addEventListener('click', e => {
         if (e.target === m) return xpClose();
         const b = e.target.closest('button'); if (!b) return;
@@ -5293,16 +5373,17 @@
       m.querySelector('.xp-p1').hidden = n !== 1; m.querySelector('.xp-p2').hidden = n !== 2;
       if (n === 1) { m.querySelector('.xp-pk').focus(); return; }
       const md = XP_MODES[xpMode], last = xpLoad(), db = xpDb(), cur = window.appState.activeReportKey;
-      const ic = m.querySelector('#xp_ic'); ic.className = 'xp-ic ' + xpMode; ic.textContent = md.ic;
+      const ic = m.querySelector('#xp_ic'), pk = m.querySelector('.xp-pk[data-mode="' + xpMode + '"]'), pcs = getComputedStyle(pk);
+      ic.innerHTML = XP_ICON[xpMode]; ic.style.background = pcs.getPropertyValue('--tint'); ic.style.color = pcs.getPropertyValue('--tc');
       m.querySelector('#xp_t2').textContent = md.title;
-      m.querySelector('#xp_f').innerHTML = Object.entries(db).map(([k, r]) => '<label class="xp-ck"><input type="checkbox" data-g="f" value="' + k + '"' + (k === cur ? ' checked' : '') + '>' + escapeHtml(r.title || r.tabTitle || k) + (k === cur ? '<em>지금 보는 분야</em>' : '') + '</label>').join('');
+      const bx = '<span class="bx">' + XP_ICON.check + '</span>';
+      m.querySelector('#xp_f').innerHTML = Object.entries(db).map(([k, r]) => { const t = escapeHtml(r.title || r.tabTitle || k), short = t.replace(/^기업\s+/, ''); return '<label class="xp-chip" title="' + t + '"><input type="checkbox" data-g="f" value="' + k + '"' + (k === cur ? ' checked' : '') + '>' + bx + '<span class="tx">' + short + '</span>' + (k === cur ? '<em>지금</em>' : '') + '</label>'; }).join('');
       const sheets = Array.isArray(last.sheets) && last.sheets.length ? last.sheets : XP_SHEETS.map(s => s[0]);
-      m.querySelector('#xp_s').innerHTML = XP_SHEETS.map(([k, , t]) => '<label class="xp-ck"><input type="checkbox" data-g="s" value="' + k + '"' + (sheets.includes(k) ? ' checked' : '') + '>' + t + '</label>').join('');
+      m.querySelector('#xp_s').innerHTML = XP_SHEETS.map(([k, , t]) => '<label class="xp-chip" title="' + t + '"><input type="checkbox" data-g="s" value="' + k + '"' + (sheets.includes(k) ? ' checked' : '') + '>' + bx + '<span class="tx"><b>' + t.slice(0, 3) + '</b>' + t.slice(4) + '</span></label>').join('');
       const ov = (last.opts && last.opts[xpMode]) || {};
-      m.querySelector('#xp_o').innerHTML = md.opts.map(k => { const [n2, h, c] = XP_OPTS[k], sel = ov[k] ?? 0; return '<div class="xp-opt"><div>' + n2 + (h ? '<small>' + h + '</small>' : '') + '</div><span class="xp-seg" data-k="' + k + '">' + c.map((x, i) => '<button type="button" data-opt="' + i + '" class="' + (i === sel ? 'on' : '') + '">' + x + '</button>').join('') + '</span></div>'; }).join('');
-      m.querySelector('#xp_note').textContent = xpMode === 'pdf' ? '「PDF 만들기」를 누르면 인쇄 창이 열립니다. 파일 이름은 미리 채워 두니 「대상」에서 「PDF로 저장」을 고르세요.'
-        : xpMode === 'print' ? '양면·컬러·부수는 인쇄 창의 「설정 더보기」에서 고르세요. 브라우저가 대신 켜 줄 수 없습니다.'
-        : '「서식마다 따로」면 파일이 여러 개 내려받아집니다. 브라우저가 여러 파일 받기를 물으면 「허용」을 누르세요.';
+      m.querySelector('#xp_o').innerHTML = md.opts.map(k => { const [n2, h, c] = XP_OPTS[k], sel = ov[k] ?? 0; return '<div class="xp-opt"><div>' + n2 + (h ? '<small title="' + h + '">' + h + '</small>' : '') + '</div><span class="xp-seg" data-k="' + k + '">' + c.map((x, i) => '<button type="button" data-opt="' + i + '" class="' + (i === sel ? 'on' : '') + '">' + x + '</button>').join('') + '</span></div>'; }).join('');
+      const note = xpMode === 'pdf' ? '인쇄 창의 「대상」에서 「PDF로 저장」을 고르세요' : xpMode === 'print' ? '양면·컬러·부수는 인쇄 창에서 고르세요' : '여러 파일 받기를 물으면 「허용」을 누르세요';
+      m.querySelector('#xp_note').textContent = note; m.querySelector('#xp_note').parentNode.title = note;
       xpCount();
       m.querySelector('#xp_go').focus();
     }
@@ -5315,19 +5396,24 @@
     }
     function xpCount() {
       const m = xpModal(), { f, s } = xpPicked(), k = f.length * s.length, go = m.querySelector('#xp_go');
-      m.querySelector('#xp_cnt').innerHTML = '<b>' + f.length + '</b>개 분야 × <b>' + s.length + '</b>개 서식 = <b>' + k + '장</b>';
-      go.textContent = XP_MODES[xpMode].go + (k ? ' (' + k + '장)' : ''); go.disabled = !k;
+      m.querySelector('#xp_cnt').innerHTML = '<b>' + k + '장</b><small>' + f.length + '개 분야 × ' + s.length + '개 서식</small>';
+      m.querySelector('#xp_fn').textContent = f.length + ' / ' + m.querySelectorAll('input[data-g="f"]').length;
+      m.querySelector('#xp_sn').textContent = s.length + ' / 4';
+      m.querySelectorAll('[data-all]').forEach(b => { const bs = [...m.querySelectorAll('input[data-g="' + b.dataset.all + '"]')]; b.textContent = bs.every(x => x.checked) ? '모두 해제' : '전체 선택'; });
+      go.innerHTML = XP_MODES[xpMode].go + XP_ICON.go; go.disabled = !k;
     }
     let xpPrev = null;
     function openExport() {
       const m = xpModal();
       xpPrev = document.activeElement;
-      m.hidden = false; document.body.classList.add('xp-open');
+      m.classList.remove('out'); m.hidden = false; document.body.classList.add('xp-open');
       xpStep(1);
     }
     function xpClose() {
       const m = document.getElementById('xp_modal');
-      m.hidden = true; document.body.classList.remove('xp-open');
+      if (m.hidden) return;
+      m.classList.add('out'); document.body.classList.remove('xp-open');
+      setTimeout(() => { m.hidden = true; m.classList.remove('out'); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200);
       if (xpPrev && xpPrev.focus) xpPrev.focus({ preventScroll: true });
     }
     function xpToast(msg, ms) {
