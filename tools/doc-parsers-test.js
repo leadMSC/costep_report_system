@@ -66,12 +66,51 @@ ok('지식재산권 등록증: 번호 앞자리로 권리 판별·8칸', () => {
   const r = P.parseTextDocument(t, 'x.png');
   assert.strictEqual(r.kind, 'ip');
   const it = r.ipItems[0];
-  assert.strictEqual(it.kind, '상표'); assert.strictEqual(it.regNo, '40-1234567'); assert.strictEqual(it.appNo, '40-2019-0012345');
+  assert.strictEqual(it.kind, '상표'); assert.strictEqual(it.regNo, '40-1234567-00-00'); assert.strictEqual(it.appNo, '40-2019-0012345');
   assert.strictEqual(it.appDate, '2019-03-04'); assert.strictEqual(it.regDate, '2020-05-06'); assert.strictEqual(it.applicant, '주식회사 예시상사');
   assert.ok(/시험스캐너등 12건/.test(it.title));
   const p = P.parseTextDocument(['특허증', '특        허         제 10-7654321 호', '출원번호              제 10-2018-0099999 호', '출원 일           2018년 01월 02일',
     '등록일           2019년 02월 03일', '발명 의 명 칭 Title of the Invention', '시험용 측정 장치', '특허권자', '주식회사 예시상사(110111-*******)', '발명자', '홍길동(800101-*******)'].join('\n'), 'y.png').ipItems[0];
   assert.strictEqual(p.kind, '특허'); assert.strictEqual(p.title, '시험용 측정 장치'); assert.strictEqual(p.inventor, '홍길동');
+});
+// 실제 등록증 글자 인식 결과와 같은 모양(가짜 이름·번호): 한글 라벨은 깨지고 영문 라벨 윗줄에 값, 사람 줄은 '이름(생년-*******)'
+const fakeCert = (head, no, app, d1, d2, titleLbl, title, people) => ['발급번호 : 2-5-2026-000000000', head, `특        허          제 ${no} 호`, head.includes('PATENT') ? 'Patent Number' : 'Registration Number',
+  `출원번호              제 ${app} 호                              Cd`, 'Application Number', `출원 일           ${d1}                            nade d`, 'Filing Date',
+  `54                ${d2}                                 or`, 'Registration Date', titleLbl, title, '특허권자6860666', '주식회사 예시상사(110111-*******)', '서울특별시 중구 시험로 1, 2층',
+  '2 Z}nventor', ...people.flatMap(n => [`${n}(800101-*******)`, '서울특별시 중구 시험로 2']), '위의 발명은 「특허법」에 따라 특허원부에 등록되었음을 증명합니다.', 'This is to certify that, in accordance with the Patent Act'].join('\n');
+ok('지식재산권 등록증 — 영문 라벨 기준·연도 오독·3D·여러 발명자·전체 등록번호', () => {
+  const t = fakeCert('CERTIFICATE OF PATENT', '10-7654321', '10-9018-0099999', '2018년 01월 02일', '20203 04월 13일', '발명 의 명 칭 Title of the Invention', '반사 오차를 줄인 30 측정기', ['홍길동', '김예시']);
+  const it = P.parseIP(t).item;
+  assert.strictEqual(it.kind, '특허'); assert.strictEqual(it.regNo, '10-7654321-00-00'); assert.strictEqual(it.appNo, '10-2018-0099999');
+  assert.strictEqual(it.appDate, '2018-01-02'); assert.strictEqual(it.regDate, '2020-04-13');
+  assert.strictEqual(it.title, '반사 오차를 줄인 3D 측정기'); assert.strictEqual(it.applicant, '주식회사 예시상사'); assert.strictEqual(it.inventor, '홍길동, 김예시');
+});
+ok('지식재산권 합본 — 쪽마다 한 건, 같은 번호 이어지는 쪽은 합침', () => {
+  const a = fakeCert('CERTIFICATE OF PATENT', '10-1111111', '10-2019-0011111', '2019년 02월 15일', '2020년 04월 13일', 'Title of the Invention', '시험 장치', ['홍길동']);
+  const b = fakeCert('CERTIFICATE OF UTILITY MODEL REGISTRATION', '20-0222222', '20-2022-0000222', '20922년 03월 29일', '2023년 04월 28일', '고안의 명칭 Title of the Device', '시험 설치장치', []);
+  const b2 = ['20-0222222 호', 'Registration Number', '고안자 Devisers', '이예시(800101-*******)', '박예시(800101-*******)'].join('\n');
+  const r = P.parseIP([a, b, b2].join('<<PAGE>>'));
+  assert.strictEqual(r.items.length, 2);
+  assert.strictEqual(r.items[1].kind, '실용신안'); assert.strictEqual(r.items[1].appDate, '2022-03-29'); assert.strictEqual(r.items[1].inventor, '이예시, 박예시');
+});
+ok('명칭 두 번 읽기 합치기', () => {
+  assert.strictEqual(P.mergeTitleOcr('AXE 이용한 체적 산출 시스템', '센서를 이용한 체적 산출 시스템'), '센서를 이용한 체적 산출 시스템');
+  assert.strictEqual(P.mergeTitleOcr('30 스캐너', '931 스캐너'), '30 스캐너');
+  assert.strictEqual(P.mergeTitleOcr('IoT 기반 관리', '이오티 기반 관리'), 'IoT 기반 관리');
+});
+ok('특허 목록 표(엑셀) — 출원 중·등록·발명자 나눔·엑셀 날짜', () => {
+  const rows = [['', 'No.', '권리', 'Our Ref.', '출원번호', '출원일', '출원인', '발명자', '등록번호', '등록일', '명칭한글'],
+    ['', '1', '국내특허', 'A1', '10-2024-0000001', '45359', '주식회사 예시상사', '홍길동ㆍ김예시', '10-1234567-00-00', '2024-11-25', '시험 장치'],
+    ['', '2', '국내특허', 'A2', '10-2025-0000002', '2025-01-02', '주식회사 예시상사', '홍길동', '-', '-', '출원 중 장치']];
+  const it = P.parseIPList(rows);
+  assert.strictEqual(it.length, 2);
+  assert.strictEqual(it[0].regNo, '10-1234567-00-00'); assert.strictEqual(it[0].appDate, '2024-03-08'); assert.strictEqual(it[0].inventor, '홍길동, 김예시');
+  assert.strictEqual(it[1].regNo, ''); assert.strictEqual(it[1].title, '출원 중 장치');
+});
+ok('지식재산권 날짜 — 월·일 글자가 숫자로 읽혀도, 영문 제목만으로도 등록증으로', () => {
+  const page = d => ['CERTIFICATE OF PATENT', '제 10-1111111 호', 'Patent Number', '제 10-2019-0011111 호', 'Application Number', '출원 일 2019년 02월 15일', 'Filing Date', d, 'Registration Date', 'Title of the Invention', '시험 장치'].join('\n');
+  [['20203 0481 139', '2020-04-13'], ['202593 08월 229', '2025-08-22'], ['202013 05월 28일', '2020-05-28'], ['2019 12가 03가', '2019-12-03']].forEach(([d, want]) => assert.strictEqual(P.parseIPPages([page(d)])[0].regDate, want, d));
+  assert.strictEqual(P.parseTextDocument(['CERTIFICATE OF PATENT', '제 10-1111111 호', 'Patent Number', '제 10-2019-0011111 호', 'Application Number'].join('\n'), 'x.png').kind, 'ip');
 });
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);

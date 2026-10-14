@@ -63,6 +63,8 @@
         demo() { w.loadDemoData(); },
         fresh() {
           doc.querySelectorAll('#section_smb_input input[type=text], #section_smb_input input[type=number]').forEach(n => { n.value = ''; });
+          // 앞 실행이 남긴 임시저장(대출 3건 등)이 섞이지 않게 대출표도 비움
+          w.appState.debtItems = []; w.renderDebtTable();
           w.calcSmbMetrics();
         },
         setDebts(items) { w.appState.debtItems = items; w.renderDebtTable(); },

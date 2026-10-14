@@ -247,7 +247,7 @@
     ['share', '주주명부', t => /주주명부/.test(t)],
     ['ledger', '거래처원장(차입금)', t => /거래처원장/.test(t)],
     ['creditor', '채권자변동정보 조회서', t => /채권자변동/.test(t)],
-    ['ip', '지식재산권 등록증', t => /특허증|실용신안등록증|디자인등록증|상표등록증/.test(t) || (/출원번호/.test(t) && /[등동]록일/.test(t))],
+    ['ip', '지식재산권 등록증', t => /특허증|실용신안등록증|디자인등록증|상표등록증/.test(t) || (/출원번호/.test(t) && /[등동]록일/.test(t)) || /CERTIFICATEOF(PATENT|UTILITY|DESIGN|TRADEMARK)/i.test(t) || (/(Patent|Registration)Number/i.test(t) && /ApplicationNumber/i.test(t))],
     ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
     ['lease', '임대차계약서', t => /임대차/.test(t)],
     ['idcard', '신분증', t => /주민등록증|운전면허증|신분증/.test(t)],
@@ -474,7 +474,7 @@
     const out = { kind: c.kind, title: c.title, fields: {}, meta: {}, debtItems: [], notes: [], status: 'ok', ocr: true };
     if (despace(text).length < 15) { out.status = 'skip'; out.notes.push('글자를 거의 읽지 못했어요 — 더 밝고 반듯한 사진으로'); return out; }
     let r = null;
-    if (c.kind === 'ip') { const ip = parseIP(text); out.ipItems = [ip.item]; out.notes = ip.notes; return out; }
+    if (c.kind === 'ip') { const ip = parseIP(text); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     if (c.kind === 'idcard') r = parseIdCard(text);
     else if (c.kind === 'lease') r = parseLease(text);
     else if (c.kind === 'bizcert' || c.kind === 'bizreg') r = parseBizCert(rows);
@@ -498,49 +498,208 @@
   }
 
   // ───────── 지식재산권 등록증(특허·실용신안·디자인·상표) — 대부분 스캔본이라 글자 인식 글로 읽는다 ─────────
-  // 권리 종류는 제목(OCR 이 자주 깨짐) 대신 번호 앞 두 자리로: 10 특허 · 20 실용신안 · 30 디자인 · 40 상표 (특허청 번호 체계)
+  // 등록증은 한글 라벨 위에 무늬(워터마크)가 있어 한글 라벨은 자주 깨지고, 아래 영문 라벨(Registration Number·
+  // Application Number·Filing Date·Registration Date·Title of the …)은 잘 읽힌다. 값은 늘 영문 라벨 바로 윗줄에 있다.
+  // 사람 줄은 '이름(생년월일6자리-*******)' 꼴(뒷자리는 redact 가 이미 지움) → 발명자·창작자는 이 꼴로 찾는다.
+  // 번호 앞 두 자리로 권리 종류: 10 특허 · 20 실용신안 · 30 디자인 · 40 상표 (특허청 번호 체계)
   const IP_KIND = { 10: '특허', 20: '실용신안', 30: '디자인', 40: '상표' };
-  function parseIP(text) {
+  const IP_HEAD = [[/CERTIFICATE\s*OF\s*PATENT|특\s*허\s*증/i, '특허'], [/UTILITY\s*MODEL|실\s*용\s*신\s*안\s*등\s*록\s*증/i, '실용신안'],
+                   [/CERTIFICATE\s*OF\s*DESIGN|디\s*자\s*인\s*등\s*록\s*증/i, '디자인'], [/TRADEMARK|상\s*표\s*등\s*록\s*증/i, '상표']];
+  // OCR 연도 실수 바로잡기: '20203'(2020년의 '년'→3) · '20922'(2022 가운데 9 끼어듦) · '9019'(2019 첫 자리 2→9)
+  function fixYear(y) {
+    y = String(y || '');
+    const ok = v => +v >= 1950 && +v <= 2045;
+    if (y.length === 4) return ok(y) ? y : (ok('2' + y.slice(1)) ? '2' + y.slice(1) : (ok('1' + y.slice(1)) ? '1' + y.slice(1) : ''));
+    if (y.length >= 5) {
+      if (ok(y.slice(0, 4))) return y.slice(0, 4);   // '202013'·'20203' → 2020 ('년'이 1·3 으로 읽힘)
+      for (let i = y.length - 1; i >= 0; i--) { const v = y.slice(0, i) + y.slice(i + 1); if (v.length === 4 && ok(v)) return v; }   // '20922' → 2022
+    }
+    return '';
+  }
+  function ipDate(s) {
+    const t = String(s || '').replace(/[oO]/g, '0');
+    // '월'·'일' 글자가 있는 꼴을 먼저(연도 뒤 '년'이 숫자로 읽혀도 월·일을 잘못 잡지 않게), 없으면 느슨하게
+    let m = t.match(/(\d{4,6})\D{0,3}?(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (!m) {
+      // '월'·'일'이 숫자로 읽힌 경우('20203 0481 139' = 2020년 04월 13일): 연도 덩어리 다음 두 숫자 덩어리의 앞 두 자리
+      const g = t.match(/\d+/g) || [];
+      const yi = g.findIndex(x => x.length >= 4 && x.length <= 6 && /^(19|20)/.test(x));
+      if (yi >= 0 && g[yi + 1] && g[yi + 2]) m = [null, g[yi], g[yi + 1].slice(0, 2), g[yi + 2].slice(0, 2)];
+    }
+    if (!m) return '';
+    const y = fixYear(m[1]), mo = +m[2], d = +m[3];
+    return y && mo >= 1 && mo <= 12 && d >= 1 && d <= 31 ? `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '';
+  }
+  // 등록번호는 특허청 전체 표기 'NN-NNNNNNN-00-00' 으로 (등록증에는 앞부분만 찍힘)
+  const fullRegNo = (a, b, c) => `${a}-${b}-${c || '00-00'}`;
+  const PERSON = /^[^가-힣]{0,3}([가-힣]{2,5})\s*[(（]\s*\d{6}\s*-/;
+  const COMPANY = /(주식회사|\(주\)|㈜|유한회사|재단법인|사단법인|협동조합|대학교|산학협력단)/;
+  const CERTIFY = /This\s*is\s*to\s*certify|위의\s*(발명|고안|디자인|상표)|증명합니다/i;
+
+  // 한 쪽 글 → 등록증 한 건(번호가 없으면 null)
+  function parseIPPage(text) {
     const t = redact(text);
     const lines = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const valOf = l => String(l || '').split(/\s{4,}/)[0].trim();   // 값 줄의 오른쪽 잡음(네 칸 이상 띄운 뒤)은 버림
     const flat = lines.join('\n');
-    const one = re => { const m = flat.match(re); return m ? m : null; };
-    const ymdOf = s => { const m = String(s || '').match(/(\d{4,5})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/); return m ? m[1].slice(-4) + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0') : ''; };
-    const app = one(/출\s*원\s*번\s*호\s*제?\s*(\d{2})\s*-\s*(\d{4})\s*-\s*(\d{7})/);
-    // 등록번호: '제 10-2102213 호' 꼴(7자리) — 출원번호(가운데 연도 4자리)와 구별
-    const reg = one(/제\s*(\d{2})\s*-\s*(\d{7})\s*호/);
-    const appDateLine = lines.find(l => /출\s*원\s*일/.test(l) && /년/.test(l)) || '';
-    const regDateLine = lines.find(l => /[등동]\s*록\s*일/.test(l) && /년/.test(l)) || '';   // OCR 이 '등록일'을 '동록일'로 읽기도 함
-    const code = +(app ? app[1] : reg ? reg[1] : 0);
-    let kind = IP_KIND[code] || '';
-    if (!kind) kind = /특허증/.test(flat) ? '특허' : /실용신안/.test(flat) ? '실용신안' : /디자인/.test(flat) ? '디자인' : /상표/.test(flat) ? '상표' : '';
-    // 라벨 다음 줄 값(영문 안내 줄은 건너뜀)
-    const after = re => {
-      const i = lines.findIndex(l => re.test(l.replace(/\s/g, '')));
-      if (i < 0) return '';
-      for (let k = i + 1; k < Math.min(lines.length, i + 4); k++) { const v = valOf(lines[k]); if (/[가-힣0-9]/.test(v) && !/^[A-Za-z\s.,'()]+$/.test(v)) return v; }
-      return '';
-    };
-    let title = after(/발명의명칭|고안의명칭|디자인의대상이되는물품|대상이되는물품/);
-    if (kind === '상표') {
-      const goods = valOf(lines.find(l => /\d+\s*건/.test(l) && !/발급/.test(l)) || '');
-      const cls = (flat.match(/제?\s*(\d{1,2})\s*류(?:\s*등\s*(\d+)\s*개\s*류)?/) || []);
-      title = [goods.replace(/\s*[|│].*$/, ''), cls[1] ? `제${cls[1]}류${cls[2] ? ` 등 ${cls[2]}개류` : ''}` : ''].filter(Boolean).join(' · ');
+    const idx = re => lines.findIndex(l => re.test(l));
+    const above = re => { const i = idx(re); return i > 0 ? lines[i - 1] : ''; };
+    let kind = (IP_HEAD.find(([re]) => re.test(flat)) || [])[1] || '';
+    // 등록번호: 'Registration Number' / 'Patent Number' 윗줄, 없으면 '제 NN-NNNNNNN 호'
+    const regLine = above(/Registration\s*Number|Patent\s*Number/i) || '';
+    const reg = (regLine.match(/(\d{2})\s*-\s*(\d{7})(?:\s*-\s*(\d{2}\s*-\s*\d{2}))?/) || flat.match(/제\s*(\d{2})\s*-\s*(\d{7})\s*호/));
+    if (!reg) return null;
+    const appLine = above(/Application\s*Number/i) || (lines.find(l => /출\s*원\s*번\s*호/.test(l)) || '');
+    const app = appLine.match(/(\d{2})\s*-\s*(\d{4})\s*-\s*(\d{7})/);
+    const code = +reg[1];
+    if (IP_KIND[code]) kind = IP_KIND[code];
+    const appYear = app ? (fixYear(app[2]) || app[2]) : '';
+    // 날짜: 영문 라벨 윗줄
+    let appDate = ipDate(above(/Filing\s*Da/i)) || ipDate(lines.find(l => /출\s*원\s*일/.test(l)) || '');
+    let regDate = ipDate(above(/Regi\w*\s*Da(te|t|l)/i)) || ipDate(lines.find(l => /[등동]\s*록\s*일/.test(l)) || '');
+    // 라벨을 못 읽었으면: 명칭 앞에 나오는 날짜 줄 순서(출원일 → 등록일)로
+    if (!appDate || !regDate) {
+      const tIdx = idx(/Title\s*of|of\s*the\s*(Invention|Device)|Article|roduc|Product|대상이\s*되는\s*물품|List\s*of\s*Goods|권\s*자|owner|atentee/i);
+      const ds = lines.slice(0, tIdx > 0 ? tIdx : lines.length).map(ipDate).filter(Boolean);
+      if (!appDate && ds[0]) appDate = ds[0];
+      if (!regDate) regDate = ds.find(d => d !== appDate && d >= appDate) || '';
     }
-    // 권리자(출원인): 회사 이름 줄 — '주식회사 OO(번호…)' 에서 괄호 앞까지
-    const ownerLine = valOf(lines.find(l => /(주식회사|\(주\)|㈜|유한회사|재단법인|사단법인)/.test(l))) || after(/특허권자|실용신안권자|디자인권자|상표권자|권리자/);
-    const nameOf = l => String(l || '').replace(/[(（].*$/, '').replace(/^[^가-힣A-Za-z㈜(]+/, '').trim();
-    const inventorRaw = after(/발명자|고안자|창작자/);
-    const inventor = /등록사항란|원부/.test(inventorRaw) ? '(등록원부 참조)' : nameOf(inventorRaw);
-    const item = {
-      kind, title: title.replace(/[|│].*$/, '').trim(),
-      appNo: app ? `${app[1]}-${app[2]}-${app[3]}` : '', appDate: ymdOf(appDateLine),
-      applicant: nameOf(ownerLine), inventor: kind === '상표' ? '' : inventor,
-      regNo: reg ? `${reg[1]}-${reg[2]}` : '', regDate: ymdOf(regDateLine)
+    // 명칭: 'Title of the Invention/Device' · 디자인 '물품(Article/Product)' 라벨 다음 줄부터 권리자(회사) 줄 전까지
+    let title = '';
+    const ti = idx(/Title\s*of|of\s*the\s*(Invention|Device)|Article|roduc|Product|대상이\s*되는\s*물품|발명의\s*명칭|고안의\s*명칭/i);
+    if (ti >= 0 && kind !== '상표') {
+      const parts = [];
+      for (let k = ti + 1; k < Math.min(lines.length, ti + 4); k++) {
+        const l = lines[k];
+        if (COMPANY.test(l) || PERSON.test(l) || /owner|atentee|Right|Type of|class|권\s*자|발\s*명\s*자|고\s*안\s*자|창\s*작\s*자|출\s*원\s*인/i.test(l) || /[가-힣]+\d{3,}\s*$/.test(l) || /^[^가-힣]*$/.test(l)) break;
+        parts.push(l.replace(/\s{2,}.*/, ''));
+      }
+      title = parts.join(' ').replace(/(^|\s)([23])0(?=\s?[가-힣A-Za-z])/g, '$1$2D').replace(/\s+/g, ' ').trim();
+    }
+    if (kind === '상표') {
+      const gi = idx(/List\s*of\s*Goods|지정\s*상품|상품\s*류/i);
+      const cls = (flat.match(/제\s*(\d{1,2})\s*류(?:\s*등\s*(\d+)\s*개\s*류)?/) || []);
+      const g = gi >= 0 ? (lines[gi + 1] || '').match(/\b(\d{2})\b/) : null;
+      const c = cls[1] || (g && g[1]);
+      const goods = (lines.find(l => /\d+\s*건/.test(l) && !/발급/.test(l)) || '').replace(/\s{2,}.*$/, '').replace(/\s*[|│].*$/, '').replace(/(^|\s)([23])0(?=\s?[가-힣A-Za-z])/g, '$1$2D').trim();
+      title = [goods, c ? `제${+c}류${cls[2] ? ` 등 ${cls[2]}개류` : ''}` : ''].filter(Boolean).join(' · ');
+    }
+    // 권리자: 회사 줄(괄호 앞), 없으면 사람 줄 첫 번째
+    const nameOf = l => String(l || '').replace(/^[^가-힣A-Za-z㈜(]+/, '').replace(/\s*[(（].*$/, '').trim();
+    const ownerLine = lines.find(l => COMPANY.test(l) && /[(（]/.test(l)) || lines.find(l => COMPANY.test(l)) || '';
+    // 발명자·고안자·창작자: 권리자 줄 다음부터 증명 문장 전까지의 사람 줄(주소 줄은 건너뜀)
+    const oi = ownerLine ? lines.indexOf(ownerLine) : idx(/nventor|Devisers?|Creator|Designer/i);
+    const ci = idx(CERTIFY);
+    const people = [];
+    for (let k = Math.max(0, oi + 1); k < (ci > oi ? ci : lines.length); k++) {
+      const m = lines[k].match(PERSON);
+      if (m && !COMPANY.test(lines[k]) && !people.includes(m[1])) people.push(m[1]);
+    }
+    const applicant = ownerLine ? nameOf(ownerLine) : (people.length && kind === '상표' ? people[0] : '');
+    return {
+      kind, title,
+      appNo: app ? `${app[1]}-${appYear}-${app[3]}` : '', appDate,
+      applicant, inventor: kind === '상표' ? '' : people.join(', '),
+      regNo: fullRegNo(reg[1], reg[2], reg[3] && reg[3].replace(/\s/g, '')), regDate
     };
-    const filled = Object.values(item).filter(Boolean).length;
-    return { item, notes: [kind ? kind + ' 등록증' : '지식재산권 등록증', `${filled}/8칸 읽음`] };
+  }
+
+  // 여러 쪽(합본 PDF·여러 장 사진): 쪽마다 한 건, 번호가 같은 다음 쪽(실용신안 2쪽 등)은 앞 건에 합침
+  function parseIPPages(texts) {
+    const items = [];
+    for (const tx of texts) {
+      const it = parseIPPage(tx);
+      if (!it) continue;
+      const prev = items.find(x => x.regNo === it.regNo);
+      if (prev) {
+        Object.keys(it).forEach(k => { if (!prev[k] && it[k]) prev[k] = it[k]; });
+        if (it.inventor) prev.inventor = [...new Set([...(prev.inventor ? prev.inventor.split(', ') : []), ...it.inventor.split(', ')])].join(', ');
+      } else items.push(it);
+    }
+    return items;
+  }
+  const IP_FIELDS = ['kind', 'title', 'appNo', 'appDate', 'applicant', 'inventor', 'regNo', 'regDate'];
+  // 예전 호출(글 → 한 건)과 같은 모양 + items(여러 건). 글 안에 쪽 경계(<<PAGE>>)가 있으면 쪽마다 나눠 읽음
+  function parseIP(text) {
+    const items = parseIPPages(String(text || '').split(/<<PAGE>>/));
+    const item = items[0] || { kind: '', title: '', appNo: '', appDate: '', applicant: '', inventor: '', regNo: '', regDate: '' };
+    const got = items.reduce((a, x) => a + IP_FIELDS.filter(k => x[k]).length, 0);
+    return { item, items, notes: [items.length > 1 ? `등록증 ${items.length}건` : (item.kind ? item.kind + ' 등록증' : '지식재산권 등록증'), `${got}/${Math.max(1, items.length) * 8}칸 읽음`] };
+  }
+
+
+  // 명칭 줄 두 번 읽기 합치기: 처음(한글+영문 모델)은 '3D' 같은 숫자·영문을 잘 읽고, 한글 전용은 한글 낱말을 잘 읽는다.
+  // 낱말 수가 같으면 처음 결과에서 '영문 대문자만으로 된 낱말'(실제 약어가 아닌 것)만 한글 전용 결과로 바꾼다.
+  const IP_ACRONYM = /^(AI|IoT|IOT|IT|ICT|LED|GPS|RFID|AR|VR|XR|PC|UV|CCTV|QR|BIM|CNC|PLC|EV|ESS|BMS|API|SW|HW|DB|OLED|LCD|PCB|MEMS|AGV|AMR|UAV|NFC|LTE|5G|3D|2D)$/i;
+  function mergeTitleOcr(first, kor) {
+    const a = String(first || '').trim().split(/\s+/), b = String(kor || '').trim().split(/\s+/);
+    if (!a[0] || a.length !== b.length) return String(first || '').trim();
+    return a.map((w, i) => (/^[A-Za-z]{2,}[^가-힣]*$/.test(w) && !IP_ACRONYM.test(w.replace(/[^A-Za-z0-9]/g, '')) && /[가-힣]/.test(b[i])) ? b[i] : w).join(' ');
+  }
+
+  // .xlsx(엑셀) 읽기 — 라이브러리 없이: zip 안의 sharedStrings·첫 시트만 풀어 행 배열로. 압축 풀기는 브라우저 기본 기능(DecompressionStream)
+  async function readXlsx(buf) {
+    const u8 = new Uint8Array(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    let eocd = -1; for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error('엑셀(zip) 형식이 아니에요');
+    const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
+    const files = {};
+    for (let k = 0; k < n; k++) {
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+      files[name] = { method, csize, off };
+      p += 46 + nlen + elen + clen;
+    }
+    const get = async name => {
+      const f = files[name]; if (!f) return '';
+      const lnl = dv.getUint16(f.off + 26, true), lel = dv.getUint16(f.off + 28, true);
+      const data = u8.subarray(f.off + 30 + lnl + lel, f.off + 30 + lnl + lel + f.csize);
+      if (f.method === 0) return new TextDecoder().decode(data);
+      const ds = new DecompressionStream('deflate-raw');
+      const out = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+      return new TextDecoder().decode(out);
+    };
+    const unx = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    const ss = [...(await get('xl/sharedStrings.xml')).matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => unx([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(t => t[1]).join('')));
+    const sheetName = Object.keys(files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort()[0];
+    const xml = await get(sheetName);
+    const colNo = ref => { let c = 0; for (const ch of ref.replace(/\d+/g, '')) c = c * 26 + ch.charCodeAt(0) - 64; return c - 1; };
+    // 엑셀 날짜(일련번호) → YYYY-MM-DD (날짜 서식 칸만 바꾸기는 어려워 4만~6만 사이 정수 + 열 제목에 '일'이 있을 때 parseIPList 가 다시 판단)
+    const rows = [];
+    for (const r of xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
+      const row = [];
+      for (const c of r[1].matchAll(/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const t = (c[2].match(/t="(\w+)"/) || [])[1], v = ((c[3] || '').match(/<v>([\s\S]*?)<\/v>/) || [])[1], is = ((c[3] || '').match(/<t[^>]*>([\s\S]*?)<\/t>/) || [])[1];
+        row[colNo(c[1])] = t === 's' ? ss[+v] : t === 'inlineStr' ? unx(is || '') : v !== undefined ? unx(v) : '';
+      }
+      rows.push(Array.from(row, x => x === undefined ? '' : x));
+    }
+    return rows;
+  }
+  const xlDate = v => { const n = Number(v); if (!/^\d{5}(\.\d+)?$/.test(String(v)) || n < 20000 || n > 70000) return v; const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000); return d.toISOString().slice(0, 10); };
+
+  // 특허사무소 목록 표(권리·출원번호·출원일·출원인·발명자·등록번호·등록일·명칭) — 표 행 배열 → 여러 건
+  function parseIPList(rows) {
+    const sq = s => String(s == null ? '' : s).replace(/\s+/g, '');
+    const hi = rows.findIndex(r => r.some(c => /출원번호/.test(sq(c))) && r.some(c => /등록번호|명칭/.test(sq(c))));
+    if (hi < 0) return [];
+    const H = rows[hi].map(sq);
+    const col = re => H.findIndex(h => re.test(h));
+    const c = { right: col(/^권리$|^종류$|^구분$/), appNo: col(/출원번호/), appDate: col(/출원일/), applicant: col(/출원인|권리자/), inventor: col(/발명자|창작자|고안자/), regNo: col(/등록번호/), regDate: col(/등록일/), title: col(/명칭/) };
+    const v = (r, k) => c[k] >= 0 ? String(r[c[k]] == null ? '' : r[c[k]]).trim() : '';
+    const day = s => { s = xlDate(s); const m = String(s).match(/(\d{4})[-./년\s]+(\d{1,2})[-./월\s]+(\d{1,2})/); return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : ''; };
+    const out = [];
+    for (const r of rows.slice(hi + 1)) {
+      const appNo = (v(r, 'appNo').match(/\d{2}-\d{4}-\d{7}/) || [''])[0];
+      const reg = v(r, 'regNo').match(/(\d{2})-(\d{7})(?:-(\d{2}-\d{2}))?/);
+      if (!appNo && !reg) continue;
+      const code = +((reg || [])[1] || appNo.slice(0, 2));
+      const right = v(r, 'right');
+      const kind = IP_KIND[code] || (/실용/.test(right) ? '실용신안' : /디자인/.test(right) ? '디자인' : /상표/.test(right) ? '상표' : /특허/.test(right) ? '특허' : '');
+      out.push({ kind, title: v(r, 'title'), appNo, appDate: day(v(r, 'appDate')), applicant: v(r, 'applicant'),
+        inventor: kind === '상표' ? '' : v(r, 'inventor').split(/[ㆍ·,、/]+/).map(s => s.trim()).filter(Boolean).join(', '),
+        regNo: reg ? fullRegNo(reg[1], reg[2], reg[3]) : '', regDate: day(v(r, 'regDate')) });
+    }
+    return out;
   }
 
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
@@ -559,7 +718,7 @@
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
-    else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = [ip.item]; out.notes = ip.notes; return out; }
+    else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     else if (c.kind === 'ledger' || c.kind === 'creditor') {
       const parsed = parseDebtDocument(pagesToCells(pages));
       out.debtItems = toDebtItems(parsed);
@@ -599,6 +758,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
