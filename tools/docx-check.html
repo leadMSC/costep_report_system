@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>docx-check</title></head>
+<body>
+<!-- Word(.docx) 내보내기 점검용: 개발본을 예시 데이터로 채우고 서식 1~4 를 .docx 로 만들어
+     base64 를 <pre id="out"> 에 넣는다. tools/docx_check.py 가 --dump-dom 으로 받아 파일로 저장하고 Word 로 연다. -->
+<script>
+  // logo=1: 시험용 가짜 펌 정보(로고·휴대폰)로 그림·서명란까지 점검. 끝나면 지움
+  if (new URLSearchParams(location.search).get('logo') === '1') {
+    try { localStorage.setItem('MSC_ME_V1', JSON.stringify({ firm: '가나경영컨설팅', mobile: '01012345678', logo: 'brand/msc-emblem-color.svg' })); } catch (e) {}
+  }
+</script>
+<iframe id="app" src="../코스텝_경영진단_리드디벨롭.html" style="width:1600px;height:900px;border:0"></iframe>
+<pre id="out"></pre>
+<script>
+  const qs = new URLSearchParams(location.search);
+  document.getElementById('app').addEventListener('load', () => setTimeout(async () => {
+    const w = document.getElementById('app').contentWindow;
+    const out = document.getElementById('out');
+    try {
+      w.alert = () => {};
+      w.loadDemoData();
+      if (qs.get('track')) w.setBizTrack(qs.get('track'));
+      if (qs.get('key')) w.selectSubReport(qs.get('key'));
+      w.selectDocumentSheet('all');
+      await new Promise(r => setTimeout(r, 400));
+      const ids = ['print_target_official', 'print_target_report', 'print_target_guide', 'print_target_bplan'];
+      const blob = w.DOCX.build(ids.map(id => w.document.getElementById(id)).filter(Boolean));
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      let s = ''; for (let i = 0; i < buf.length; i += 8192) s += String.fromCharCode.apply(null, buf.subarray(i, i + 8192));
+      out.textContent = 'OK:' + btoa(s);
+      if (qs.get('logo') === '1') { try { localStorage.removeItem('MSC_ME_V1'); } catch (e) {} }
+    } catch (e) { out.textContent = 'ERR:' + e.message; }
+  }, 1200));
+</script>
+</body>
+</html>

@@ -3671,203 +3671,378 @@
     // Render Active Report with Individual Single Sheets
     
     // =========================================================================
-    // GOOGLE DOCS / MS WORD EXPORT ENGINES (독스 및 워드 수정용 .doc 내보내기)
+    // Word(.docx) 내보내기 — 화면에 그려진 서식을 진짜 Word 파일로 만든다.
+    // 예전 .doc 는 HTML 에 확장자만 붙인 것이라 구글 독스·한글·워드에서 깨졌다.
+    // 화면에 실제로 보이는 모양(글자 크기·굵기·색, 표, 가로 배치, 테두리·배경, 로고·직인)을
+    // 읽어 Word 문단·표로 옮긴다. 외부 라이브러리 없이 압축 안 한 zip 으로 묶는다.
     // =========================================================================
-    function downloadAsDoc(elementId, docTitle) {
-      const el = document.getElementById(elementId);
-      if (!el) {
-        alert('다운로드할 서식 영역을 찾을 수 없습니다.');
-        return;
+    const DOCX = (() => {
+      const crcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+      const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+      const enc = { encode: v => new TextEncoder().encode(v) };   // 쓸 때 만든다(점검 시뮬레이터에는 없음)
+      function zip(files) {
+        const parts = [], central = []; let off = 0;
+        for (const f of files) {
+          const name = enc.encode(f.name), d = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(d);
+          const h = new DataView(new ArrayBuffer(30));
+          h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(12, 0x21, true);
+          h.setUint32(14, crc, true); h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, name.length, true);
+          parts.push(new Uint8Array(h.buffer), name, d);
+          const c = new DataView(new ArrayBuffer(46));
+          c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(14, 0x21, true);
+          c.setUint32(16, crc, true); c.setUint32(20, d.length, true); c.setUint32(24, d.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+          central.push(new Uint8Array(c.buffer), name);
+          off += 30 + name.length + d.length;
+        }
+        const size = central.reduce((a, b) => a + b.length, 0);
+        const e = new DataView(new ArrayBuffer(22));
+        e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+        return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
       }
-      
-      const clone = el.cloneNode(true);
-      clone.querySelectorAll('.no-print').forEach(e => e.remove()); stripScreenFit(clone);
-      const contentHtml = clone.innerHTML;
-      
-      const fullHtml = `<!DOCTYPE html>
-<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head>
-  <meta charset='utf-8'>
-  <title>${escapeHtml(docTitle)}</title>
-  <!--[if gte mso 9]>
-  <xml>
-    <w:WordDocument>
-      <w:View>Print</w:View>
-      <w:Zoom>100</w:Zoom>
-      <w:DoNotOptimizeForBrowser/>
-    </w:WordDocument>
-  </xml>
-  <![endif]-->
-  <style>
-    @page {
-      size: 210mm 297mm;
-      margin: 15mm 18mm 15mm 18mm;
-      mso-page-orientation: portrait;
+
+      const X = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      // rgb(a) → 'RRGGBB' (흰 바탕 위에 섞은 색). 거의 투명이면 null
+      function hex(c) {
+        const m = String(c || '').match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/);
+        if (!m) return null;
+        let a = m[4] === undefined ? 1 : (String(m[4]).endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]);
+        if (a < 0.04) return null;
+        return [m[1], m[2], m[3]].map(v => Math.round(255 - a * (255 - +v)).toString(16).padStart(2, '0')).join('').toUpperCase();
+      }
+      const px2tw = px => Math.round(px * 15);                 // 1px = 0.75pt = 15 twip
+      // 지금 옮기는 서식의 비율: K = A4 본문 폭(twip) ÷ 서식 안쪽 폭(px), S = 미리보기 배율
+      const ctx = { K: 15, S: 1 };
+      const SKIP = new Set(['SCRIPT', 'STYLE', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'NOSCRIPT', 'TEMPLATE', 'svg', 'SVG']);
+      const hidden = (el, cs) => el.classList.contains('no-print') || cs.display === 'none' || cs.visibility === 'hidden' || (el.getClientRects().length === 0);
+      const isInline = cs => /^inline(?!-table)/.test(cs.display) && cs.display !== 'inline-table';
+      const blockBorder = cs => ['Top', 'Right', 'Bottom', 'Left'].map(s => (parseFloat(cs['border' + s + 'Width']) >= 0.5 && cs['border' + s + 'Style'] !== 'none' && hex(cs['border' + s + 'Color'])) ? { w: parseFloat(cs['border' + s + 'Width']), c: hex(cs['border' + s + 'Color']) } : null);
+
+      function rPr(cs) {
+        const sz = Math.max(10, Math.round(parseFloat(cs.fontSize) * 0.75 * 2 * ctx.K / 15));
+        const col = hex(cs.color);
+        const mono = /mono|consolas|courier/i.test(cs.fontFamily);
+        const fw = parseInt(cs.fontWeight, 10) || 400;
+        const ls = parseFloat(cs.letterSpacing);
+        return '<w:rPr>' + (mono ? '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Malgun Gothic"/>' : '') +
+          (fw >= 600 ? '<w:b/><w:bCs/>' : '') + (cs.fontStyle === 'italic' ? '<w:i/>' : '') +
+          (/line-through/.test(cs.textDecorationLine || cs.textDecoration) ? '<w:strike/>' : '') +
+          (col && col !== '000000' ? `<w:color w:val="${col}"/>` : '') +
+          (ls && ls > 0.4 ? `<w:spacing w:val="${px2tw(ls)}"/>` : '') +
+          `<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>` +
+          (/underline/.test(cs.textDecorationLine || cs.textDecoration) ? '<w:u w:val="single"/>' : '') + '</w:rPr>';
+      }
+      const textRun = (t, cs) => `<w:r>${rPr(cs)}<w:t xml:space="preserve">${X(t)}</w:t></w:r>`;
+
+      function make() {
+        const media = [];   // {name, bytes}
+        let picId = 1;
+
+        function imgRun(img) {
+          try {
+            const W = img.offsetWidth, H = img.offsetHeight || (img.naturalHeight * W / (img.naturalWidth || 1));
+            if (!W || !H || !img.complete) return '';
+            const k = 3, cv = document.createElement('canvas');
+            cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+            const g = cv.getContext('2d');
+            // object-contain 처럼 비율 유지
+            const nw = img.naturalWidth || W, nh = img.naturalHeight || H, s = Math.min(cv.width / nw, cv.height / nh);
+            g.drawImage(img, (cv.width - nw * s) / 2, (cv.height - nh * s) / 2, nw * s, nh * s);
+            const b64 = cv.toDataURL('image/png').split(',')[1];
+            const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            const id = picId++, name = `image${id}.png`;
+            media.push({ name, bytes, rid: 'rIdImg' + id });
+            const cx = Math.round(W * ctx.K * 635), cy = Math.round(H * ctx.K * 635);
+            return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="그림 ${id}"/>` +
+              `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+              `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr>` +
+              `<pic:blipFill><a:blip r:embed="rIdImg${id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+              `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+          } catch (e) { return ''; }   // 그림을 못 읽으면 빼고 계속
+        }
+
+        // 인라인 내용 → 글자 묶음(run)
+        function inlineRuns(el, out) {
+          const cs = getComputedStyle(el);
+          for (const n of el.childNodes) {
+            if (n.nodeType === 3) { const t = n.textContent.replace(/\s+/g, ' '); if (t) out.push({ t, cs }); continue; }
+            if (n.nodeType !== 1 || SKIP.has(n.tagName)) continue;
+            const c2 = getComputedStyle(n);
+            if (hidden(n, c2)) continue;
+            if (n.tagName === 'BR') { out.push({ br: true }); continue; }
+            if (n.tagName === 'IMG') { const r = imgRun(n); if (r) out.push({ x: r }); continue; }
+            inlineRuns(n, out);
+            if (!isInline(c2)) out.push({ t: ' ', cs: c2 });   // 인라인 안의 블록(드묾)은 띄어 쓰기로
+          }
+        }
+
+        function para(items, cs, extra) {
+          // 앞뒤 빈칸 정리
+          while (items.length && items[0].t !== undefined && !items[0].t.trim()) items.shift();
+          while (items.length && items[items.length - 1].t !== undefined && !items[items.length - 1].t.trim()) items.pop();
+          if (!items.length && !(extra && extra.keepEmpty)) return null;
+          if (items.length && items[0].t !== undefined) items[0] = Object.assign({}, items[0], { t: items[0].t.replace(/^\s+/, '') });
+          const last = items.length - 1;
+          if (last >= 0 && items[last].t !== undefined) items[last] = Object.assign({}, items[last], { t: items[last].t.replace(/\s+$/, '') });
+          const al = { center: 'center', right: 'right', end: 'right', justify: 'both' }[cs.textAlign] || 'left';
+          const runs = items.map(i => i.br ? '<w:r><w:br/></w:r>' : i.x ? i.x : textRun(i.t, i.cs)).join('');
+          return { t: 'p', al, runs, lh: cs.lineHeight, fs: parseFloat(cs.fontSize) };
+        }
+
+        // 블록 요소 → [{t:'p'...} | {t:'tbl', xml}]
+        function blocks(el) {
+          const cs = getComputedStyle(el);
+          const out = []; let items = [];
+          const flush = () => { const p = para(items, cs); if (p) out.push(p); items = []; };
+          for (const n of el.childNodes) {
+            if (n.nodeType === 3) { const t = n.textContent.replace(/\s+/g, ' '); if (t.trim() || items.length) items.push({ t, cs }); continue; }
+            if (n.nodeType !== 1 || SKIP.has(n.tagName)) continue;
+            const c2 = getComputedStyle(n);
+            if (hidden(n, c2)) continue;
+            if (n.tagName === 'BR') { items.push({ br: true }); continue; }
+            if (n.tagName === 'IMG') { const r = imgRun(n); if (r) items.push({ x: r }); continue; }
+            if (isInline(c2)) {
+              // 인라인-플렉스·인라인-블록 안의 글자들 사이는 한 칸 띄움
+              const before = items.length; inlineRuns(n, items);
+              if (/inline-(flex|block|grid)/.test(c2.display) && items.length > before) items.push({ t: ' ', cs: c2 });
+              continue;
+            }
+            flush();
+            out.push(...block(n, c2));
+          }
+          flush();
+          return out;
+        }
+
+        const visKids = el => [...el.children].filter(k => !SKIP.has(k.tagName) && !hidden(k, getComputedStyle(k)) && (k.textContent.trim() || k.querySelector('img')));
+
+        // 폭은 모두 실제 화면 폭(px)을 A4 본문 폭에 맞춘 비율(K, twip/px)로 옮긴다 — 표 안의 표도 칸 밖으로 안 넘친다
+        const tw = px => Math.max(60, Math.round(px * ctx.K));
+        const rectW = el => el.getBoundingClientRect().width / ctx.S;   // 미리보기 확대·축소를 빼고 본 폭
+
+        function block(n, cs) {
+          if (n.tagName === 'TABLE') return [{ t: 'tbl', xml: tableXml(n) }];
+          const kids = visKids(n);
+          // 가로로 나란한 묶음(flex row / grid) → 테두리 없는 표
+          const row = /flex/.test(cs.display) && !/column/.test(cs.flexDirection);
+          const grid = /grid/.test(cs.display);
+          if (row && kids.length >= 2 && n.textContent.trim().length <= 70 && !n.querySelector('table')) {
+            // 짧고 폭이 좁은 가로 묶음(서명 줄·이름표 등)은 표 대신 한 줄 글로 — 칸이 좁아 줄이 꺾이지 않게
+            const sheetW = 9978 / ctx.K;   // 서식 안쪽 폭(px)
+            if (rectW(n) < sheetW * 0.7) {
+              const items = []; inlineRuns(n, items);
+              const p = para(items, cs);
+              return p ? wrapBox(n, cs, [p]) : [];
+            }
+          }
+          if ((row || grid) && kids.length >= 2 && kids.length <= 8) {
+            // 줄 나누기: 앞 줄 아래 끝보다 아래에서 시작하면 새 줄 (가운데 정렬로 높이가 달라도 한 줄로 봄)
+            const rows = []; let bottom = -Infinity;
+            kids.forEach(k => { const r = k.getBoundingClientRect(); if (!rows.length || r.top >= bottom - 2) { rows.push([k]); bottom = r.bottom; } else { rows[rows.length - 1].push(k); bottom = Math.max(bottom, r.bottom); } });
+            // 한 줄에 하나뿐이면 표로 만들 필요 없음
+            if (rows.every(r => r.length === 1)) return wrapBox(n, cs, kids.flatMap(k => block(k, getComputedStyle(k))));
+            return wrapBox(n, cs, [{ t: 'tbl', xml: gridTable(rows, null, n) }]);
+          }
+          return wrapBox(n, cs, blocks(n));
+        }
+
+        // 테두리·배경이 있는 상자는 칸 하나짜리 표로 감싼다. 위·아래 줄만 있으면 문단 선으로
+        function wrapBox(n, cs, inner) {
+          if (!inner.length) return inner;
+          const b = blockBorder(cs), bg = hex(cs.backgroundColor);
+          const sides = b.filter(Boolean).length;
+          if (sides >= 3 || (bg && bg !== 'FFFFFF')) {
+            const W = tw(rectW(n));
+            const mar = (v, d) => px2tw(Math.min(14, parseFloat(v) || d));
+            const xml = `<w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/>${tblBorders(b)}<w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="${mar(cs.paddingTop, 4)}" w:type="dxa"/><w:left w:w="${mar(cs.paddingLeft, 6)}" w:type="dxa"/><w:bottom w:w="${mar(cs.paddingBottom, 4)}" w:type="dxa"/><w:right w:w="${mar(cs.paddingRight, 6)}" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="${W}"/></w:tblGrid>` +
+              `<w:tr><w:tc><w:tcPr><w:tcW w:w="${W}" w:type="dxa"/>${bg && bg !== 'FFFFFF' ? `<w:shd w:val="clear" w:color="auto" w:fill="${bg}"/>` : ''}</w:tcPr>${renderBlocks(inner)}</w:tc></w:tr></w:tbl>`;
+            return [{ t: 'tbl', xml }, { t: 'gap' }];
+          }
+          if (b[2]) { const last = [...inner].reverse().find(x => x.t === 'p'); if (last) last.bb = b[2]; else inner.push({ t: 'p', al: 'left', runs: '', bb: b[2] }); }
+          if (b[0]) { const first = inner.find(x => x.t === 'p'); if (first) first.bt = b[0]; }
+          const mt = parseFloat(cs.marginTop) || 0, mb = parseFloat(cs.marginBottom) || 0;
+          const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+          const first = inner[0], last = inner[inner.length - 1];
+          if (first.t === 'p') first.before = (first.before || 0) + Math.min(24, mt + pt);
+          if (last.t === 'p') last.after = (last.after || 0) + Math.min(24, mb + pb);
+          return inner;
+        }
+
+        const bdr = (tag, s) => s ? `<w:${tag} w:val="single" w:sz="${Math.max(2, Math.min(24, Math.round(s.w * 6)))}" w:space="0" w:color="${s.c}"/>` : `<w:${tag} w:val="nil"/>`;
+        const tblBorders = b => `<w:tblBorders>${bdr('top', b[0])}${bdr('left', b[3])}${bdr('bottom', b[2])}${bdr('right', b[1])}<w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>`;
+
+        function cellXml(cell, wTw, span, isTableCell, al) {
+          const cs = getComputedStyle(cell);
+          const bg = hex(cs.backgroundColor), b = blockBorder(cs);
+          let inner = isTableCell ? blocks(cell) : block(cell, cs);
+          if (!inner.length) inner = [{ t: 'p', al: 'left', runs: '' }];
+          if (al) inner.forEach(x => { if (x.t === 'p' && x.al === 'left') x.al = al; });
+          const va = { middle: 'center', bottom: 'bottom' }[cs.verticalAlign] || (isTableCell ? 'center' : (/center/.test(getComputedStyle(cell.parentElement).alignItems) ? 'center' : 'top'));
+          // 레이아웃 칸(표가 아닌 묶음)은 테두리·배경을 안쪽 상자가 이미 그렸으므로 칸에는 안 그림
+          const own = isTableCell;
+          return `<w:tc><w:tcPr><w:tcW w:w="${wTw}" w:type="dxa"/>${span > 1 ? `<w:gridSpan w:val="${span}"/>` : ''}` +
+            `<w:tcBorders>${own ? bdr('top', b[0]) + bdr('left', b[3]) + bdr('bottom', b[2]) + bdr('right', b[1]) : '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>'}</w:tcBorders>` +
+            `${own && bg && bg !== 'FFFFFF' ? `<w:shd w:val="clear" w:color="auto" w:fill="${bg}"/>` : ''}<w:vAlign w:val="${va}"/></w:tcPr>${renderBlocks(inner)}</w:tc>`;
+        }
+
+        // rows: [[칸 요소...], ...]. 칸들의 실제 왼쪽·오른쪽 끝을 모아 열 경계를 만들고, 칸마다 몇 열을 차지하는지 센다
+        function gridTable(rows, tableEl, holder) {
+          const edges = new Set();
+          let geo = rows.map(r => r.map(c => { const R = c.getBoundingClientRect(); return { c, L: Math.round(R.left / ctx.S), R: Math.round(R.right / ctx.S) }; }));
+          if (!tableEl && holder) {
+            // 레이아웃 줄: 칸 사이 빈자리를 반씩 나눠 붙이고 양 끝은 묶음 끝까지 — Word 글꼴이 조금 넓어도 줄바꿈이 안 생기게
+            const hr = holder.getBoundingClientRect(), hcs = getComputedStyle(holder);
+            const cl = Math.round(hr.left / ctx.S + (parseFloat(hcs.paddingLeft) || 0) + (parseFloat(hcs.borderLeftWidth) || 0));
+            const cr = Math.round(hr.right / ctx.S - (parseFloat(hcs.paddingRight) || 0) - (parseFloat(hcs.borderRightWidth) || 0));
+            const jc = hcs.justifyContent;
+            geo = geo.map(r => { r = [...r].sort((a, b) => a.L - b.L);
+              // 짧은 칸(이름표·서명 등)은 제 폭의 1.2배를 먼저 주고, 긴 글 칸이 나머지를 나눠 가짐
+              const total = Math.max(1, cr - cl), nat = r.map(g => g.R - g.L);
+              const short = r.map(g => g.c.textContent.trim().length <= 40 && !g.c.querySelector('table'));
+              let need = r.map((g, i) => short[i] ? Math.min(total, nat[i] * 1.2 + 6) : 0);
+              let left = total - need.reduce((x, y) => x + y, 0);
+              const longSum = r.reduce((x, g, i) => x + (short[i] ? 0 : nat[i]), 0);
+              if (left < 0 || !longSum) { const k = total / r.reduce((x, g, i) => x + (short[i] ? need[i] : nat[i]), 0); need = r.map((g, i) => (short[i] ? need[i] : nat[i]) * k); left = 0; }
+              const w = r.map((g, i) => short[i] ? need[i] : nat[i] / longSum * left);
+              let x = cl;
+              return r.map((g, i) => {
+              const L = Math.round(x), R = i === r.length - 1 ? cr : Math.round(x + w[i]); x += w[i];
+              // 오른쪽 끝 칸은 오른쪽 정렬, 가운데 몰린 줄은 가운데 정렬
+              const al = /center/.test(jc) && r.length > 1 ? 'center' : (i === r.length - 1 && r.length > 1 && /between|end|right/.test(jc) ? 'right' : null);
+              return { c: g.c, L, R, al };
+            }); });
+          }
+          geo.forEach(r => r.forEach(g => { edges.add(g.L); edges.add(g.R); }));
+          // 2px 안쪽 차이는 같은 경계로
+          const xs = [...edges].sort((a, b) => a - b).reduce((a, x) => { if (!a.length || x - a[a.length - 1] > 2) a.push(x); return a; }, []);
+          const snap = x => xs.reduce((best, e) => Math.abs(e - x) < Math.abs(best - x) ? e : best, xs[0]);
+          const cols = xs.slice(1).map((x, i) => tw(x - xs[i]));
+          const total = cols.reduce((a, b) => a + b, 0);
+          const isT = !!tableEl;
+          const mar = isT ? '<w:tblCellMar><w:top w:w="20" w:type="dxa"/><w:left w:w="70" w:type="dxa"/><w:bottom w:w="20" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar>'
+                          : '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar>';
+          const borders = isT ? '' : '<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>';
+          return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>${borders}<w:tblLayout w:type="fixed"/>${mar}</w:tblPr>` +
+            `<w:tblGrid>${cols.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>` +
+            geo.map(r => {
+              let cells = '', at = 0;
+              r.forEach(g => {
+                const a = xs.indexOf(snap(g.L)), z = xs.indexOf(snap(g.R));
+                if (a > at) { cells += `<w:tc><w:tcPr><w:tcW w:w="${cols.slice(at, a).reduce((s, v) => s + v, 0)}" w:type="dxa"/>${a - at > 1 ? `<w:gridSpan w:val="${a - at}"/>` : ''}<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders></w:tcPr><w:p/></w:tc>`; }
+                const span = Math.max(1, z - Math.max(a, at));
+                cells += cellXml(g.c, cols.slice(Math.max(a, at), Math.max(a, at) + span).reduce((s, v) => s + v, 0), span, isT, g.al);
+                at = Math.max(a, at) + span;
+              });
+              if (at < cols.length) cells += `<w:tc><w:tcPr><w:tcW w:w="${cols.slice(at).reduce((s, v) => s + v, 0)}" w:type="dxa"/>${cols.length - at > 1 ? `<w:gridSpan w:val="${cols.length - at}"/>` : ''}<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders></w:tcPr><w:p/></w:tc>`;
+              return `<w:tr>${isT ? '<w:trPr><w:cantSplit/></w:trPr>' : ''}${cells}</w:tr>`;
+            }).join('') + '</w:tbl>';
+        }
+
+        function tableXml(t) {
+          const rows = [...t.rows].filter(r => !hidden(r, getComputedStyle(r))).map(r => [...r.cells].filter(c => !hidden(c, getComputedStyle(c)))).filter(r => r.length);
+          if (!rows.length) return '';
+          return gridTable(rows, t);
+        }
+
+        function renderBlocks(list) {
+          let xml = '';
+          list.forEach((b, i) => {
+            if (b.t === 'tbl') { xml += b.xml; if (list[i + 1] && list[i + 1].t === 'tbl') xml += '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"/></w:pPr></w:p>'; return; }
+            if (b.t === 'gap') return;
+            // 줄 간격: 화면 값을 따르되 Word 는 글꼴 자체 줄 높이가 커서 0.85 배, 1.0~1.3 배 사이로
+            const lh = parseFloat(b.lh), line = lh && b.fs ? Math.max(240, Math.min(312, Math.round(lh / b.fs * 240 * 0.85))) : 252;
+            if (b.tiny) { xml += `<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>`; return; }
+            xml += `<w:p><w:pPr>${b.pb ? '<w:pageBreakBefore/>' : ''}${b.bt || b.bb ? `<w:pBdr>${b.bt ? bdr('top', b.bt) : ''}${b.bb ? bdr('bottom', b.bb) : ''}</w:pBdr>` : ''}` +
+              `<w:spacing w:before="${px2tw(Math.min(24, b.before || 0))}" w:after="${px2tw(Math.min(24, b.after || 0))}" w:line="${line}" w:lineRule="auto"/><w:jc w:val="${b.al}"/></w:pPr>${b.runs}</w:p>`;
+          });
+          // 표 칸 맨 끝은 문단이어야 한다
+          const lastReal = [...list].reverse().find(x => x.t !== 'gap');
+          if (lastReal && lastReal.t === 'tbl') xml += '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"/></w:pPr></w:p>';
+          return xml || '<w:p/>';
+        }
+        return { blocks, renderBlocks, media };
+      }
+
+      // sheets: 서식 카드 요소 배열. 서식마다 새 쪽에서 시작
+      function build(sheets) {
+        const m = make();
+        const body = sheets.map((el, i) => {
+          const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+          ctx.S = el.offsetWidth ? r.width / el.offsetWidth : 1;
+          const inner = el.offsetWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+          ctx.K = inner > 100 ? 9978 / inner : 15;
+          const bl = m.blocks(el);
+          if (i) { if (bl[0] && bl[0].t === 'p') bl[0].pb = true; else bl.unshift({ t: 'p', al: 'left', runs: '', pb: true, tiny: true }); }
+          return m.renderBlocks(bl);
+        }).join('');
+        const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+        const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body}` +
+          `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="850" w:right="964" w:bottom="850" w:left="964" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+        const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+          `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Malgun Gothic" w:hAnsi="Malgun Gothic" w:eastAsia="Malgun Gothic" w:cs="Malgun Gothic"/><w:sz w:val="18"/><w:szCs w:val="18"/><w:lang w:val="en-US" w:eastAsia="ko-KR"/></w:rPr></w:rPrDefault>` +
+          `<w:pPrDefault><w:pPr><w:wordWrap w:val="0"/><w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/><w:spacing w:after="0" w:line="252" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>` +
+          `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>` +
+          `<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>`;
+        const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+          `<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+          m.media.map(x => `<Relationship Id="${x.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${x.name}"/>`).join('') + '</Relationships>';
+        const files = [
+          { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>` },
+          { name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+          { name: 'word/document.xml', data: doc },
+          { name: 'word/styles.xml', data: styles },
+          { name: 'word/_rels/document.xml.rels', data: rels },
+          ...m.media.map(x => ({ name: 'word/media/' + x.name, data: x.bytes }))
+        ];
+        return zip(files);
+      }
+      return { build };
+    })();
+    window.DOCX = DOCX;
+
+    // 파일 이름: "[고객사명] - 펌명 경영리포트_꼬리.docx"
+    function docxFileName(tail) {
+      const clean = v => String(v || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+      const corp = clean(document.getElementById('corp_name')?.value) || '고객사';
+      let firm = ''; try { firm = clean(getBrand().name); } catch (e) { /* 브랜드 없음 */ }
+      return `[${corp}] - ${firm ? firm + ' ' : ''}경영리포트${tail ? '_' + clean(tail) : ''}.docx`;
     }
-    body {
-      font-family: 'Malgun Gothic', 'Pretendard', '맑은 고딕', sans-serif;
-      font-size: 10pt;
-      line-height: 1.6;
-      color: #111111;
-      background-color: #ffffff;
-      margin: 0;
-      padding: 0;
-    }
-    h1 { font-size: 18pt; font-weight: bold; text-align: center; margin: 10px 0 15px 0; letter-spacing: 0.25em; }
-    h2 { font-size: 14pt; font-weight: bold; text-align: center; margin: 8px 0; }
-    h3 { font-size: 12pt; font-weight: bold; margin: 8px 0 4px 0; }
-    h4, h5, h6 { font-size: 10.5pt; font-weight: bold; margin: 6px 0; }
-    p { margin: 4px 0; line-height: 1.6; }
-    table { border-collapse: collapse; width: 100%; margin: 10px 0; border: 1px solid #444444; }
-    th, td { border: 1px solid #555555; padding: 6px 8px; font-size: 9.5pt; vertical-align: middle; }
-    th { background-color: #f1f5f9; font-weight: bold; text-align: center; }
-    .text-center { text-align: center; }
-    .text-right { text-align: right; }
-    .font-bold { font-weight: bold; }
-    .border { border: 1px solid #555555; }
-    .border-b { border-bottom: 1px solid #555555; }
-    .border-t { border-top: 1px solid #555555; }
-    .border-box { border: 1px solid #444444; padding: 10px 12px; margin: 10px 0; background-color: #fafafa; }
-    img { max-width: 100%; height: auto; }
-  </style>
-</head>
-<body>
-  ${contentHtml}
-</body>
-</html>`;
-      
-      const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword;charset=utf-8' });
+    function saveDocx(sheets, fileName) {
+      const blob = DOCX.build(sheets);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      const safeFilename = (docTitle.endsWith('.doc') ? docTitle : docTitle + '.doc').replace(/[\\/:*?"<>|]/g, '_');
-      a.download = safeFilename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+    window.saveDocx = saveDocx;
+    window.docxFileName = docxFileName;
+
+    function downloadAsDoc(elementId, tail) {
+      const el = document.getElementById(elementId);
+      if (!el) { alert('다운로드할 서식 영역을 찾을 수 없습니다.'); return; }
+      saveDocx([el], docxFileName(tail));
     }
     window.downloadAsDoc = downloadAsDoc;
 
+    const DOCX_SHEETS = { official: ['print_target_official', '서식1 행정시행문'], report: ['print_target_report', '서식2 결과보고서'], guide: ['print_target_guide', '서식3 실행안내서'], bplan: ['print_target_bplan', '서식4 사업계획 개요서'] };
+    const repLabel = () => { try { const track = window.appState.bizTrack || 'smb'; const db = COSTEP_REPORTS_DB[track] || COSTEP_REPORTS_DB.sme; const r = db[window.appState.activeReportKey] || Object.values(db)[0]; return r.title || r.name || ''; } catch (e) { return ''; } };
     function downloadSingleSheetDoc(sheetKey) {
-      const corpName = document.getElementById('corp_name')?.value || '수진기업';
-      const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
-      const rep = db[window.appState.activeReportKey] || Object.values(db)[0];
-      
-      let targetId = '';
-      let sheetName = '';
-      if (sheetKey === 'official') {
-        targetId = 'print_target_official';
-        sheetName = '서식1_정식행정시행문';
-      } else if (sheetKey === 'report') {
-        targetId = 'print_target_report';
-        sheetName = '서식2_경영진단결과보고서';
-      } else if (sheetKey === 'guide') {
-        targetId = 'print_target_guide';
-        sheetName = '서식3_세부실행안내서_구비서류';
-      } else if (sheetKey === 'bplan') {
-        targetId = 'print_target_bplan';
-        sheetName = '서식4_사업계획개요서';
-      } else {
-        downloadAllSheetsDoc();
-        return;
-      }
-      
-      const docTitle = `${getBrand().name}_${corpName}_${sheetName}_${rep.key}.doc`;
-      downloadAsDoc(targetId, docTitle);
+      const s = DOCX_SHEETS[sheetKey];
+      if (!s) { downloadAllSheetsDoc(); return; }
+      downloadAsDoc(s[0], [repLabel(), s[1]].filter(Boolean).join('_'));
     }
     window.downloadSingleSheetDoc = downloadSingleSheetDoc;
 
+    // 지금 분야의 서식 1~4 를 한 파일로(서식마다 새 쪽). 화면이 낱장 보기면 잠깐 전체 보기로 그려서 읽는다
     function downloadAllSheetsDoc() {
-      const corpName = document.getElementById('corp_name')?.value || '수진기업';
-      const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
-      const rep = db[window.appState.activeReportKey] || Object.values(db)[0];
-      
-      const targetIds = ['print_target_official', 'print_target_report', 'print_target_guide', 'print_target_bplan'];
-      let combinedContent = '';
-      
-      targetIds.forEach((id, idx) => {
-        const el = document.getElementById(id);
-        if (el) {
-          const clone = el.cloneNode(true);
-          clone.querySelectorAll('.no-print').forEach(e => e.remove()); stripScreenFit(clone);
-          if (idx > 0) {
-            combinedContent += '<div style="page-break-before: always; mso-break-type: section-break;"></div><br><br>';
-          }
-          combinedContent += clone.innerHTML;
-        }
-      });
-      
-      if (!combinedContent) {
-        alert('다운로드할 서식이 없습니다. 먼저 서식을 열람해 주세요.');
-        return;
-      }
-      
-      const docTitle = `${getBrand().name}_${corpName}_경영진단_공문서철_전체_${rep.key}.doc`;
-      
-      const fullHtml = `<!DOCTYPE html>
-<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head>
-  <meta charset='utf-8'>
-  <title>${escapeHtml(docTitle)}</title>
-  <!--[if gte mso 9]>
-  <xml>
-    <w:WordDocument>
-      <w:View>Print</w:View>
-      <w:Zoom>100</w:Zoom>
-      <w:DoNotOptimizeForBrowser/>
-    </w:WordDocument>
-  </xml>
-  <![endif]-->
-  <style>
-    @page {
-      size: 210mm 297mm;
-      margin: 15mm 18mm 15mm 18mm;
-      mso-page-orientation: portrait;
-    }
-    body {
-      font-family: 'Malgun Gothic', 'Pretendard', '맑은 고딕', sans-serif;
-      font-size: 10pt;
-      line-height: 1.6;
-      color: #111111;
-      background-color: #ffffff;
-      margin: 0;
-      padding: 0;
-    }
-    h1 { font-size: 18pt; font-weight: bold; text-align: center; margin: 10px 0 15px 0; letter-spacing: 0.25em; }
-    h2 { font-size: 14pt; font-weight: bold; text-align: center; margin: 8px 0; }
-    h3 { font-size: 12pt; font-weight: bold; margin: 8px 0 4px 0; }
-    h4, h5, h6 { font-size: 10.5pt; font-weight: bold; margin: 6px 0; }
-    p { margin: 4px 0; line-height: 1.6; }
-    table { border-collapse: collapse; width: 100%; margin: 10px 0; border: 1px solid #444444; }
-    th, td { border: 1px solid #555555; padding: 6px 8px; font-size: 9.5pt; vertical-align: middle; }
-    th { background-color: #f1f5f9; font-weight: bold; text-align: center; }
-    .text-center { text-align: center; }
-    .text-right { text-align: right; }
-    .font-bold { font-weight: bold; }
-    .border { border: 1px solid #555555; }
-    .border-b { border-bottom: 1px solid #555555; }
-    .border-t { border-top: 1px solid #555555; }
-    .border-box { border: 1px solid #444444; padding: 10px 12px; margin: 10px 0; background-color: #fafafa; }
-    img { max-width: 100%; height: auto; }
-  </style>
-</head>
-<body>
-  ${combinedContent}
-</body>
-</html>`;
-      
-      const blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = docTitle.replace(/[\\/:*?"<>|]/g, '_');
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const ids = Object.values(DOCX_SHEETS).map(v => v[0]);
+      const saved = window.appState.activeSheet;
+      let swapped = false;
+      if (ids.some(id => !document.getElementById(id))) { window.appState.activeSheet = 'all'; renderActiveReport(); swapped = true; }
+      const els = ids.map(id => document.getElementById(id)).filter(Boolean);
+      if (!els.length) { alert('다운로드할 서식이 없습니다. 먼저 서식을 열람해 주세요.'); return; }
+      try { saveDocx(els, docxFileName(repLabel())); }
+      finally { if (swapped) { window.appState.activeSheet = saved; renderActiveReport(); } }
     }
     window.downloadAllSheetsDoc = downloadAllSheetsDoc;
 
@@ -7372,7 +7547,7 @@
     #l3 .l3-mode { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; gap: 2px; }
     #l3 .l3-mode button { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; color: var(--t-text-3, #66635C); cursor: pointer; white-space: nowrap; }
     #l3 .l3-mode button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-    #l3_radar { flex: 1; overflow-y: auto; padding: 72px 16px 16px; }
+    #l3_radar { flex: 1; overflow-y: auto; padding: 16px; }
     #l3_preview.radar #l3_stage, #l3_preview.radar .l3-view, #l3_preview.radar .l3-print { display: none !important; }
     #l3_preview:not(.radar) #l3_radar { display: none; }
     /* 고객사 정보: 선택 → 새 고객(서류+기본정보) / 기존(불러오기+기본정보) */
@@ -7537,18 +7712,17 @@
       --g-chip: rgba(15,23,42,.055); --g-hover: rgba(15,23,42,.06); --g-thumb: #fff; --g-ink: #0f172a; --g-mute: #64748b;
       --g-acc: #0f766e; --g-acc-soft: rgba(15,118,110,.10);
       --ease-out: cubic-bezier(.16,1,.3,1); --ease-in: cubic-bezier(.4,0,1,1);
-      position: absolute; top: 14px; left: 50%; z-index: 8; max-width: calc(100% - 28px); padding: 5px; border-radius: 999px;
+      position: absolute; top: 14px; right: 18px; z-index: 8; max-width: calc(100% - 36px); padding: 5px; border-radius: 999px;
       background: var(--g-bg); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
       border: 1px solid var(--g-edge);
       box-shadow: inset 0 1px 0 var(--g-hl), 0 0 0 .5px var(--g-hair), 0 1px 2px rgba(15,23,42,.06), 0 14px 34px -14px rgba(15,23,42,.32);
-      transform: translate(-50%, 0) scale(1); transform-origin: 50% 0;
+      transform: scale(1); transform-origin: 100% 0;
       transition: transform .45s var(--ease-out), opacity .3s ease, box-shadow .35s ease; }
     #l3_head::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
       background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0) 55%); mix-blend-mode: soft-light; }
-    /* 굴리면 살짝 작아지고, 아래로 계속 굴리면 위로 숨었다가 위로 굴리면 다시 내려온다 */
-    #l3_head.scrolled { transform: translate(-50%, 0) scale(.94); box-shadow: inset 0 1px 0 var(--g-hl), 0 0 0 .5px var(--g-hair), 0 2px 4px rgba(15,23,42,.06), 0 20px 44px -16px rgba(15,23,42,.42); }
-    #l3_head.hide { transform: translate(-50%, calc(-100% - 22px)) scale(.94); opacity: 0; pointer-events: none; }
-    #l3_head .row { display: flex; gap: 4px; align-items: center; position: relative; z-index: 1; }
+    /* 미리보기 위에 떠 있어 문서가 밑으로 지나간다. 굴리면 살짝 작아지고 그림자가 짙어짐 */
+    #l3_head.scrolled { transform: scale(.94); box-shadow: inset 0 1px 0 var(--g-hl), 0 0 0 .5px var(--g-hair), 0 2px 4px rgba(15,23,42,.06), 0 20px 44px -16px rgba(15,23,42,.42); }
+    #l3_head .row { display: flex; gap: 4px; align-items: center; justify-content: center; position: relative; z-index: 1; }
     /* 보고서/지원사업: 흰 알약이 미끄러져 옮겨 감 */
     #l3_head .l3-mode { position: relative; background: var(--g-chip); border-radius: 999px; padding: 3px; gap: 0; }
     #l3_head .l3-mode::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--tw, 0); border-radius: 999px; background: var(--g-thumb);
@@ -7597,7 +7771,7 @@
     #l3_head #subrep_btn_bar, #l3_head .l3-sheets { display: flex; flex-direction: row !important; gap: 4px; }
     #l3_head #subrep_btn_bar > *, #l3_head .l3-sheets > * { margin: 0 !important; width: auto !important; white-space: nowrap; padding: 5px 10px !important; font-size: 11px; }
     #l3_head .l3-print { margin-left: auto; padding: 6px 12px; border-radius: 9px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); font-size: 11px; font-weight: 800; white-space: nowrap; cursor: pointer; }
-    #l3_stage { flex: 1; overflow: auto; padding: 72px 0 16px; }
+    #l3_stage { flex: 1; overflow: auto; padding: 16px 0; }
     /* [8] 미리보기 배율: − 100% + 맞춤 (Ctrl+휠로도) */
     #l3 .l3-zoom { position: absolute; right: 22px; bottom: 18px; z-index: 6; display: inline-flex; align-items: center; gap: 2px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
     #l3_preview.radar .l3-zoom { display: none; }
@@ -7861,19 +8035,10 @@
         mode.addEventListener('click', placeThumb);
         requestAnimationFrame(placeThumb); setTimeout(placeThumb, 300);
         new ResizeObserver(placeThumb).observe(mode);
-        // 미리보기를 굴리면: 조금 내려가면 막대가 작아지고, 아래로 더 굴리면 위로 숨고, 위로 굴리면 다시 나온다
-        const onPrevScroll = el => { let lastY = 0, acc = 0; return () => requestAnimationFrame(() => {
-          const y = el.scrollTop, dy = y - lastY; lastY = y;
-          acc = (dy > 0) === (acc > 0) ? acc + dy : dy;   // 같은 방향으로 굴린 거리
-          head.classList.toggle('scrolled', y > 8);
-          if (y < 80 || view.classList.contains('open')) head.classList.remove('hide');
-          else if (acc > 60) head.classList.add('hide');
-          else if (acc < -24) head.classList.remove('hide');
-        }); };
+        // 미리보기를 굴리면 막대가 살짝 작아진다(막대는 그대로 떠 있고 문서가 밑으로 지나감)
+        const onPrevScroll = el => () => requestAnimationFrame(() => head.classList.toggle('scrolled', el.scrollTop > 8));
         document.getElementById('l3_stage').addEventListener('scroll', onPrevScroll(document.getElementById('l3_stage')));
         radarBox.addEventListener('scroll', onPrevScroll(radarBox));
-        // 마우스를 미리보기 맨 위로 올리면 숨은 막대가 다시 나옴
-        document.getElementById('l3_preview').addEventListener('mousemove', e => { if (e.clientY - document.getElementById('l3_preview').getBoundingClientRect().top < 70) head.classList.remove('hide'); });
 
         // 고객 불러오기 줄: 자주 쓰는 것(불러오기·새 고객·저장)만 보이고 나머지는 더보기
         const cbar = document.getElementById('client_bar');
@@ -7969,7 +8134,7 @@
           if (document.getElementById('l3_preview').classList.contains('radar')) return;
           const el = anchorEl(i); if (!el) return;
           const st = document.getElementById('l3_stage');
-          const top = st.scrollTop + el.getBoundingClientRect().top - st.getBoundingClientRect().top - 72;
+          const top = st.scrollTop + el.getBoundingClientRect().top - st.getBoundingClientRect().top - 16;
           st.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
           document.querySelectorAll('#l3 .l3-hl').forEach(x => x.classList.remove('l3-hl'));
           if (el.classList && !el.classList.contains('a4-page-card')) {

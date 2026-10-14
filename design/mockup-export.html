@@ -96,7 +96,8 @@ th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vert
    <li><b>직인 넣기</b>: 서식1 발신란의 펌 직인</li>
    <li><b>쪽 번호</b>: 아래 가운데 「1 / 8」</li>
    <li><b>컬러</b> (인쇄만): 컬러 / 흑백</li>
-   <li><b>부수</b> (인쇄만)</li></ul></div>
+   <li><b>부수</b> (인쇄만)</li>
+   <li><b>양면 인쇄</b> (인쇄·PDF): 단면 / 양면 — 양면이면 서식마다 앞면에서 시작하도록 빈 쪽을 자동으로 끼움. 브라우저가 프린터의 양면 설정을 대신 켤 수 없어서, 인쇄 창의 「설정 더보기 → 양면 인쇄」를 켜라고 안내</li></ul></div>
   <div class="card"><h3>파일 이름</h3><ul>
    <li>한 장: <span class="fn">[한빛정밀] - 가나경영 경영리포트_경영개선_서식2 결과보고서.pdf</span></li>
    <li>분야 하나: <span class="fn">[한빛정밀] - 가나경영 경영리포트_경영개선.pdf</span></li>
@@ -108,7 +109,7 @@ th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vert
 <table>
 <tr><th style="width:80px">방식</th><th>2단계에서 「내보내기」를 누르면</th><th>끝</th></tr>
 <tr><td><b>PDF</b></td><td>인쇄 창이 고른 장만 담아 열림 · 파일 이름 미리 채움 → 대상에서 「PDF로 저장」<br><small>「서식마다 따로」면 파일 수만큼 차례로 창이 열림</small></td><td>미리보기로 돌아옴</td></tr>
-<tr><td><b>Docs</b></td><td>.doc 바로 내려받기 (한 파일이면 장마다 쪽 나눔, 따로면 여러 파일)</td><td>「저장했어요 · K장」 알림</td></tr>
+<tr><td><b>Docs</b></td><td>.docx 바로 내려받기 (한 파일이면 장마다 쪽 나눔, 따로면 여러 파일)</td><td>「저장했어요 · K장」 알림</td></tr>
 <tr><td><b>인쇄</b></td><td>인쇄 창이 고른 장만 담아 열림 → 프린터 선택</td><td>미리보기로 돌아옴</td></tr>
 </table>
 <p style="font-size:12px;color:var(--sub);margin-top:10px">장 순서: 분야 순서대로, 각 분야 안에서 서식1→4. 빈 필수 칸·A4 넘침은 2단계 안에 노란 알림으로만 알리고 막지 않습니다.<br>참고: 브라우저는 인쇄 창의 「대상」을 미리 PDF로 정해 둘 수 없어서, PDF는 파일 이름을 채워 두고 「PDF로 저장」을 고르라고 안내합니다.</p>
@@ -117,9 +118,9 @@ th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vert
 const F=['경영개선 진단서','사업정리·재기지원 진단서','금융비용·채무조정 진단서','판로·로컬마케팅 진단서','점포 환경개선·시설 진단서','노무관리 준법점검 진단서'];
 const S=['서식1 행정시행문','서식2 결과보고서','서식3 실행안내서','서식4 사업계획 개요서'];
 const M={pdf:['pdf','PDF','PDF로 내보내기','PDF 만들기'],doc:['doc','DOC','Docs로 내보내기','내려받기'],print:['prt','인쇄','인쇄하기','인쇄하기']};
-const O={pdf:[['파일 묶음','',['한 파일','서식마다 따로']],['직인 넣기','서식1 발신란',['넣기','빼기']],['쪽 번호','',['넣기','빼기']]],
+const O={pdf:[['파일 묶음','',['한 파일','서식마다 따로']],['양면 인쇄용','서식마다 앞면에서 시작',['아니오','예']],['직인 넣기','서식1 발신란',['넣기','빼기']],['쪽 번호','',['넣기','빼기']]],
  doc:[['파일 묶음','',['한 파일','서식마다 따로']],['직인 넣기','서식1 발신란',['넣기','빼기']]],
- print:[['컬러','',['컬러','흑백']],['직인 넣기','서식1 발신란',['넣기','빼기']],['쪽 번호','',['넣기','빼기']],['부수','',['1','2','3']]]};
+ print:[['양면 인쇄','인쇄 창에서 「양면」도 켜 주세요',['단면','양면']],['컬러','',['컬러','흑백']],['직인 넣기','서식1 발신란',['넣기','빼기']],['쪽 번호','',['넣기','빼기']],['부수','',['1','2','3']]]};
 const $=id=>document.getElementById(id);let mode='pdf';
 $('fList').innerHTML=F.map((t,i)=>`<label class="ck"><input type="checkbox" data-g="f" ${i==0?'checked':''}>${t}${i==0?'<span class="now">지금 보는 분야</span>':''}</label>`).join('');
 $('sList').innerHTML=S.map(t=>`<label class="ck"><input type="checkbox" data-g="s" checked>${t}</label>`).join('');
