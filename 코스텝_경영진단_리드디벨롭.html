@@ -8747,7 +8747,8 @@
           return m;
         }
         let meCache = null, meSnap = {}, meTimer = null, meDirty = {};
-        const readMe = () => meServer() ? (meCache || (meCache = meFromServer(), meSnap = Object.assign({}, meCache), meCache)) : readMeLocal();
+        const meInit = () => { meCache = meFromServer(); meSnap = Object.assign({}, meCache); meMigrateLocal(); return meCache; };
+        const readMe = () => meServer() ? (meCache || meInit()) : readMeLocal();
         function writeMe(m) {
           if (!meServer()) { writeMeLocal(m); return; }
           const old = meSnap; meCache = m; meSnap = Object.assign({}, m);
@@ -8898,7 +8899,7 @@
         const cons = document.getElementById('consultant_name');
         if (cons) { const w = cons.parentNode; w.querySelector('label').textContent = '이름·직함'; meCard.querySelector('#l3_me_person').prepend(w); }
         function fillMe() {
-          if (meServer() && meCache === null) { meCache = meFromServer(); meSnap = Object.assign({}, meCache); meMigrateLocal(); }
+          if (meServer() && meCache === null) meInit();
           if (!meServer()) meCache = null;
           meSyncUi();
           const m = readMe(), org = (window.appState.auth || {}).org || {};
