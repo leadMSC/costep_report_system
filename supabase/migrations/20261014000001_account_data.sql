@@ -65,6 +65,8 @@ alter table public.assessments
   add column if not exists updated_by    uuid references auth.users (id),
   add column if not exists deleted_at    timestamptz;
 create index if not exists assessments_owner_idx on public.assessments (consultant_id, updated_at desc);
+-- 상호를 아직 안 적은 작성 중 화면도 바로 서버에 저장한다(고객은 상호가 생기면 연결)
+alter table public.assessments alter column client_id drop not null;
 
 -- ---------------------------------------------------------------------------
 -- 5. 고친 시각·고친 사람·버전 자동 기록

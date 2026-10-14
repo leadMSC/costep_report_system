@@ -707,7 +707,7 @@
         <button type="button" onclick="exportClientFile()" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold cursor-pointer">파일로 내보내기</button>
         <label class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-bold cursor-pointer">파일 가져오기<input type="file" id="client_import" accept=".json,application/json" class="hidden" onchange="importClientFile(this)"></label>
         <button type="button" onclick="deleteClient()" class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 bg-white hover:bg-rose-50 font-bold cursor-pointer">삭제</button>
-        <span id="client_status" class="ml-auto text-slate-500">작성 내용은 이 PC 브라우저에 자동 저장됩니다</span>
+        <span id="client_status" class="ml-auto text-slate-500">작성 내용은 자동 저장됩니다</span>
       </div>
 
       <!-- 진단 건 정보: 서식1 머리(시행일자·경유·관련 협약)와 상담 분야(보고서 종류). 비우면 기본 문구 -->
@@ -6264,6 +6264,12 @@
     function refreshClientSelect() {
       const sel = document.getElementById('client_select');
       if (!sel) return;
+      if (cloudOn()) {
+        sel.innerHTML = '<option value="">서버에 저장된 내 고객 (' + cloud.list.length + '건)</option>' +
+          cloud.list.map(a => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.title || '상호 미입력 고객')} · ${escapeHtml(timeLabel(a.updated_at))}</option>`).join('');
+        sel.value = cloud.aid && cloud.list.some(a => a.id === cloud.aid) ? cloud.aid : '';
+        return;
+      }
       const store = readClientStore();
       const items = Object.entries(store.clients).sort((a, b) => (b[1].savedAt || '').localeCompare(a[1].savedAt || ''));
       sel.innerHTML = '<option value="">저장된 고객 선택 (' + items.length + '곳)</option>' +
@@ -6272,6 +6278,7 @@
     }
 
     function saveClient() {
+      if (cloudOn()) { setClientStatus('서버에 저장하는 중…'); cloudSaveNow(); return; }
       const name = (document.getElementById('corp_name')?.value || '').trim();
       if (!name) { alert('상호(법인명)를 먼저 입력해 주세요. 상호 이름으로 저장됩니다.'); document.getElementById('corp_name')?.focus(); return; }
       const store = readClientStore();
@@ -6290,6 +6297,7 @@
 
     function loadClient(id) {
       if (!id) return;
+      if (cloudOn()) { cloudLoad(id); return; }
       const c = readClientStore().clients[id];
       if (!c) return;
       currentClientId = id;
@@ -6315,6 +6323,16 @@
 
     function newClient() {
       const hasInput = (document.getElementById('corp_name')?.value || '').trim() !== '';
+      if (cloudOn()) {
+        if (hasInput && !confirm('새 고객을 시작할까요?\n(지금 화면은 서버에 저장해 두고 비웁니다)')) return;
+        (cloud.dirty ? cloudSaveNow() : Promise.resolve()).then(() => {
+          cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false;
+          resetFormToDefaults(); refreshClientSelect(); cloudPref({ last_assessment_id: null });
+          setClientStatus('새 고객 작성 중 · 입력하면 서버에 자동 저장됩니다');
+          if (typeof renderActiveReport === 'function') renderActiveReport();
+        });
+        return;
+      }
       if (hasInput && !confirm('지금 작성 중인 내용을 비우고 새 고객을 시작할까요?\n(저장하지 않은 내용은 사라집니다)')) return;
       currentClientId = '';
       resetFormToDefaults();
@@ -6325,6 +6343,19 @@
     window.newClient = newClient;
 
     function deleteClient() {
+      if (cloudOn()) {
+        const a = cloud.list.find(x => x.id === cloud.aid);
+        if (!a) { alert('삭제할 고객을 먼저 목록에서 불러와 주세요.'); return; }
+        if (!confirm(`'${a.title}' 을(를) 휴지통으로 옮길까요? (화면의 내용은 그대로 남습니다)`)) return;
+        clearTimeout(cloud.timer);
+        sb.from('assessments').update({ deleted_at: new Date().toISOString() }).eq('id', a.id).then(({ error }) => {
+          if (error) { alert('삭제하지 못했습니다: ' + error.message); return; }
+          cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false;
+          cloudPref({ last_assessment_id: null }); cloudList().catch(() => {});
+          setClientStatus(`'${a.title}' 휴지통으로 옮김 · 다시 고치면 새 고객으로 저장됩니다`);
+        });
+        return;
+      }
       const store = readClientStore();
       const c = store.clients[currentClientId];
       if (!c) { alert('삭제할 고객을 먼저 목록에서 불러와 주세요.'); return; }
@@ -6360,6 +6391,12 @@
     function importClientText(text) {
       const parsed = JSON.parse(text);
       if (parsed.app !== 'costep-diagnosis' || !parsed.data) throw new Error('이 시스템에서 내보낸 고객 파일이 아닙니다.');
+      if (cloudOn()) {
+        cloud.aid = null; cloud.ver = 0; cloud.cid = null;
+        applyFormData(parsed.data); refreshClientSelect(); cloudSchedule(200);
+        setClientStatus(`'${parsed.name}' 파일을 불러옴 · 서버에 새 고객으로 저장합니다`);
+        return;
+      }
       currentClientId = '';
       applyFormData(parsed.data);
       autosaveDraft();
@@ -6383,9 +6420,13 @@
     // 작성 중 자동 저장 (새로고침해도 이어서 작성)
     let draftTimer = null;
     function autosaveDraft() {
+      if (cloudOn()) { cloudSchedule(); return; }
+      if (storageScope === 'signed-out') return;
       safeStorage.setItem(scopedKey(DRAFT_KEY), JSON.stringify({ clientId: currentClientId, data: collectFormData() }));
     }
     function scheduleDraftSave() {
+      if (cloudOn()) { cloudSchedule(); return; }
+      if (storageScope === 'signed-out') return;
       clearTimeout(draftTimer);
       draftTimer = setTimeout(() => { autosaveDraft(); setClientStatus('자동 저장됨 · ' + timeLabel(new Date().toISOString())); }, 600);
     }
@@ -6407,6 +6448,9 @@
       clearTimeout(draftTimer);
       storageScope = scope;
       currentClientId = '';
+      // 로그인한 승인 계정 = 서버 저장(이 PC에 남기지 않음)
+      if (scope !== 'local' && scope !== 'signed-out' && typeof sb !== 'undefined' && sb && ['consultant', 'org_admin', 'operator'].includes(cloudProfile().role)) { cloudStart(); return; }
+      cloud.on = false;
       resetFormToDefaults();
       if (!restoreDraft()) setClientStatus(scope === 'local' ? '작성 내용은 이 PC 브라우저에 자동 저장됩니다' : '새 고객 작성 중 · 이 계정 전용으로 자동 저장됩니다');
       refreshClientSelect();
@@ -6416,6 +6460,7 @@
     // 로그아웃: 저장은 그대로 두고(다음 로그인 때 이어서) 화면만 비운다. 이후 입력은 어느 계정에도 섞이지 않게 임시 묶음
     function clearScreenForSignOut() {
       clearTimeout(draftTimer);
+      clearTimeout(cloud.timer); cloud.on = false; cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.list = []; cloud.dirty = false;
       storageScope = 'signed-out';
       currentClientId = '';
       resetFormToDefaults();
@@ -6423,6 +6468,168 @@
       setClientStatus('로그아웃됨');
     }
     window.clearScreenForSignOut = clearScreenForSignOut;
+
+    // =========================================================================
+    // 서버 저장(Supabase) — 로그인한 승인 계정은 고객·작성 중 내용을 이 PC에 남기지 않고 모두 서버에 저장한다
+    // 고객사(clients) 1 : N 진단 건(assessments). 화면 하나 = 진단 건 하나. 고칠 때마다 1.5초 묶어 저장
+    // 다른 PC에서 먼저 고쳤으면(version 다름) 덮어쓰지 않고 묻는다. 로그인 없는 로컬 시험 모드는 예전처럼 이 PC 저장
+    // 이 PC에 남아 있던 예전 자료(고객 목록·작성 중 내용)는 로그인하면 모두 서버로 옮기고 이 PC에서 지운다
+    // =========================================================================
+    const cloud = { on: false, aid: null, ver: 0, cid: null, list: [], timer: null, busy: null, again: false, dirty: false, listTimer: null };
+    function cloudOn() { return cloud.on && typeof sb !== 'undefined' && !!sb; }
+    window.cloudOn = cloudOn;
+    const cloudProfile = () => (window.appState.auth || {}).profile || {};
+    const CLIENT_PROFILE_IDS = ['corp_ceo', 'corp_ceo_birth', 'corp_est_date', 'corp_form', 'corp_reg_no', 'corp_address', 'corp_factory_address', 'corp_biz_type', 'corp_main_bank'];
+    function cloudSummary(data) {
+      const f = (data && data.fields) || {};
+      const profile = {}; CLIENT_PROFILE_IDS.forEach(k => { if (f[k]) profile[k] = f[k]; });
+      return { name: String(f.corp_name || '').trim(), bizNo: String(f.corp_biz_no || '').trim(), profile };
+    }
+    // 고객사 찾기(사업자번호, 없으면 상호) → 없으면 만들기. 같은 펌의 다른 컨설턴트가 이미 등록한 사업자번호면 연결만 미룬다
+    async function cloudEnsureClient(sum, cid) {
+      if (!sum.name) return cid || null;
+      const patch = { name: sum.name, biz_no: sum.bizNo || null, profile: sum.profile };
+      if (cid) { const { error } = await sb.from('clients').update(patch).eq('id', cid); if (!error) return cid; }
+      const norm = sum.bizNo.replace(/\D/g, '');
+      let q = sb.from('clients').select('id').is('deleted_at', null).limit(1);
+      q = norm ? q.eq('biz_no_norm', norm) : q.eq('name', sum.name).is('biz_no_norm', null);
+      const { data: hit } = await q;
+      if (hit && hit[0]) { await sb.from('clients').update(patch).eq('id', hit[0].id); return hit[0].id; }
+      const { data, error } = await sb.from('clients').insert(Object.assign({ org_id: cloudProfile().org_id }, patch)).select('id').single();
+      if (error) { if (error.code === '23505') return null; throw error; }
+      return data.id;
+    }
+    function cloudRow(data, sum, cid) {
+      return { client_id: cid, biz_track: data.bizTrack || 'smb', industry_track: data.industryTrack || 'mfg', form_data: data,
+        form_version: data.version || 1, title: sum.name || '상호 미입력 고객', report_keys: data.reportKey ? [data.reportKey] : [] };
+    }
+    async function cloudPref(patch) {
+      const p = cloudProfile(); if (!p.id) return;
+      p.prefs = Object.assign({}, p.prefs || {}, patch);
+      await sb.from('profiles').update({ prefs: p.prefs }).eq('id', p.id);
+    }
+    async function cloudList() {
+      const { data, error } = await sb.from('assessments').select('id,title,updated_at,version').is('deleted_at', null).order('updated_at', { ascending: false }).limit(500);
+      if (error) throw error;
+      cloud.list = data || [];
+      refreshClientSelect();
+    }
+    function cloudListSoon() { clearTimeout(cloud.listTimer); cloud.listTimer = setTimeout(() => cloudList().catch(() => {}), 800); }
+    function cloudSchedule(ms) {
+      if (!cloudOn()) return;
+      cloud.dirty = true;
+      clearTimeout(cloud.timer);
+      cloud.timer = setTimeout(cloudSaveNow, ms ?? 1500);
+      setClientStatus('고치는 중 · 잠시 뒤 서버에 저장');
+    }
+    async function cloudSaveNow() {
+      if (!cloudOn()) return;
+      clearTimeout(cloud.timer);
+      if (!cloudProfile().org_id) { setClientStatus('서버 저장 대기 — [내 정보]에서 펌을 먼저 등록해 주세요'); return; }
+      if (cloud.busy) { cloud.again = true; return cloud.busy; }
+      cloud.busy = (async () => {
+        const data = collectFormData(), sum = cloudSummary(data);
+        try {
+          cloud.cid = await cloudEnsureClient(sum, cloud.cid);
+          const row = cloudRow(data, sum, cloud.cid);
+          if (!cloud.aid) {
+            const { data: r, error } = await sb.from('assessments').insert(Object.assign({ org_id: cloudProfile().org_id }, row)).select('id,version').single();
+            if (error) throw error;
+            cloud.aid = r.id; cloud.ver = r.version; cloudPref({ last_assessment_id: r.id });
+          } else {
+            const { data: r, error } = await sb.from('assessments').update(row).eq('id', cloud.aid).eq('version', cloud.ver).select('version');
+            if (error) throw error;
+            if (!r || !r.length) { await cloudConflict(row); return; }
+            cloud.ver = r[0].version;
+          }
+          cloud.dirty = false;
+          setClientStatus('서버에 저장됨 · ' + timeLabel(new Date().toISOString()));
+          cloudListSoon();
+        } catch (e) {
+          cloud.dirty = true;
+          setClientStatus('서버 저장 실패 — 인터넷 연결을 확인해 주세요 (' + (e.message || e) + ')');
+        }
+      })().finally(() => { cloud.busy = null; if (cloud.again) { cloud.again = false; cloudSchedule(300); } });
+      return cloud.busy;
+    }
+    window.cloudSaveNow = cloudSaveNow;
+    async function cloudConflict(row) {
+      const { data: srv } = await sb.from('assessments').select('id,version,form_data,updated_at,deleted_at,client_id').eq('id', cloud.aid).maybeSingle();
+      if (!srv || srv.deleted_at) {   // 다른 곳에서 지웠으면 새 진단 건으로 저장
+        const { data: r, error } = await sb.from('assessments').insert(Object.assign({ org_id: cloudProfile().org_id }, row)).select('id,version').single();
+        if (error) throw error;
+        cloud.aid = r.id; cloud.ver = r.version; cloud.dirty = false; cloudListSoon();
+        setClientStatus('다른 곳에서 지운 고객이라 새로 저장했습니다'); return;
+      }
+      const mine = confirm('다른 PC(또는 다른 창)에서 이 고객을 먼저 고쳤습니다 · ' + timeLabel(srv.updated_at) + '\n\n[확인] 지금 이 화면 내용으로 저장(서버 내용 덮어쓰기)\n[취소] 서버의 최신 내용 불러오기');
+      if (mine) {
+        const { data: r, error } = await sb.from('assessments').update(row).eq('id', cloud.aid).select('version').single();
+        if (error) throw error;
+        cloud.ver = r.version; cloud.dirty = false; setClientStatus('서버에 저장됨(덮어씀) · ' + timeLabel(new Date().toISOString()));
+      } else {
+        cloud.ver = srv.version; cloud.cid = srv.client_id; cloud.dirty = false;
+        applyFormData(srv.form_data); setClientStatus('서버의 최신 내용을 불러왔습니다 · ' + timeLabel(srv.updated_at));
+      }
+    }
+    async function cloudLoad(id) {
+      if (cloud.dirty) await cloudSaveNow();
+      const { data: a, error } = await sb.from('assessments').select('id,version,client_id,form_data,title,updated_at').eq('id', id).single();
+      if (error) { alert('불러오지 못했습니다: ' + error.message); return; }
+      cloud.aid = a.id; cloud.ver = a.version; cloud.cid = a.client_id;
+      applyFormData(a.form_data);
+      clearTimeout(cloud.timer); cloud.dirty = false;
+      cloudPref({ last_assessment_id: a.id });
+      refreshClientSelect();
+      setClientStatus(`'${a.title}' 불러옴 · ${timeLabel(a.updated_at)} 저장본`);
+    }
+    // 이 PC에 남아 있던 예전 자료를 서버로 옮긴다(한 건씩 올리고 올린 것은 표시 → 모두 끝나면 이 PC에서 지움)
+    async function cloudUploadOne(data) {
+      const sum = cloudSummary(data);
+      const cid = await cloudEnsureClient(sum, null);
+      const { error } = await sb.from('assessments').insert(Object.assign({ org_id: cloudProfile().org_id }, cloudRow(data, sum, cid)));
+      if (error) throw error;
+    }
+    const hasContent = d => d && d.fields && Object.entries(d.fields).some(([k, v]) => k !== 'doc_date' && k !== 'consultant_name' && typeof v === 'string' && v.trim() !== '' && v !== '0');
+    async function cloudMigrateLocal() {
+      if (!cloudProfile().org_id) return 0;
+      const uid = storageScope;
+      const ls = (() => { try { return window.localStorage; } catch (e) { return null; } })();
+      if (!ls) return 0;
+      let n = 0;
+      for (const k of [CLIENT_STORE_KEY + ':' + uid, CLIENT_STORE_KEY]) {
+        let store = null; try { store = JSON.parse(ls.getItem(k) || 'null'); } catch (e) { store = null; }
+        if (!store || !store.clients) continue;
+        for (const c of Object.values(store.clients)) {
+          if (c.uploaded || !c.data) continue;
+          await cloudUploadOne(c.data); c.uploaded = true; n++;
+          try { ls.setItem(k, JSON.stringify(store)); } catch (e) { /* 표시 실패 */ }
+        }
+        ls.removeItem(k);
+      }
+      for (const k of [DRAFT_KEY + ':' + uid, DRAFT_KEY]) {
+        let d = null; try { d = JSON.parse(ls.getItem(k) || 'null'); } catch (e) { d = null; }
+        if (d && hasContent(d.data)) { await cloudUploadOne(d.data); n++; }
+        ls.removeItem(k);
+      }
+      return n;
+    }
+    async function cloudStart() {
+      cloud.on = true; cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false; cloud.list = [];
+      resetFormToDefaults();
+      refreshClientSelect();
+      if (!cloudProfile().org_id) { setClientStatus('서버 저장 대기 — [내 정보]에서 펌을 먼저 등록해 주세요'); return; }
+      setClientStatus('서버에서 불러오는 중…');
+      try {
+        const moved = await cloudMigrateLocal();
+        await cloudList();
+        const last = (cloudProfile().prefs || {}).last_assessment_id;
+        if (last && cloud.list.some(a => a.id === last)) await cloudLoad(last);
+        else setClientStatus(cloud.list.length ? '새 고객 작성 중 · 입력하면 서버에 자동 저장됩니다' : '입력하면 서버에 자동 저장됩니다');
+        if (moved) setClientStatus(`이 PC에 있던 고객 ${moved}건을 서버로 옮겼습니다 · ` + (document.getElementById('client_status')?.innerText || ''));
+      } catch (e) { setClientStatus('서버 연결 실패: ' + (e.message || e)); }
+      if (typeof renderActiveReport === 'function') renderActiveReport();
+    }
+    window.cloudStart = cloudStart;
     // Initialization on Page Load
     document.addEventListener('DOMContentLoaded', () => {
       // 소상공인 연 매출 칸 이름표: 해당연도·직전 3개년
@@ -6541,7 +6748,8 @@
       if (!sb) return;
       await authLog('logout');
       try { sessionStorage.removeItem('MSC_LOGIN_LOGGED'); } catch (e) {}
-      if (typeof autosaveDraft === 'function' && storageScope !== 'signed-out' && storageScope !== 'local') autosaveDraft();
+      if (typeof cloudOn === 'function' && cloudOn() && cloud.dirty) await cloudSaveNow();
+      else if (typeof autosaveDraft === 'function' && storageScope !== 'signed-out' && storageScope !== 'local' && !(typeof cloudOn === 'function' && cloudOn())) autosaveDraft();
       if (typeof clearScreenForSignOut === 'function') clearScreenForSignOut();
       await sb.auth.signOut();
       window.appState.auth = { user: null, profile: null, org: null };
@@ -8524,8 +8732,98 @@
         // 내 정보: 소속 펌(로고·상호·접두어·대표·주소·전화)과 나(이름·직함·휴대폰·메일). 계정별로 이 PC에 저장, 서식 발신란에 반영
         const ME_KEY = 'MSC_ME_V1';
         const meKey = () => (typeof scopedKey === 'function' ? scopedKey(ME_KEY) : ME_KEY);
-        const readMe = () => { try { return JSON.parse(localStorage.getItem(meKey()) || '{}'); } catch (e) { return {}; } };
-        const writeMe = m => { try { localStorage.setItem(meKey(), JSON.stringify(m)); } catch (e) { /* 저장 불가 환경 */ } };
+        const readMeLocal = () => { try { return JSON.parse(localStorage.getItem(meKey()) || '{}'); } catch (e) { return {}; } };
+        const writeMeLocal = m => { try { localStorage.setItem(meKey(), JSON.stringify(m)); } catch (e) { /* 저장 불가 환경 */ } };
+        // 서버 모드: 펌 칸 ↔ orgs, 나 칸 ↔ profiles. 화면이 쓰는 이름(m.firm 등)은 그대로 둔다
+        const ME_ORG = { firm: 'name', prefix: 'doc_prefix', ceo: 'ceo_name', phone: 'phone', address: 'address', reviewer: 'reviewer_label', approver: 'approver_label', logo: 'logo_path' };
+        const meServer = () => typeof cloudOn === 'function' && cloudOn();
+        const meCanEditOrg = () => { const a = window.appState.auth || {}; return !!(a.org && a.profile && ['org_admin', 'operator'].includes(a.profile.role)); };
+        function meFromServer() {
+          const a = window.appState.auth || {}, o = a.org || {}, p = a.profile || {}, m = {};
+          Object.entries(ME_ORG).forEach(([k, c]) => { if (o[c]) m[k] = o[c]; });
+          if (p.phone) m.mobile = p.phone;
+          if (p.contact_email) m.email = p.contact_email;
+          if (p.prefs && p.prefs.consultant) m.consultant = p.prefs.consultant;
+          return m;
+        }
+        let meCache = null, meSnap = {}, meTimer = null, meDirty = {};
+        const readMe = () => meServer() ? (meCache || (meCache = meFromServer(), meSnap = Object.assign({}, meCache), meCache)) : readMeLocal();
+        function writeMe(m) {
+          if (!meServer()) { writeMeLocal(m); return; }
+          const old = meSnap; meCache = m; meSnap = Object.assign({}, m);
+          Object.keys(Object.assign({}, old, m)).forEach(k => { if ((old[k] || '') !== (m[k] || '')) meDirty[k] = true; });
+          clearTimeout(meTimer); meTimer = setTimeout(meSave, 900);
+          meSyncMsg('고치는 중 · 잠시 뒤 서버에 저장');
+        }
+        async function meSave() {
+          const a = window.appState.auth || {}, m = meCache || {}, keys = Object.keys(meDirty);
+          if (!keys.length || !a.profile) return;
+          meDirty = {};
+          try {
+            const orgPatch = {};
+            keys.filter(k => ME_ORG[k]).forEach(k => { orgPatch[ME_ORG[k]] = k === 'prefix' ? ((m.prefix || '').replace(/[^A-Za-z0-9]/g, '') || 'MSC') : (m[k] || null); });
+            if (orgPatch.name === null) delete orgPatch.name;   // 상호는 비울 수 없다
+            if (Object.keys(orgPatch).length && a.org && meCanEditOrg()) {
+              const { error } = await sb.from('orgs').update(orgPatch).eq('id', a.org.id);
+              if (error) throw error;
+              Object.assign(a.org, orgPatch);
+            }
+            const pp = {};
+            if (keys.includes('mobile')) pp.phone = m.mobile || null;
+            if (keys.includes('email')) pp.contact_email = m.email || null;
+            if (keys.includes('consultant')) pp.prefs = Object.assign({}, a.profile.prefs || {}, { consultant: m.consultant || '' });
+            if (Object.keys(pp).length) {
+              const { error } = await sb.from('profiles').update(pp).eq('id', a.profile.id);
+              if (error) throw error;
+              Object.assign(a.profile, pp);
+            }
+            meSyncMsg(a.org ? (meCanEditOrg() ? '서버에 저장됨 · 관리자 화면·다른 PC에도 같은 정보' : '내 연락처는 서버에 저장됨 · 펌 정보는 펌 관리자가 고칩니다') : '내 연락처는 서버에 저장됨 · 펌을 등록하면 펌 정보도 저장됩니다', true);
+          } catch (e) { keys.forEach(k => { meDirty[k] = true; }); meSyncMsg('서버 저장 실패: ' + (e.message || e)); }
+        }
+        // 이 PC에 남아 있던 예전 내 정보는 서버 칸이 비어 있을 때만 옮기고 지운다
+        function meMigrateLocal() {
+          const loc = readMeLocal(); if (!Object.keys(loc).length) return;
+          const m = Object.assign({}, meFromServer());
+          Object.entries(loc).forEach(([k, v]) => { if (v && !m[k] && (ME_ORG[k] ? meCanEditOrg() : true)) { m[k] = v; meDirty[k] = true; } });
+          meCache = m;
+          if (!window.appState.auth.org) return;   // 펌 등록 전이면 지우지 않고 기다린다(등록할 때 상호 등으로 쓴다)
+          try { localStorage.removeItem(meKey()); } catch (e) { /* 무시 */ }
+          if (Object.keys(meDirty).length) { clearTimeout(meTimer); meTimer = setTimeout(meSave, 300); }
+        }
+        function meSyncMsg(t, ok) { const el = document.getElementById('l3_me_sync_msg'); if (el) { el.textContent = t; el.dataset.ok = ok ? '1' : ''; } }
+        async function meCreateOrg() {
+          const m = Object.assign({}, readMeLocal(), meCache || {});
+          const firm = (meCard.querySelector('[data-me="firm"]').value || '').trim();
+          if (!firm) { alert('상호를 먼저 적어 주세요.'); meCard.querySelector('[data-me="firm"]').focus(); return; }
+          const btn = document.getElementById('l3_me_org_btn'); btn.disabled = true; meSyncMsg('펌을 등록하는 중…');
+          try {
+            const { data: orgId, error } = await sb.rpc('create_my_org', { p_name: firm, p_prefix: m.prefix || meCard.querySelector('[data-me="prefix"]').value || 'MSC' });
+            if (error) throw error;
+            const a = window.appState.auth;
+            const { data: pf } = await sb.from('profiles').select('*').eq('id', a.profile.id).single();
+            const { data: org } = await sb.from('orgs').select('*').eq('id', orgId).single();
+            a.profile = pf; a.org = org;
+            meDirty = {}; ['prefix', 'ceo', 'phone', 'address', 'reviewer', 'approver', 'logo'].forEach(k => { if (m[k]) meDirty[k] = true; });
+            meCache = Object.assign(meFromServer(), m, { firm });
+            try { localStorage.removeItem(meKey()); } catch (e) { /* 무시 */ }
+            await meSave(); meSnap = Object.assign({}, meCache);
+            meSyncUi(); if (typeof authApplyUser === 'function') authApplyUser();
+            if (typeof cloudStart === 'function') cloudStart();   // 이 PC에 있던 고객도 서버로 옮긴다
+          } catch (e) { meSyncMsg('펌 등록 실패: ' + (e.message || e)); }
+          btn.disabled = false;
+        }
+        function meSyncUi() {
+          const box = document.getElementById('l3_me_sync'); if (!box) return;
+          const a = window.appState.auth || {};
+          box.classList.toggle('hidden', !meServer());
+          if (!meServer()) return;
+          const noOrg = !a.org, ro = !!a.org && !meCanEditOrg();
+          document.getElementById('l3_me_org_btn').classList.toggle('hidden', !noOrg);
+          meCard.querySelectorAll('[data-me]').forEach(i => { if (ME_ORG[i.dataset.me]) { i.readOnly = ro; i.classList.toggle('bg-slate-50', ro); } });
+          meCard.querySelectorAll('#l3_me_logo_in, #l3_me_logo_del').forEach(el => { el.disabled = ro; });
+          meSyncMsg(noOrg ? '아직 서버에 등록된 펌이 없습니다 — 상호를 적고 [펌 등록]을 누르면 관리자 화면·다른 PC에서도 보입니다'
+            : ro ? '펌 정보는 펌 관리자가 고칩니다 · 내 연락처는 서버에 저장됩니다' : '서버에 저장됩니다 · 관리자 화면·다른 PC에도 같은 정보', !noOrg);
+        }
         const meCard = document.createElement('div');
         meCard.id = 'l3_me';
         meCard.className = 'bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-5';
@@ -8536,9 +8834,11 @@
           '<img id="l3_me_logo" class="max-h-12 max-w-[9rem] hidden" alt="펌 로고"><span id="l3_me_logo_ph">로고 올리기</span><input type="file" accept="image/*,.svg,.png,.jpg,.jpeg,.gif,.webp,.bmp,.avif,.ico" id="l3_me_logo_in" class="hidden"></label>' +
           '<button type="button" id="l3_me_logo_del" class="text-xs text-slate-500 underline cursor-pointer">로고 지우기</button><span class="text-[11px] text-slate-400">SVG·PNG·JPG·GIF 등 이미지, 10MB 이하</span></div>' +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">' + fld('firm', '상호', '예: 가나경영컨설팅') + fld('prefix', '문서번호 접두어', '예: GANA') + fld('ceo', '대표', '대표 성명') + fld('phone', '대표 전화', '02-000-0000') + fld('address', '주소', '사무실 주소', 1) + fld('reviewer', '검토자 (서식1 결재란)', '예: 수석컨설턴트 김OO') + fld('approver', '결재권자', '예: 대표이사') + '</div></div>' +
+          '<div id="l3_me_sync" class="hidden -mt-2 flex items-center gap-2 text-[11px] font-bold text-slate-500"><span id="l3_me_sync_msg" class="min-w-0"></span><button type="button" id="l3_me_org_btn" class="hidden ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-[#0f766e] text-white font-extrabold cursor-pointer">펌 등록</button></div>' +
           '<div><h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 mb-3 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span><span>나</span></h3>' +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="l3_me_person">' + fld('mobile', '휴대폰', '000-0000-0000') + fld('email', '메일', 'name@example.com') + '</div></div>';
         scr.insertBefore(meCard, scr.firstChild);
+        meCard.querySelector('#l3_me_org_btn').addEventListener('click', meCreateOrg);
 
         // 짧은 글(만원·명·태그·버튼 이름 등 10자 이하)은 한 줄로 — 좁은 칸에서 '만/원'처럼 갈라지지 않게
         scr.querySelectorAll('span, label, button, th, strong, b').forEach(el => {
@@ -8591,13 +8891,16 @@
         choice.id = 'l3_cchoice';
         choice.innerHTML = '<div class="l3-ask"><div class="q">어떤 고객을 작성할까요?</div><div class="opts">' +
           '<button type="button" data-c="new"><b>새 고객 작성</b><span>서류를 올리면 빈칸을 알아서 채웁니다</span></button>' +
-          '<button type="button" data-c="old"><b>기존 고객 불러오기</b><span>내 계정으로 이 PC에 저장한 고객을 다시 엽니다</span></button></div></div>' +
+          '<button type="button" data-c="old"><b>기존 고객 불러오기</b><span>내 계정에 저장된 고객을 다시 엽니다</span></button></div></div>' +
           '<div class="l3-seg"><button type="button" data-c="new">새 고객 작성</button><button type="button" data-c="old">기존 고객 불러오기</button></div>';
         scr.insertBefore(choice, scr.firstChild);
         // 원본의 '자문 수행 담당자'(이름·직함) 칸을 여기로 옮긴다 — 서식이 읽는 id 는 그대로
         const cons = document.getElementById('consultant_name');
         if (cons) { const w = cons.parentNode; w.querySelector('label').textContent = '이름·직함'; meCard.querySelector('#l3_me_person').prepend(w); }
         function fillMe() {
+          if (meServer() && meCache === null) { meCache = meFromServer(); meSnap = Object.assign({}, meCache); meMigrateLocal(); }
+          if (!meServer()) meCache = null;
+          meSyncUi();
           const m = readMe(), org = (window.appState.auth || {}).org || {};
           const dflt = { firm: org.name || '', prefix: org.doc_prefix || '', address: org.address || '', phone: org.phone || '' };
           meCard.querySelectorAll('[data-me]').forEach(i => { i.value = m[i.dataset.me] ?? dflt[i.dataset.me] ?? ''; });
