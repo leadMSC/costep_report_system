@@ -6475,7 +6475,7 @@
     // 다른 PC에서 먼저 고쳤으면(version 다름) 덮어쓰지 않고 묻는다. 로그인 없는 로컬 시험 모드는 예전처럼 이 PC 저장
     // 이 PC에 남아 있던 예전 자료(고객 목록·작성 중 내용)는 로그인하면 모두 서버로 옮기고 이 PC에서 지운다
     // =========================================================================
-    const cloud = { on: false, aid: null, ver: 0, cid: null, list: [], timer: null, busy: null, again: false, dirty: false, listTimer: null };
+    const cloud = { base: null, on: false, aid: null, ver: 0, cid: null, list: [], timer: null, busy: null, again: false, dirty: false, listTimer: null };
     function cloudOn() { return cloud.on && typeof sb !== 'undefined' && !!sb; }
     window.cloudOn = cloudOn;
     const cloudProfile = () => (window.appState.auth || {}).profile || {};
@@ -6527,6 +6527,7 @@
       clearTimeout(cloud.timer);
       if (!cloudProfile().org_id) { setClientStatus('서버 저장 대기 — [내 정보]에서 펌을 먼저 등록해 주세요'); return; }
       if (cloud.busy) { cloud.again = true; return cloud.busy; }
+      if (!cloud.aid && !hasContent(collectFormData())) { cloud.dirty = false; setClientStatus('입력하면 서버에 자동 저장됩니다'); return; }
       cloud.busy = (async () => {
         const data = collectFormData(), sum = cloudSummary(data);
         try {
@@ -6589,7 +6590,8 @@
       const { error } = await sb.from('assessments').insert(Object.assign({ org_id: cloudProfile().org_id }, cloudRow(data, sum, cid)));
       if (error) throw error;
     }
-    const hasContent = d => d && d.fields && Object.entries(d.fields).some(([k, v]) => k !== 'doc_date' && k !== 'consultant_name' && typeof v === 'string' && v.trim() !== '' && v !== '0');
+    // 빈 화면(기본값 그대로)은 저장하지 않는다 — 기본값은 cloudStart 에서 비운 화면으로 잡아 둔다
+    const hasContent = d => !!d && !!d.fields && ((d.debtItems || []).length > 0 || Object.entries(d.fields).some(([k, v]) => k !== 'doc_date' && k !== 'consultant_name' && String(v ?? '') !== String((cloud.base || {})[k] ?? '')));
     async function cloudMigrateLocal() {
       if (!cloudProfile().org_id) return 0;
       const uid = storageScope;
@@ -6600,7 +6602,7 @@
         let store = null; try { store = JSON.parse(ls.getItem(k) || 'null'); } catch (e) { store = null; }
         if (!store || !store.clients) continue;
         for (const c of Object.values(store.clients)) {
-          if (c.uploaded || !c.data) continue;
+          if (c.uploaded || !c.data || !hasContent(c.data)) continue;
           await cloudUploadOne(c.data); c.uploaded = true; n++;
           try { ls.setItem(k, JSON.stringify(store)); } catch (e) { /* 표시 실패 */ }
         }
@@ -6616,6 +6618,7 @@
     async function cloudStart() {
       cloud.on = true; cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false; cloud.list = [];
       resetFormToDefaults();
+      cloud.base = collectFormData().fields;
       refreshClientSelect();
       if (!cloudProfile().org_id) { setClientStatus('서버 저장 대기 — [내 정보]에서 펌을 먼저 등록해 주세요'); return; }
       setClientStatus('서버에서 불러오는 중…');
