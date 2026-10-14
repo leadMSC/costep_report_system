@@ -550,8 +550,8 @@
   </div>
 
   <!-- ================= 관리 화면 (펌 관리자·운영자) ================= -->
-  <div id="admin_modal" class="no-print hidden fixed inset-0 z-[90] bg-slate-900/50 flex items-start sm:items-center justify-center p-3 overflow-y-auto">
-    <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-slate-200">
+  <div id="admin_modal" class="no-print hidden fixed inset-0 z-[90] bg-slate-900/50 flex items-start sm:items-center justify-center p-3 overflow-hidden">
+    <div class="w-full max-w-4xl max-h-[calc(100vh-24px)] flex flex-col bg-white rounded-2xl shadow-lg border border-slate-200">
       <div class="flex items-center justify-between px-5 py-3 border-b border-slate-200">
         <div class="flex items-center space-x-2">
           <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
@@ -566,7 +566,7 @@
         <button type="button" id="admin_tab_logs" onclick="adminTab('logs')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">접속·작업 기록</button>
         <button type="button" id="admin_tab_org" onclick="adminTab('org')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">펌 정보·로고·직인</button>
       </div>
-      <div class="p-5 text-xs">
+      <div class="p-5 text-xs flex-1 min-h-0 overflow-y-auto">
         <div id="admin_msg" class="hidden mb-3 px-3 py-2 rounded-lg text-xs font-bold"></div>
         <div id="admin_pane_members"></div>
         <div id="admin_pane_invites" class="hidden space-y-3">
@@ -6968,24 +6968,34 @@
       adminMsg('펌 정보를 저장했습니다. 서식에 바로 반영됩니다.', true);
     }
     window.adminSaveOrg = adminSaveOrg;
-    const LOG_LABEL = { login: '로그인', logout: '로그아웃', signup: '가입', role_change: '역할 변경', invite: '사전 등록', print: '출력', export: '문서 저장', save_client: '고객 저장', org_update: '펌 정보 수정' };
-    async function adminLoadLogs() {
+    const LOG_LABEL = { login: '로그인', logout: '로그아웃', signup: '가입', role_change: '역할 변경', invite: '사전 등록', print: '출력', export: '문서 저장', save_client: '고객 저장', org_update: '펌 정보 수정', org_create: '펌 등록' };
+    // 접속·작업 기록: 50건씩 불러오고 [더 보기]로 이어 붙인다. 표는 정해진 높이 안에서만 굴러가고 머리줄은 고정
+    const LOG_PAGE = 50;
+    let logRows = [], logDone = false;
+    async function adminLoadLogs(more) {
       const pane = document.getElementById('admin_pane_logs');
-      pane.innerHTML = '<p class="text-slate-500">불러오는 중…</p>';
-      const { data, error } = await sb.from('audit_logs').select('id,user_id,org_id,action,target_type,detail,created_at').order('created_at', { ascending: false }).limit(200);
+      if (!more) { logRows = []; logDone = false; pane.innerHTML = '<p class="text-slate-500">불러오는 중…</p>'; }
+      const { data, error } = await sb.from('audit_logs').select('id,user_id,org_id,action,target_type,detail,created_at').order('created_at', { ascending: false }).range(logRows.length, logRows.length + LOG_PAGE - 1);
       if (error) { pane.innerHTML = `<p class="text-red-700">${escapeHtml(error.message)}</p>`; return; }
       if (!adminCache.members.length) await adminLoadMembers();
+      logRows = logRows.concat(data || []); logDone = (data || []).length < LOG_PAGE;
       const who = (id) => { const m = adminCache.members.find(x => x.id === id); return m ? (m.name || m.email) : '(알 수 없음)'; };
       const desc = (l) => {
         const d = l.detail || {};
         if (l.action === 'role_change') return `${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to}`;
-        if (l.action === 'invite') return `${d.email || ''} (${ROLE_LABEL[d.role] || ''})`;
+        if (l.action === 'invite') return `${escapeHtml(d.email || '')} (${ROLE_LABEL[d.role] || ''})`;
         if (l.action === 'signup') return d.invited ? '초대로 가입' : '승인 대기로 가입';
+        if (l.action === 'org_create' || l.action === 'org_update') return d.name ? escapeHtml(d.name) : '';
         return d.corp ? escapeHtml(d.corp) : '';
       };
-      pane.innerHTML = `<p class="mb-2 text-slate-500">최근 200건 · ${isOperator() ? '전체 펌' : '우리 펌'}</p><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="bg-slate-50 text-slate-600"><th class="p-2">시각</th><th class="p-2">사용자</th><th class="p-2">작업</th><th class="p-2">내용</th></tr></thead><tbody>` +
-        ((data || []).map(l => `<tr class="border-b border-slate-100"><td class="p-2 whitespace-nowrap text-slate-500">${fmtTime(l.created_at)}</td><td class="p-2">${escapeHtml(who(l.user_id))}</td><td class="p-2 font-bold">${LOG_LABEL[l.action] || escapeHtml(l.action)}</td><td class="p-2">${desc(l)}</td></tr>`).join('') ||
-          '<tr><td colspan="4" class="p-3 text-slate-500">기록이 없습니다.</td></tr>') + '</tbody></table></div>';
+      const keep = pane.querySelector('.log-scroll')?.scrollTop || 0;
+      pane.innerHTML = `<p class="mb-2 text-slate-500">최근 ${logRows.length}건${logDone ? ' (전부)' : ''} · ${isOperator() ? '전체 펌' : '우리 펌'}</p>` +
+        `<div class="log-scroll max-h-[55vh] overflow-auto border border-slate-200 rounded-lg"><table class="w-full text-left"><thead class="sticky top-0 bg-slate-50 z-[1]"><tr class="text-slate-600"><th class="p-2">시각</th><th class="p-2">사용자</th><th class="p-2">작업</th><th class="p-2">내용</th></tr></thead><tbody>` +
+        (logRows.map(l => `<tr class="border-b border-slate-100"><td class="p-2 whitespace-nowrap text-slate-500">${fmtTime(l.created_at)}</td><td class="p-2 whitespace-nowrap">${escapeHtml(who(l.user_id))}</td><td class="p-2 font-bold whitespace-nowrap">${LOG_LABEL[l.action] || escapeHtml(l.action)}</td><td class="p-2">${desc(l)}</td></tr>`).join('') ||
+          '<tr><td colspan="4" class="p-3 text-slate-500">기록이 없습니다.</td></tr>') + '</tbody></table></div>' +
+        (logDone ? '' : '<div class="mt-2 text-center"><button type="button" id="log_more" class="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-300 font-bold cursor-pointer">50건 더 보기</button></div>');
+      const sc = pane.querySelector('.log-scroll'); if (sc) sc.scrollTop = keep;
+      pane.querySelector('#log_more')?.addEventListener('click', () => adminLoadLogs(true));
     }
 
     // 출력·문서 저장·고객 저장을 접속 기록에 남긴다 (기존 함수를 감싸기만 하고 동작은 그대로)
