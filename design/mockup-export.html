@@ -6,148 +6,138 @@
 :root{--navy:#0A1F44;--teal:#00E0C6;--teal-ink:#00A898;--gold:#FFC300;--ink:#0A0B0F;--paper:#F6F5F1;--line:#E4E2DB;--sub:#66635C}
 *{box-sizing:border-box}body{margin:0;font-family:"Noto Sans KR",sans-serif;background:var(--paper);color:var(--ink)}
 .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 80px}
-h1{font-size:22px;font-weight:900;margin:0 0 4px}.lead{color:var(--sub);font-size:13px;margin:0 0 28px}
+h1{font-size:22px;font-weight:900;margin:0 0 4px}.lead{color:var(--sub);font-size:13px;margin:0 0 20px}
 h2{font-size:14px;font-weight:900;color:var(--sub);margin:36px 0 12px}
-.stage{display:grid;grid-template-columns:1.2fr 1fr;gap:20px;align-items:start}
-/* 3뎁스 미리보기 모형 */
-.pv{position:relative;height:560px;border-radius:18px;background:#E9E7E1;overflow:hidden;border:1px solid var(--line)}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font:700 12px "Noto Sans KR";cursor:pointer}.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stage{display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start}
+.pv{position:relative;height:640px;border-radius:18px;background:#E9E7E1;overflow:hidden;border:1px solid var(--line)}
 .bar{position:absolute;top:14px;left:14px;right:14px;display:flex;align-items:center;gap:8px;padding:6px;border-radius:999px;background:rgba(255,255,255,.72);backdrop-filter:blur(10px);box-shadow:0 6px 20px rgba(10,31,68,.12);border:1px solid rgba(255,255,255,.8);z-index:3}
 .seg{display:inline-flex;background:#F1EFE9;border-radius:999px;padding:3px}.seg b{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;color:var(--sub)}.seg b.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .pill{padding:7px 13px;border-radius:999px;font-size:12px;font-weight:800;background:#fff;border:1px solid var(--line)}
-.ex{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:999px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;cursor:pointer;border:0}
-.ex svg{width:14px;height:14px}
-.paper{position:absolute;top:80px;left:50%;transform:translateX(-50%);width:330px;height:466px;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.12);padding:22px 24px}
+.ex{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:999px;background:var(--ink);color:#fff;font:800 12px "Noto Sans KR";cursor:pointer;border:0}
+.paper{position:absolute;top:80px;left:50%;transform:translateX(-50%);width:330px;height:520px;background:#fff;box-shadow:0 8px 28px rgba(0,0,0,.12);padding:22px 24px}
 .paper i{display:block;height:7px;border-radius:4px;background:#EEF0F3;margin:9px 0}.paper i.t{height:14px;width:60%;margin:6px auto 16px;background:#D9DEE6}
 .gone{position:absolute;top:96px;right:calc(50% - 150px);display:flex;gap:6px;opacity:.55}
 .gone span{font-size:10px;font-weight:800;padding:4px 8px;border-radius:7px;background:#169aa8;color:#fff;text-decoration:line-through}
 .gone em{position:absolute;top:-18px;right:0;font-size:10px;font-style:normal;color:#DC2626;font-weight:800;white-space:nowrap}
-/* 드롭다운 */
-.menu{position:absolute;top:58px;right:14px;width:290px;background:#fff;border-radius:16px;box-shadow:0 16px 40px rgba(10,31,68,.22);border:1px solid var(--line);padding:8px;z-index:4;display:none}
-.menu.open{display:block}
-.mh{font-size:11px;font-weight:800;color:var(--sub);padding:8px 10px 4px}
-.mi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;position:relative}
-.mi:hover,.mi.hl{background:#F1EFE9}.mi .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;flex:none}
-.ic.pdf{background:#FDECEC;color:#B42318}.ic.doc{background:#E8F0FE;color:#1A56DB}
-.mi small{display:block;font-size:11px;font-weight:500;color:var(--sub)}.mi .ar{margin-left:auto;color:#94A3B8}
-.sep{height:1px;background:var(--line);margin:6px 4px}
-.sub{position:absolute;top:44px;right:308px;width:230px;background:#fff;border-radius:14px;box-shadow:0 16px 40px rgba(10,31,68,.22);border:1px solid var(--line);padding:6px;display:none;z-index:5}
-.sub.open{display:block}.sub .mi{font-weight:600}
-.note{font-size:11px;color:var(--sub);padding:8px 10px 4px;line-height:1.5}
-/* 오른쪽 설명 */
+/* 팝업 */
+.dim{position:absolute;inset:0;background:rgba(10,31,68,.38);z-index:6;display:none;align-items:center;justify-content:center}
+.dim.open{display:flex}
+.dlg{width:480px;max-height:600px;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(10,31,68,.35);padding:18px 20px}
+.dh{display:flex;align-items:center;gap:8px;margin-bottom:4px}.dh h3{margin:0;font-size:16px;font-weight:900}.dh .x{margin-left:auto;border:0;background:none;font-size:18px;color:var(--sub);cursor:pointer}
+.back{border:0;background:#F1EFE9;border-radius:8px;padding:4px 8px;font:800 12px "Noto Sans KR";cursor:pointer}
+.steps{display:flex;gap:6px;font-size:11px;font-weight:800;color:#94A3B8;margin:0 0 14px}.steps b.on{color:var(--teal-ink)}
+.ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;flex:none}
+.ic.pdf{background:#FDECEC;color:#B42318}.ic.doc{background:#E8F0FE;color:#1A56DB}.ic.prt{background:#E7F7F4;color:#00796B}
+.pick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pk{border:1.5px solid var(--line);border-radius:14px;padding:16px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center}
+.pk:hover{border-color:var(--navy);background:#F8F9FB}.pk b{font-size:14px}.pk small{font-size:11px;color:var(--sub);line-height:1.45}
+.sec{font-size:12px;font-weight:900;margin:12px 2px 6px;display:flex;justify-content:space-between}.sec a{font-size:11px;color:var(--teal-ink);cursor:pointer}
+.grp{border:1px solid var(--line);border-radius:12px;padding:6px 10px}
+.ck{display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:12.5px;font-weight:600;cursor:pointer;border-radius:8px}.ck:hover{background:#F6F5F1}
+.ck input{width:16px;height:16px;accent-color:var(--navy);flex:none}.ck .now{margin-left:auto;font-size:10px;font-weight:800;color:var(--teal-ink)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 6px}
+.opt{display:flex;align-items:center;justify-content:space-between;padding:7px 4px;font-size:12.5px;font-weight:600;border-bottom:1px dashed var(--line)}.opt:last-child{border:0}
+.opt small{display:block;font-size:10.5px;color:var(--sub);font-weight:500}
+.sg{display:inline-flex;background:#F1EFE9;border-radius:8px;padding:2px}.sg span{padding:4px 9px;border-radius:6px;font-size:11.5px;font-weight:800;color:var(--sub);cursor:pointer}.sg span.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.warn{font-size:11.5px;background:#FFF8E1;border:1px solid #FFE08A;border-radius:10px;padding:7px 10px;margin:10px 0 0;line-height:1.5}.warn a{color:#8A5A00;font-weight:800}
+.foot{display:flex;align-items:center;gap:8px;margin-top:12px}.cnt{font-size:12px;color:var(--sub)}.cnt b{color:var(--ink)}
+.btn{border:0;border-radius:10px;padding:9px 14px;font:800 13px "Noto Sans KR";cursor:pointer}.btn.pri{background:var(--ink);color:#fff;margin-left:auto}.btn.pri:disabled{opacity:.35;cursor:default}
+.toast{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:12px;font-weight:700;padding:9px 16px;border-radius:999px;display:none;z-index:7}.toast.open{display:block}
 .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:14px}
 .card h3{margin:0 0 8px;font-size:14px;font-weight:900}
-ol{margin:0;padding-left:18px;font-size:13px;line-height:1.75}ol li b{font-weight:800}
-.fn{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:#F6F5F1;border-radius:6px;padding:1px 6px}
-table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#F6F5F1;font-weight:800;color:var(--sub)}
-.tag{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px}.tag.pdf{background:#FDECEC;color:#B42318}.tag.doc{background:#E8F0FE;color:#1A56DB}
-.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px}.flow span{background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-weight:700}.flow b{color:var(--teal-ink)}
-.toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:12px;padding:10px 14px;border-radius:12px;display:none;z-index:6;white-space:nowrap}
-.toast.on{display:block}
-.dlg{position:absolute;inset:0;background:rgba(10,11,15,.35);display:none;align-items:center;justify-content:center;z-index:7}
-.dlg.on{display:flex}.dlg .box{width:360px;background:#fff;border-radius:14px;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,.3);font-size:12.5px}
-.dlg .box b{font-size:14px}.dlg .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}
-.dlg .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.dlg .btns span{padding:7px 14px;border-radius:9px;border:1px solid var(--line);font-weight:800}.dlg .btns span.go{background:#1A56DB;color:#fff;border-color:#1A56DB}
-@media(max-width:980px){.stage{grid-template-columns:1fr}}
+ul{margin:0;padding-left:18px;font-size:13px;line-height:1.75}
+.fn{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;background:#F6F5F1;border-radius:6px;padding:1px 6px;word-break:break-all}
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;border:1px solid var(--line)}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;line-height:1.6}th{background:#F1EFE9;font-weight:900}
+@media(max-width:900px){.stage{grid-template-columns:1fr}.dlg{width:calc(100% - 24px)}.pick{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
-<h1>내보내기 — 목업</h1>
-<p class="lead">미리보기 위 「전체 인쇄·PDF」를 「내보내기」 한 버튼으로 바꾸고, 서식별·전체 × PDF·Docs 네 가지로 고릅니다. 서식 위의 「출력(인쇄/PDF)」·「저장(독스 다운로드)」 버튼은 없앱니다. 버튼을 눌러 직접 써 보세요.</p>
-
+<h1>내보내기 목업 v3</h1>
+<p class="lead">「내보내기」를 누르면 팝업. 1단계에서 PDF · Docs · 인쇄 중 고르고, 2단계에서 리포트(분야 6 + 서식 4)와 출력 옵션을 고릅니다.</p>
+<div class="tabs" id="tabs">
+ <button data-s="">처음</button><button data-s="s1">1단계 · 방식</button><button data-s="pdf">2단계 · PDF</button><button data-s="doc">2단계 · Docs</button><button data-s="print">2단계 · 인쇄</button><button data-s="done">끝</button>
+</div>
 <div class="stage">
- <div class="pv" id="pv">
-  <div class="bar">
-   <span class="seg"><b class="on">보고서</b><b>지원사업</b></span>
-   <span class="pill">보기옵션 ▾</span>
-   <button class="ex" id="ex" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>내보내기 ▾</button>
-  </div>
-  <div class="paper"><i class="t"></i><i></i><i style="width:80%"></i><i></i><i style="width:70%"></i><i></i><i style="width:90%"></i><i></i><i style="width:60%"></i><i></i><i style="width:85%"></i><i></i><i style="width:75%"></i></div>
-  <div class="gone"><em>없앰 → 내보내기로</em><span>출력 (인쇄/PDF)</span><span>저장 (독스 다운로드)</span></div>
-
-  <div class="menu" id="menu">
-   <div class="mh">서식 하나씩</div>
-   <div class="mi" data-sub="pdf"><span class="ic pdf">PDF</span><div>서식별 PDF<small>고른 서식 한 장 → PDF</small></div><span class="ar">›</span></div>
-   <div class="mi" data-sub="doc"><span class="ic doc">DOC</span><div>서식별 Docs<small>고른 서식 한 장 → 워드·구글 문서</small></div><span class="ar">›</span></div>
-   <div class="sep"></div>
-   <div class="mh">서식 1~4 한 묶음</div>
-   <div class="mi" data-go="all-pdf"><span class="ic pdf">PDF</span><div>전체 PDF<small>서식 1~4를 한 파일로 (지금 상담 분야)</small></div></div>
-   <div class="mi" data-go="all-doc"><span class="ic doc">DOC</span><div>전체 Docs<small>서식 1~4를 한 파일로 (지금 상담 분야)</small></div></div>
-   <div class="note">PDF는 인쇄 창에서 「PDF로 저장」을 고르면 됩니다. 파일 이름은 미리 채워 둡니다.</div>
-  </div>
-  <div class="sub" id="sub"></div>
+ <div class="pv">
+  <div class="bar"><span class="seg"><b class="on">보고서</b><b>지원사업</b></span><span class="pill">보기옵션 ▾</span>
+   <button class="ex" id="exBtn">내보내기</button></div>
+  <div class="paper"><i class="t"></i><i></i><i></i><i style="width:80%"></i><i></i><i></i><i style="width:70%"></i><i></i><i></i><i style="width:60%"></i><i></i><i></i><i style="width:85%"></i></div>
+  <div class="gone"><em>카드별 버튼 없앰 → 내보내기로</em><span>출력 (인쇄/PDF)</span><span>저장 (독스 다운로드)</span></div>
+  <div class="dim" id="dim"><div class="dlg">
+   <!-- 1단계 -->
+   <div id="p1">
+    <div class="dh"><h3>내보내기</h3><button class="x" data-close>✕</button></div>
+    <div class="steps"><b class="on">1 방식</b>›<b>2 리포트 · 옵션</b></div>
+    <div class="pick">
+     <div class="pk" data-go="pdf"><span class="ic pdf">PDF</span><b>PDF</b><small>고객에게 보낼 파일</small></div>
+     <div class="pk" data-go="doc"><span class="ic doc">DOC</span><b>Docs</b><small>한글·워드에서 고쳐 쓸 파일</small></div>
+     <div class="pk" data-go="print"><span class="ic prt">인쇄</span><b>인쇄</b><small>바로 프린터로</small></div>
+    </div>
+   </div>
+   <!-- 2단계 -->
+   <div id="p2" hidden>
+    <div class="dh"><button class="back" id="back">‹ 방식</button><span class="ic" id="dIc"></span><h3 id="dTitle"></h3><button class="x" data-close>✕</button></div>
+    <div class="steps"><b>1 방식</b>›<b class="on">2 리포트 · 옵션</b></div>
+    <div class="sec">분야별 리포트<a data-all="f">전체 선택</a></div><div class="grp" id="fList"></div>
+    <div class="sec">서식<a data-all="s">전체 선택</a></div><div class="grp cols" id="sList"></div>
+    <div class="sec">출력 옵션</div><div class="grp" id="oList"></div>
+    <div class="warn">⚠ 「경영개선 × 서식2」에 빈 필수 칸 3개 — 그대로 내보내면 빈칸으로 나옵니다. <a>채우러 가기</a></div>
+    <div class="foot"><span class="cnt" id="cnt"></span><button class="btn pri" id="go"></button></div>
+   </div>
+  </div></div>
   <div class="toast" id="toast"></div>
-  <div class="dlg" id="dlg"><div class="box" id="box"></div></div>
  </div>
-
  <div>
-  <div class="card"><h3>버튼 하나, 네 가지 저장</h3>
-   <ol>
-    <li><b>내보내기 ▾</b>를 누르면 메뉴가 열립니다.</li>
-    <li><b>서식별</b>을 고르면 옆에 서식 1~4 목록이 나옵니다. 하나를 고르면 그 서식만 저장합니다.</li>
-    <li><b>전체</b>는 지금 고른 상담 분야의 서식 1~4를 한 파일로 저장합니다.</li>
-    <li><b>PDF</b>는 인쇄 창이 열립니다. 대상에서 「PDF로 저장」을 고르고 저장을 누릅니다. 파일 이름은 미리 채워져 있습니다.</li>
-    <li><b>Docs</b>는 인쇄 창 없이 바로 내려받습니다. 워드·한글·구글 문서에서 열어 고칠 수 있습니다.</li>
-   </ol>
-  </div>
-  <div class="card"><h3>파일 이름</h3>
-   <table>
-    <tr><th>저장</th><th>이름</th></tr>
-    <tr><td><span class="tag pdf">PDF</span> 서식별</td><td><span class="fn">[한빛정밀] - 가나경영 경영리포트_서식2 결과보고서.pdf</span></td></tr>
-    <tr><td><span class="tag doc">DOC</span> 서식별</td><td><span class="fn">[한빛정밀] - 가나경영 경영리포트_서식2 결과보고서.doc</span></td></tr>
-    <tr><td><span class="tag pdf">PDF</span> 전체</td><td><span class="fn">[한빛정밀] - 가나경영 경영리포트.pdf</span></td></tr>
-    <tr><td><span class="tag doc">DOC</span> 전체</td><td><span class="fn">[한빛정밀] - 가나경영 경영리포트.doc</span></td></tr>
-   </table>
-  </div>
+  <div class="card"><h3>처음 열 때 체크 상태</h3><ul>
+   <li>분야: <b>지금 보고 있는 분야</b>만</li><li>서식: <b>1~4 모두</b></li>
+   <li>다음에 열면 마지막 선택을 기억</li></ul></div>
+  <div class="card"><h3>출력 옵션 (제안 — 넣고 뺄 것 골라 주세요)</h3><ul>
+   <li><b>파일 묶음</b> (PDF·Docs): 한 파일 / 서식마다 따로</li>
+   <li><b>직인 넣기</b>: 서식1 발신란의 펌 직인</li>
+   <li><b>쪽 번호</b>: 아래 가운데 「1 / 8」</li>
+   <li><b>컬러</b> (인쇄만): 컬러 / 흑백</li>
+   <li><b>부수</b> (인쇄만)</li></ul></div>
+  <div class="card"><h3>파일 이름</h3><ul>
+   <li>한 장: <span class="fn">[한빛정밀] - 가나경영 경영리포트_경영개선_서식2 결과보고서.pdf</span></li>
+   <li>분야 하나: <span class="fn">[한빛정밀] - 가나경영 경영리포트_경영개선.pdf</span></li>
+   <li>분야 여럿: <span class="fn">[한빛정밀] - 가나경영 경영리포트.pdf</span></li></ul></div>
  </div>
 </div>
 
-<h2>누른 뒤의 흐름</h2>
-<div class="card">
- <table>
-  <tr><th style="width:120px">고른 것</th><th>순서</th></tr>
-  <tr><td><span class="tag pdf">PDF</span> 서식별</td><td><div class="flow"><span>내보내기</span>›<span>서식별 PDF</span>›<span>서식 고르기</span>›<span><b>① 확인</b> 빈 필수칸 있으면 알림</span>›<span><b>② 인쇄 창</b> 그 서식만 · 이름 채움</span>›<span>PDF로 저장</span>›<span>미리보기 그대로 복귀</span></div></td></tr>
-  <tr><td><span class="tag doc">DOC</span> 서식별</td><td><div class="flow"><span>내보내기</span>›<span>서식별 Docs</span>›<span>서식 고르기</span>›<span><b>① 확인</b></span>›<span><b>② 바로 내려받기</b> .doc</span>›<span>아래 「저장했어요」 알림</span></div></td></tr>
-  <tr><td><span class="tag pdf">PDF</span> 전체</td><td><div class="flow"><span>내보내기</span>›<span>전체 PDF</span>›<span><b>① 확인</b></span>›<span><b>② 인쇄 창</b> 서식 1~4 · 4쪽 이상</span>›<span>PDF로 저장</span>›<span>복귀</span></div></td></tr>
-  <tr><td><span class="tag doc">DOC</span> 전체</td><td><div class="flow"><span>내보내기</span>›<span>전체 Docs</span>›<span><b>① 확인</b></span>›<span><b>② 바로 내려받기</b> 서식 1~4 한 파일(서식마다 새 쪽)</span>›<span>알림</span></div></td></tr>
- </table>
- <p style="font-size:12.5px;color:var(--sub);margin:12px 0 0;line-height:1.7"><b>① 확인</b>: 상호·대표자 같은 필수칸이 비었거나 서식이 A4 한 장을 넘으면 저장 전에 한 번 알립니다. 「그대로 저장」 또는 「채우러 가기」(그 칸으로 이동) 중에서 고릅니다. 문제가 없으면 이 단계는 건너뜁니다.<br>
- <b>바뀌는 것</b>: 지금 「전체 인쇄·PDF」는 상담 분야 6개를 모두 돌려 24쪽을 찍습니다. 「전체」는 고객에게 보내는 묶음, 곧 <b>지금 고른 분야의 서식 1~4</b>로 바꿉니다. 6개 분야 모두 찍기가 필요하면 메뉴 맨 아래에 작게 남길 수 있습니다(제안: 빼기).</p>
+<h2>누른 뒤 흐름</h2>
+<table>
+<tr><th style="width:80px">방식</th><th>2단계에서 「내보내기」를 누르면</th><th>끝</th></tr>
+<tr><td><b>PDF</b></td><td>인쇄 창이 고른 장만 담아 열림 · 파일 이름 미리 채움 → 대상에서 「PDF로 저장」<br><small>「서식마다 따로」면 파일 수만큼 차례로 창이 열림</small></td><td>미리보기로 돌아옴</td></tr>
+<tr><td><b>Docs</b></td><td>.doc 바로 내려받기 (한 파일이면 장마다 쪽 나눔, 따로면 여러 파일)</td><td>「저장했어요 · K장」 알림</td></tr>
+<tr><td><b>인쇄</b></td><td>인쇄 창이 고른 장만 담아 열림 → 프린터 선택</td><td>미리보기로 돌아옴</td></tr>
+</table>
+<p style="font-size:12px;color:var(--sub);margin-top:10px">장 순서: 분야 순서대로, 각 분야 안에서 서식1→4. 빈 필수 칸·A4 넘침은 2단계 안에 노란 알림으로만 알리고 막지 않습니다.<br>참고: 브라우저는 인쇄 창의 「대상」을 미리 PDF로 정해 둘 수 없어서, PDF는 파일 이름을 채워 두고 「PDF로 저장」을 고르라고 안내합니다.</p>
 </div>
-
 <script>
-const $ = s => document.querySelector(s);
-const menu = $('#menu'), sub = $('#sub'), toast = $('#toast'), dlg = $('#dlg'), box = $('#box');
-const SHEETS = ['서식1 행정시행문', '서식2 결과보고서', '서식3 실행안내서', '서식4 사업계획 개요서'];
-const base = '[한빛정밀] - 가나경영 경영리포트';
-$('#ex').onclick = e => { e.stopPropagation(); menu.classList.toggle('open'); sub.classList.remove('open'); };
-document.addEventListener('click', e => { if (!e.target.closest('#menu,#sub,#ex,.box')) { menu.classList.remove('open'); sub.classList.remove('open'); } });
-menu.addEventListener('mouseover', e => {
-  const it = e.target.closest('.mi'); if (!it) return;
-  menu.querySelectorAll('.mi').forEach(m => m.classList.toggle('hl', m === it));
-  if (it.dataset.sub) {
-    const kind = it.dataset.sub;
-    sub.innerHTML = SHEETS.map((s, i) => `<div class="mi" data-go="${kind}" data-i="${i}"><span class="ic ${kind}">${i + 1}</span>${s}</div>`).join('');
-    sub.style.top = (it.offsetTop + 50) + 'px'; sub.classList.add('open');
-  } else sub.classList.remove('open');
-});
-function go(kind, i) {
-  menu.classList.remove('open'); sub.classList.remove('open');
-  const one = i !== undefined, name = one ? `${base}_${SHEETS[i]}` : base;
-  const isPdf = kind.includes('pdf');
-  // ① 확인(예시: 대표자 빈칸)
-  box.innerHTML = `<b>저장 전에 확인해 주세요</b><div style="margin:10px 0;color:#66635C">비어 있는 필수칸 1개 — <b style="font-size:12.5px">대표자 성명</b><br>비워 둔 채 저장하면 서식에 「대표자」로 나옵니다.</div><div class="btns"><span>채우러 가기</span><span class="go" id="keep">그대로 저장</span></div>`;
-  dlg.classList.add('on');
-  $('#keep').onclick = () => {
-    if (isPdf) {
-      box.innerHTML = `<b>인쇄 (브라우저 창)</b><div class="row"><span>대상</span><span>PDF로 저장 ▾</span></div><div class="row"><span>페이지</span><span>${one ? '1' : '4'}쪽</span></div><div class="row"><span>파일 이름</span><span style="max-width:200px;text-align:right">${name}.pdf</span></div><div class="btns"><span>취소</span><span class="go" id="ok">저장</span></div>`;
-      $('#ok').onclick = done;
-    } else done();
-    function done() { dlg.classList.remove('on'); toast.textContent = `저장했어요 — ${name}.${isPdf ? 'pdf' : 'doc'}`; toast.classList.add('on'); setTimeout(() => toast.classList.remove('on'), 2600); }
-  };
-  box.querySelector('.btns span').onclick = () => { dlg.classList.remove('on'); toast.textContent = '대표자 성명 칸으로 이동했어요'; toast.classList.add('on'); setTimeout(() => toast.classList.remove('on'), 2000); };
-}
-document.addEventListener('click', e => { const it = e.target.closest('[data-go]'); if (!it) return; e.stopPropagation(); go(it.dataset.go.replace('all-', ''), it.dataset.i !== undefined ? +it.dataset.i : undefined); });
-const q = new URLSearchParams(location.search).get('s');
-if (q === 'menu' || q === 'sub') { menu.classList.add('open'); if (q === 'sub') menu.querySelector('[data-sub=pdf]').dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); }
-if (q === 'check') go('pdf', 1);
-if (q === 'print') { go('pdf', 1); document.getElementById('keep').click(); }
+const F=['경영개선 진단서','사업정리·재기지원 진단서','금융비용·채무조정 진단서','판로·로컬마케팅 진단서','점포 환경개선·시설 진단서','노무관리 준법점검 진단서'];
+const S=['서식1 행정시행문','서식2 결과보고서','서식3 실행안내서','서식4 사업계획 개요서'];
+const M={pdf:['pdf','PDF','PDF로 내보내기','PDF 만들기'],doc:['doc','DOC','Docs로 내보내기','내려받기'],print:['prt','인쇄','인쇄하기','인쇄하기']};
+const O={pdf:[['파일 묶음','',['한 파일','서식마다 따로']],['직인 넣기','서식1 발신란',['넣기','빼기']],['쪽 번호','',['넣기','빼기']]],
+ doc:[['파일 묶음','',['한 파일','서식마다 따로']],['직인 넣기','서식1 발신란',['넣기','빼기']]],
+ print:[['컬러','',['컬러','흑백']],['직인 넣기','서식1 발신란',['넣기','빼기']],['쪽 번호','',['넣기','빼기']],['부수','',['1','2','3']]]};
+const $=id=>document.getElementById(id);let mode='pdf';
+$('fList').innerHTML=F.map((t,i)=>`<label class="ck"><input type="checkbox" data-g="f" ${i==0?'checked':''}>${t}${i==0?'<span class="now">지금 보는 분야</span>':''}</label>`).join('');
+$('sList').innerHTML=S.map(t=>`<label class="ck"><input type="checkbox" data-g="s" checked>${t}</label>`).join('');
+function cnt(){const f=document.querySelectorAll('[data-g=f]:checked').length,s=document.querySelectorAll('[data-g=s]:checked').length,k=f*s;
+ $('cnt').innerHTML=`<b>${f}</b>개 분야 × <b>${s}</b>개 서식 = <b>${k}장</b>`;$('go').textContent=`${M[mode][3]} (${k}장)`;$('go').disabled=!k;}
+document.addEventListener('change',cnt);
+document.querySelectorAll('[data-all]').forEach(a=>a.onclick=()=>{const bs=[...document.querySelectorAll(`[data-g=${a.dataset.all}]`)],on=!bs.every(b=>b.checked);bs.forEach(b=>b.checked=on);a.textContent=on?'모두 해제':'전체 선택';cnt();});
+function opts(){$('oList').innerHTML=O[mode].map(([n,h,c])=>`<div class="opt"><div>${n}${h?`<small>${h}</small>`:''}</div><span class="sg">${c.map((x,i)=>`<span class="${i?'':'on'}">${x}</span>`).join('')}</span></div>`).join('');
+ $('oList').querySelectorAll('.sg span').forEach(s=>s.onclick=()=>{s.parentNode.querySelectorAll('span').forEach(x=>x.classList.remove('on'));s.classList.add('on');});}
+function show(s){const two=!!M[s];$('dim').classList.toggle('open',s==='s1'||two);$('p1').hidden=two;$('p2').hidden=!two;$('toast').classList.remove('open');
+ if(two){mode=s;const m=M[s];$('dIc').className='ic '+m[0];$('dIc').textContent=m[1];$('dTitle').textContent=m[2];opts();cnt();}
+ if(s==='done'){$('toast').textContent='저장했어요 · 4장';$('toast').classList.add('open');}
+ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));}
+$('exBtn').onclick=()=>show('s1');$('back').onclick=()=>show('s1');
+document.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>show(e.dataset.go));
+document.querySelectorAll('[data-close]').forEach(e=>e.onclick=()=>show(''));
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>show(b.dataset.s));
+$('go').onclick=()=>show('done');
+show(new URLSearchParams(location.search).get('s')||'');
 </script>
-</div></body></html>
+</body></html>

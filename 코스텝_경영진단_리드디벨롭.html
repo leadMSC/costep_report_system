@@ -7530,36 +7530,69 @@
     #l3_input #screen_input > .l3-step { min-height: var(--l3h, 100vh); box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 24px 28px; margin: 0; }
     #l3_input #screen_input > .l3-step > * { margin: 0 !important; }
     #l3_preview { display: flex; flex-direction: column; min-width: 0; background: var(--t-surface-3, #F1EFE9); border-left: 1px solid var(--t-line, #E4E2DB); position: relative; }
-    /* 미리보기 위 떠 있는 둥근 유리 막대 */
-    #l3_head { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 8; max-width: calc(100% - 28px); padding: 5px; border-radius: 999px;
-      background: rgba(255,255,255,.58); -webkit-backdrop-filter: blur(18px) saturate(1.7); backdrop-filter: blur(18px) saturate(1.7);
-      border: 1px solid rgba(255,255,255,.75); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 8px 28px rgba(15,23,42,.12), 0 1px 3px rgba(15,23,42,.06);
-      transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, background .35s, padding .35s; }
-    #l3_head.scrolled { transform: translateX(-50%) scale(.95); background: rgba(255,255,255,.72); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 14px 36px rgba(15,23,42,.2), 0 2px 6px rgba(15,23,42,.08); }
-    #l3_head .row { display: flex; gap: 4px; align-items: center; }
-    #l3_head .l3-mode { background: rgba(15,23,42,.06); border-radius: 999px; }
-    #l3_head .l3-mode button { border-radius: 999px; padding: 6px 14px; }
+    /* 미리보기 위 떠 있는 둥근 유리 막대 — 움직임은 transform·opacity 만(덜컹거림 없음) */
+    #l3_head {
+      --g-bg: linear-gradient(180deg, rgba(255,255,255,.80), rgba(255,255,255,.58));
+      --g-edge: rgba(255,255,255,.85); --g-hair: rgba(15,23,42,.10); --g-hl: rgba(255,255,255,.95);
+      --g-chip: rgba(15,23,42,.055); --g-hover: rgba(15,23,42,.06); --g-thumb: #fff; --g-ink: #0f172a; --g-mute: #64748b;
+      --g-acc: #0f766e; --g-acc-soft: rgba(15,118,110,.10);
+      --ease-out: cubic-bezier(.16,1,.3,1); --ease-in: cubic-bezier(.4,0,1,1);
+      position: absolute; top: 14px; left: 50%; z-index: 8; max-width: calc(100% - 28px); padding: 5px; border-radius: 999px;
+      background: var(--g-bg); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+      border: 1px solid var(--g-edge);
+      box-shadow: inset 0 1px 0 var(--g-hl), 0 0 0 .5px var(--g-hair), 0 1px 2px rgba(15,23,42,.06), 0 14px 34px -14px rgba(15,23,42,.32);
+      transform: translate(-50%, 0) scale(1); transform-origin: 50% 0;
+      transition: transform .45s var(--ease-out), opacity .3s ease, box-shadow .35s ease; }
+    #l3_head::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0) 55%); mix-blend-mode: soft-light; }
+    /* 굴리면 살짝 작아지고, 아래로 계속 굴리면 위로 숨었다가 위로 굴리면 다시 내려온다 */
+    #l3_head.scrolled { transform: translate(-50%, 0) scale(.94); box-shadow: inset 0 1px 0 var(--g-hl), 0 0 0 .5px var(--g-hair), 0 2px 4px rgba(15,23,42,.06), 0 20px 44px -16px rgba(15,23,42,.42); }
+    #l3_head.hide { transform: translate(-50%, calc(-100% - 22px)) scale(.94); opacity: 0; pointer-events: none; }
+    #l3_head .row { display: flex; gap: 4px; align-items: center; position: relative; z-index: 1; }
+    /* 보고서/지원사업: 흰 알약이 미끄러져 옮겨 감 */
+    #l3_head .l3-mode { position: relative; background: var(--g-chip); border-radius: 999px; padding: 3px; gap: 0; }
+    #l3_head .l3-mode::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--tw, 0); border-radius: 999px; background: var(--g-thumb);
+      box-shadow: 0 1px 2px rgba(15,23,42,.12), 0 3px 8px -2px rgba(15,23,42,.12); transform: translateX(var(--tx, 0)); transition: transform .42s var(--ease-out), width .42s var(--ease-out); }
+    #l3_head .l3-mode button { position: relative; z-index: 1; border-radius: 999px; padding: 6px 15px; background: none !important; box-shadow: none !important; color: var(--g-mute); transition: color .25s; }
+    #l3_head .l3-mode button.on { color: var(--g-ink); }
     #l3_head .l3-view { position: relative; }
-    #l3_head .l3-view-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 13px; border-radius: 999px; font-size: 11px; font-weight: 800; color: var(--t-text, #0A0B0F); cursor: pointer; white-space: nowrap; transition: background .2s; }
-    #l3_head .l3-view-btn:hover, #l3_head .l3-view.open .l3-view-btn { background: rgba(15,23,42,.07); }
-    #l3_head .l3-view-btn .chev { transition: transform .3s cubic-bezier(.2,.8,.2,1); opacity: .6; }
+    #l3_head .l3-view-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 13px; border-radius: 999px; font-size: 11px; font-weight: 800; color: var(--g-ink); cursor: pointer; white-space: nowrap; transition: background .2s, transform .2s var(--ease-out); }
+    #l3_head .l3-view-btn:hover, #l3_head .l3-view.open .l3-view-btn { background: var(--g-hover); }
+    #l3_head .l3-view-btn:active { transform: scale(.97); }
+    #l3_head .l3-view-btn .chev { opacity: .55; transition: transform .45s var(--ease-out); }
     #l3_head .l3-view.open .chev { transform: rotate(180deg); }
-    #l3_head .l3-view-pop { position: absolute; top: calc(100% + 12px); left: 50%; min-width: 236px; padding: 6px; border-radius: 20px;
-      background: rgba(255,255,255,.78); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7);
-      border: 1px solid rgba(255,255,255,.8); box-shadow: 0 18px 48px rgba(15,23,42,.2), 0 2px 8px rgba(15,23,42,.08);
-      opacity: 0; visibility: hidden; transform: translate(-50%, -8px) scale(.96); transform-origin: top center;
-      transition: opacity .22s, transform .32s cubic-bezier(.2,.8,.2,1), visibility 0s .32s; }
-    #l3_head .l3-view.open .l3-view-pop { opacity: 1; visibility: visible; transform: translate(-50%, 0) scale(1); transition: opacity .22s, transform .32s cubic-bezier(.2,.8,.2,1); }
+    #l3_head .l3-view-btn:focus-visible, #l3_head .l3-view-pop .sheet-tab-btn:focus-visible, #l3_head .l3-mode button:focus-visible { outline: 2px solid var(--g-acc); outline-offset: 2px; }
+    /* 드롭다운: 열 때는 위에서 살짝 커지며 내려오고(.42s), 닫을 때는 짧게 걷힌다(.2s) */
+    #l3_head .l3-view-pop { position: absolute; top: calc(100% + 12px); left: 50%; min-width: 248px; padding: 6px; border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(250,251,252,.90)); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--g-edge); box-shadow: inset 0 1px 0 var(--g-hl), 0 0 0 .5px var(--g-hair), 0 24px 56px -18px rgba(15,23,42,.38), 0 4px 12px -4px rgba(15,23,42,.10);
+      opacity: 0; visibility: hidden; transform: translate(-50%, -10px) scale(.94); transform-origin: 50% -12px;
+      transition: opacity .18s ease, transform .2s var(--ease-in), visibility 0s linear .2s; }
+    #l3_head .l3-view.open .l3-view-pop { opacity: 1; visibility: visible; transform: translate(-50%, 0) scale(1);
+      transition: opacity .26s ease, transform .42s var(--ease-out), visibility 0s; }
+    #l3_head .l3-view-pop::before { content: ""; position: absolute; top: -6px; left: 50%; width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg);
+      background: rgba(255,255,255,.9); border-left: 1px solid var(--g-edge); border-top: 1px solid var(--g-edge); border-radius: 3px 0 0 0; }
     #l3_head .l3-view-pop .l3-sheets { display: flex; flex-direction: column !important; gap: 2px; }
-    #l3_head .l3-view-pop .sheet-tab-btn { all: unset; box-sizing: border-box; display: block; width: 100% !important; padding: 9px 14px !important; border-radius: 14px; font-size: 12px !important; font-weight: 700; color: var(--t-text, #0A0B0F); cursor: pointer; white-space: nowrap;
-      opacity: 0; transform: translateY(-6px); transition: background .15s, opacity .25s, transform .35s cubic-bezier(.2,.8,.2,1); }
-    #l3_head .l3-view.open .sheet-tab-btn { opacity: 1; transform: none; transition-delay: 0s, calc(var(--i) * 35ms + 40ms), calc(var(--i) * 35ms + 40ms); }
-    #l3_head .l3-view-pop .sheet-tab-btn:hover { background: rgba(15,23,42,.06); }
-    #l3_head .l3-view-pop .sheet-tab-btn.active { background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); }
-    #l3_head .l3-print { border-radius: 999px !important; padding: 7px 15px !important; }
-    :root[data-theme="ink"] #l3_head, :root[data-theme="ink"] #l3_head .l3-view-pop { background: rgba(28,30,38,.62); border-color: rgba(255,255,255,.1); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.45); }
-    :root[data-theme="ink"] #l3_head.scrolled { background: rgba(28,30,38,.78); }
-    :root[data-theme="ink"] #l3_head .l3-mode, :root[data-theme="ink"] #l3_head .l3-view-btn:hover, :root[data-theme="ink"] #l3_head .l3-view.open .l3-view-btn, :root[data-theme="ink"] #l3_head .l3-view-pop .sheet-tab-btn:hover { background: rgba(255,255,255,.08); }
+    #l3_head .l3-view-pop .sheet-tab-btn { all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100% !important; padding: 9px 14px !important; border-radius: 15px; font-size: 12px !important; font-weight: 700; color: var(--g-ink) !important; background: transparent !important; box-shadow: none !important; cursor: pointer; white-space: nowrap;
+      opacity: 0; transform: translateY(-4px); transition: background .18s, color .18s, opacity .15s ease, transform .2s var(--ease-in); }
+    #l3_head .l3-view.open .sheet-tab-btn { opacity: 1; transform: none; transition: background .18s, color .18s, opacity .3s ease calc(var(--i) * 32ms + 60ms), transform .45s var(--ease-out) calc(var(--i) * 32ms + 60ms); }
+    #l3_head .l3-view-pop .sheet-tab-btn:hover { background: var(--g-hover) !important; }
+    #l3_head .l3-view-pop .sheet-tab-btn.active { background: var(--g-acc-soft) !important; color: var(--g-acc) !important; }
+    #l3_head .l3-view-pop .sheet-tab-btn.active::after { content: ""; width: 14px; height: 14px; flex: none; background: currentColor;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/contain no-repeat; }
+    #l3_head .l3-view-pop .sheet-tab-btn:first-child { margin-bottom: 3px; }
+    #l3_head .l3-view-pop .sheet-tab-btn:first-child + .sheet-tab-btn { margin-top: 3px; }
+    #l3_head .l3-view-pop .sheet-tab-btn:first-child::before { content: ""; position: absolute; left: 10px; right: 10px; bottom: -4px; height: 1px; background: var(--g-hair); }
+    #l3_head .l3-print { border-radius: 999px !important; padding: 7px 15px !important; box-shadow: 0 1px 2px rgba(15,23,42,.2), inset 0 1px 0 rgba(255,255,255,.14); transition: transform .2s var(--ease-out), filter .2s; }
+    #l3_head .l3-print:hover { filter: brightness(1.15); }
+    #l3_head .l3-print:active { transform: scale(.97); }
+    :root[data-theme="ink"] #l3_head { --g-bg: linear-gradient(180deg, rgba(40,43,54,.78), rgba(24,26,34,.62)); --g-edge: rgba(255,255,255,.12); --g-hair: rgba(0,0,0,.5); --g-hl: rgba(255,255,255,.08);
+      --g-chip: rgba(255,255,255,.07); --g-hover: rgba(255,255,255,.08); --g-thumb: rgba(255,255,255,.16); --g-ink: #f1f5f9; --g-mute: #94a3b8; --g-acc: #5eead4; --g-acc-soft: rgba(94,234,212,.12); }
+    :root[data-theme="ink"] #l3_head::after { opacity: .25; }
+    :root[data-theme="ink"] #l3_head .l3-view-pop { background: linear-gradient(180deg, rgba(40,43,54,.97), rgba(26,28,36,.94)); }
+    :root[data-theme="ink"] #l3_head .l3-view-pop::before { background: rgba(40,43,54,.95); }
+    @media (prefers-reduced-motion: reduce) { #l3_head, #l3_head *, #l3_head *::before { transition-duration: .01ms !important; transition-delay: 0s !important; } }
     #l3_head .row > * { flex: none; }
     #l3_head #subrep_btn_bar, #l3_head .l3-sheets { display: flex; flex-direction: row !important; gap: 4px; }
     #l3_head #subrep_btn_bar > *, #l3_head .l3-sheets > * { margin: 0 !important; width: auto !important; white-space: nowrap; padding: 5px 10px !important; font-size: 11px; }
@@ -7789,10 +7822,20 @@
         row2.appendChild(view);
         const viewBtn = view.querySelector('.l3-view-btn');
         const setView = open => { view.classList.toggle('open', open); viewBtn.setAttribute('aria-expanded', open); };
-        viewBtn.addEventListener('click', () => setView(!view.classList.contains('open')));
+        viewBtn.addEventListener('click', () => {
+          const open = !view.classList.contains('open'); setView(open);
+          if (open) setTimeout(() => (sheetBox.querySelector('.active') || sheetBox.firstElementChild).focus({ preventScroll: true }), 60);
+        });
+        view.addEventListener('keydown', e => {
+          if (!view.classList.contains('open') || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+          e.preventDefault();
+          const items = [...sheetBox.children], i = items.indexOf(document.activeElement);
+          const n = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+          items[n].focus({ preventScroll: true });
+        });
         sheetBox.addEventListener('click', e => { if (e.target.closest('button')) setTimeout(() => setView(false), 120); });
         document.addEventListener('click', e => { if (!e.target.closest('.l3-view')) setView(false); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') setView(false); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && view.classList.contains('open')) { setView(false); viewBtn.focus({ preventScroll: true }); } });
         const pr = document.createElement('button');
         pr.type = 'button'; pr.className = 'l3-print'; pr.textContent = '전체 인쇄·PDF';
         pr.onclick = () => printAllReportsBatch();
@@ -7813,9 +7856,24 @@
         }
         mode.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
         const head = document.getElementById('l3_head');
-        const onPrevScroll = el => () => requestAnimationFrame(() => head.classList.toggle('scrolled', el.scrollTop > 8));
+        // 보고서/지원사업 흰 알약을 고른 버튼 밑으로 미끄러뜨림
+        const placeThumb = () => { const b = mode.querySelector('button.on'); if (!b || !b.offsetWidth) return; mode.style.setProperty('--tw', b.offsetWidth + 'px'); mode.style.setProperty('--tx', (b.offsetLeft) + 'px'); };
+        mode.addEventListener('click', placeThumb);
+        requestAnimationFrame(placeThumb); setTimeout(placeThumb, 300);
+        new ResizeObserver(placeThumb).observe(mode);
+        // 미리보기를 굴리면: 조금 내려가면 막대가 작아지고, 아래로 더 굴리면 위로 숨고, 위로 굴리면 다시 나온다
+        const onPrevScroll = el => { let lastY = 0, acc = 0; return () => requestAnimationFrame(() => {
+          const y = el.scrollTop, dy = y - lastY; lastY = y;
+          acc = (dy > 0) === (acc > 0) ? acc + dy : dy;   // 같은 방향으로 굴린 거리
+          head.classList.toggle('scrolled', y > 8);
+          if (y < 80 || view.classList.contains('open')) head.classList.remove('hide');
+          else if (acc > 60) head.classList.add('hide');
+          else if (acc < -24) head.classList.remove('hide');
+        }); };
         document.getElementById('l3_stage').addEventListener('scroll', onPrevScroll(document.getElementById('l3_stage')));
         radarBox.addEventListener('scroll', onPrevScroll(radarBox));
+        // 마우스를 미리보기 맨 위로 올리면 숨은 막대가 다시 나옴
+        document.getElementById('l3_preview').addEventListener('mousemove', e => { if (e.clientY - document.getElementById('l3_preview').getBoundingClientRect().top < 70) head.classList.remove('hide'); });
 
         // 고객 불러오기 줄: 자주 쓰는 것(불러오기·새 고객·저장)만 보이고 나머지는 더보기
         const cbar = document.getElementById('client_bar');
