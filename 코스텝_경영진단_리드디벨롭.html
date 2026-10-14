@@ -82,9 +82,11 @@
     .a4-page-card.a4-measure > .no-print {
       display: none !important;
     }
+    /* 쪽 여백을 0 으로 두면 브라우저가 위아래에 찍는 날짜·제목·주소(머리글·바닥글)가 들어갈 자리가 없어져 빠진다.
+       대신 같은 여백(10mm 12mm)을 서식 카드 안쪽에 주고, 두 쪽으로 이어질 때도 쪽마다 여백이 반복되게 한다 */
     @page {
       size: A4 portrait;
-      margin: 10mm 12mm;
+      margin: 0;
     }
     @media print {
       .no-print {
@@ -105,10 +107,13 @@
       .a4-page-card {
         width: 100% !important;
         height: auto !important;
-        min-height: 265mm !important;
+        min-height: 285mm !important;
         max-height: none !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: 10mm 12mm !important;
+        box-sizing: border-box !important;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
         border: none !important;
         box-shadow: none !important;
         page-break-after: always !important;
@@ -4091,6 +4096,23 @@
     // 로그인 전·로컬 검증 모드에서는 중립 기본값(직인 없음)
     // =========================================================================
     const DEFAULT_BRAND = { name: '경영지원센터', logo: '', seal: '', docPrefix: 'MSC', address: '', phone: '', homepage: '' };
+    // 인쇄·PDF 저장 때 파일 이름이 문서 제목을 따르므로, 그동안만 "[고객사명] - 펌명 경영리포트" 로 바꿨다가 되돌린다
+    let __docTitle = null;
+    function setPrintTitle() {
+      if (__docTitle === null) __docTitle = document.title;
+      const clean = v => String(v || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+      const corp = clean(document.getElementById('corp_name') && document.getElementById('corp_name').value) || '고객사';
+      let firm = '';
+      try { firm = clean(getBrand().name); } catch (e) { /* 브랜드 없음 */ }
+      document.title = `[${corp}] - ${firm ? firm + ' ' : ''}경영리포트`;
+    }
+    function restorePrintTitle() { if (__docTitle !== null) { document.title = __docTitle; __docTitle = null; } }
+    window.setPrintTitle = setPrintTitle;
+    document.addEventListener('DOMContentLoaded', () => {
+      window.addEventListener('beforeprint', setPrintTitle);      // Ctrl+P 로 인쇄해도 같은 이름
+      window.addEventListener('afterprint', restorePrintTitle);
+    });
+
     function getBrand() {
       const o = window.appState && window.appState.auth && window.appState.auth.org;
       if (!o) return DEFAULT_BRAND;
@@ -4099,11 +4121,26 @@
     }
     window.getBrand = getBrand;
     // 서명란: 로고가 있으면 로고, 없으면 상호 글자. 직인은 있을 때만
-    function brandSignHtml(b, sealCls, prefix) {
+    function brandSignHtml(b, sealCls, prefix, person) {
       const name = escapeHtml(b.name);
-      const mark = b.logo ? `<img src="${b.logo}" alt="${name}" class="h-6 w-auto object-contain inline-block select-none pointer-events-none">` : `<span class="font-black text-slate-950 tracking-wider">${name}</span>`;
+      const logo = b.logo ? `<img src="${b.logo}" alt="${name} 로고" class="h-5 w-auto max-w-[5rem] object-contain inline-block select-none pointer-events-none">` : '';
       const seal = b.seal ? `<img src="${b.seal}" alt="${name} 직인" class="${sealCls} object-contain inline-block -ml-1 select-none pointer-events-none">` : '';
-      return `${prefix ? `<span class="font-extrabold text-slate-900">${prefix}</span>` : ''}${mark}${seal}`;
+      return `<span class="sign-line">${prefix ? `<span>${prefix}</span>` : ''}${logo}<span class="sign-firm">${name}</span>${person ? `<span class="sign-sep"></span>${person}` : ''}</span>${seal}`;
+    }
+    // 서식 오른쪽 아래 담당자: "담당 이름 직함 010-1234-5678" (전화는 하이픈 서식)
+    function fmtTel(v) {
+      const d = String(v || '').replace(/\D/g, '');
+      const g = (...n) => { const o = []; let i = 0; for (const k of n) { if (i >= d.length) break; o.push(d.slice(i, i + k)); i += k; } if (i < d.length && o.length) o[o.length - 1] += d.slice(i); return o.join('-'); };
+      if (!d) return String(v || '').trim();
+      if (/^1[5-9]\d{6}$/.test(d)) return g(4, 4);
+      if (d.startsWith('02')) return d.length <= 9 ? g(2, 3, 4) : g(2, 4, 4);
+      if (/^050\d/.test(d)) return d.length <= 11 ? g(4, 3, 4) : g(4, 4, 4);
+      return d.length <= 10 ? g(3, 3, 4) : g(3, 4, 4);
+    }
+    window.fmtTel = fmtTel;
+    function personSignHtml(label, b) {
+      const tel = b.mobile ? fmtTel(b.mobile) : '';
+      return `<span>담당 ${label}</span>${tel ? `<span class="sign-tel">${escapeHtml(tel)}</span>` : ''}`;
     }
     function makeDocNo(base, bizNo, corpName) {
       const year = new Date().getFullYear();
@@ -4431,7 +4468,7 @@
             <div class="flex justify-between items-center">
               <span class="text-[10px] text-slate-500 font-medium">※ 본 문서는 경영컨설팅 협약에 의거한 공식 행정시행문입니다.</span>
               <div class="flex items-center space-x-1">
-                <span class="text-sm sm:text-base inline-flex items-center space-x-1">${brandSignHtml(brand, 'w-14 h-14', '')}</span>
+                <span class="sign-lg inline-flex items-center space-x-1">${brandSignHtml(brand, 'w-14 h-14', '')}</span>
               </div>
             </div>
 
@@ -4672,8 +4709,7 @@
               <p class="text-[10px] text-slate-500">본 진단은 관계 법령 및 소관 기관 규격에 따라 실시되었습니다.</p>
             </div>
             <div class="flex items-center space-x-1">
-              <span class="font-extrabold text-slate-900">담당 ${consultantLabel}</span>${brand.contact ? `<span class="text-[9px] text-slate-600 ml-1">${escapeHtml(brand.contact)}</span>` : ''}
-              ${brand.seal ? `<img src="${brand.seal}" alt="${brandName} 직인" class="w-12 h-12 object-contain inline-block -ml-1 select-none pointer-events-none">` : ''}
+              ${brandSignHtml(brand, 'w-12 h-12', '', personSignHtml(consultantLabel, brand))}
             </div>
           </div>
         </div>
@@ -4750,7 +4786,7 @@
           <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center text-xs">
             <span class="text-[10px] text-slate-500">※ 본 안내서는 수진기업의 적법하고 신속한 행정 절차 이행을 지원합니다.</span>
             <div class="flex items-center space-x-1">
-              ${brandSignHtml(brand, 'w-11 h-11', '')}
+              ${brandSignHtml(brand, 'w-11 h-11', '', personSignHtml(consultantLabel, brand))}
             </div>
           </div>
         </div>
@@ -4858,7 +4894,7 @@
           <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center text-xs">
             <span class="text-[10px] text-slate-500">※ 본 개요서는 정부 지원사업 공식 사업계획서 작성 시 그대로 인용 가능합니다.</span>
             <div class="flex items-center space-x-1">
-              ${brandSignHtml(brand, 'w-11 h-11', '작성 자문 :')}
+              ${brandSignHtml(brand, 'w-11 h-11', '작성 자문 :', personSignHtml(consultantLabel, brand))}
             </div>
           </div>
         </div>
@@ -4941,6 +4977,7 @@
       area.innerHTML = target.outerHTML;
 
       setTimeout(() => {
+        setPrintTitle();
         window.print();
         // Restore
         area.innerHTML = savedHtml;
@@ -4976,6 +5013,7 @@
       area.innerHTML = batchHtml;
 
       setTimeout(() => {
+        setPrintTitle();
         window.print();
         window.appState.activeReportKey = savedKey;
         window.appState.activeSheet = savedSheet;
@@ -6269,6 +6307,13 @@
     .fs-tight th { padding-top: 5px !important; padding-bottom: 5px !important; }
     .fs-tight .form-input-control { padding-top: 3px; padding-bottom: 3px; }
     @media print { .fold-box { height: auto !important; } }
+    /* 서식 서명란: 로고·펌명·담당자·전화 모두 같은 글꼴·크기 */
+    .sign-line { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800; color: #0f172a; letter-spacing: 0; white-space: nowrap; }
+    .sign-line .sign-firm { font-weight: 900; }
+    .sign-line .sign-sep { width: 1px; height: 10px; background: #94a3b8; margin: 0 2px; }
+    .sign-lg .sign-line { font-size: 15px; gap: 7px; }
+    .sign-lg .sign-line img { height: 1.6rem; max-width: 7rem; }
+    .sign-line .sign-tel { font-weight: 700; font-variant-numeric: tabular-nums; }
     .fin-ind { border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; background: #F8FAFC; }
     .fin-ind-t td, .fin-ind-t th { white-space: nowrap; }
     /* 내용 길이만큼 늘어나는 글 칸 */
@@ -7327,8 +7372,8 @@
     #l3 .l3-mode { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; gap: 2px; }
     #l3 .l3-mode button { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; color: var(--t-text-3, #66635C); cursor: pointer; white-space: nowrap; }
     #l3 .l3-mode button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-    #l3_radar { flex: 1; overflow-y: auto; padding: 16px; }
-    #l3_preview.radar #l3_stage, #l3_preview.radar .l3-sheets, #l3_preview.radar .l3-print { display: none !important; }
+    #l3_radar { flex: 1; overflow-y: auto; padding: 72px 16px 16px; }
+    #l3_preview.radar #l3_stage, #l3_preview.radar .l3-view, #l3_preview.radar .l3-print { display: none !important; }
     #l3_preview:not(.radar) #l3_radar { display: none; }
     /* 고객사 정보: 선택 → 새 고객(서류+기본정보) / 기존(불러오기+기본정보) */
     #l3 .l3-step[data-cust=""] > :not(#l3_cchoice) { display: none !important; }
@@ -7485,13 +7530,41 @@
     #l3_input #screen_input > .l3-step { min-height: var(--l3h, 100vh); box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 24px 28px; margin: 0; }
     #l3_input #screen_input > .l3-step > * { margin: 0 !important; }
     #l3_preview { display: flex; flex-direction: column; min-width: 0; background: var(--t-surface-3, #F1EFE9); border-left: 1px solid var(--t-line, #E4E2DB); position: relative; }
-    #l3_head { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--t-surface, #fff); border-bottom: 1px solid var(--t-line, #E4E2DB); }
-    #l3_head .row { display: flex; gap: 4px; overflow-x: auto; align-items: center; }
+    /* 미리보기 위 떠 있는 둥근 유리 막대 */
+    #l3_head { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 8; max-width: calc(100% - 28px); padding: 5px; border-radius: 999px;
+      background: rgba(255,255,255,.58); -webkit-backdrop-filter: blur(18px) saturate(1.7); backdrop-filter: blur(18px) saturate(1.7);
+      border: 1px solid rgba(255,255,255,.75); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 8px 28px rgba(15,23,42,.12), 0 1px 3px rgba(15,23,42,.06);
+      transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, background .35s, padding .35s; }
+    #l3_head.scrolled { transform: translateX(-50%) scale(.95); background: rgba(255,255,255,.72); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 14px 36px rgba(15,23,42,.2), 0 2px 6px rgba(15,23,42,.08); }
+    #l3_head .row { display: flex; gap: 4px; align-items: center; }
+    #l3_head .l3-mode { background: rgba(15,23,42,.06); border-radius: 999px; }
+    #l3_head .l3-mode button { border-radius: 999px; padding: 6px 14px; }
+    #l3_head .l3-view { position: relative; }
+    #l3_head .l3-view-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 13px; border-radius: 999px; font-size: 11px; font-weight: 800; color: var(--t-text, #0A0B0F); cursor: pointer; white-space: nowrap; transition: background .2s; }
+    #l3_head .l3-view-btn:hover, #l3_head .l3-view.open .l3-view-btn { background: rgba(15,23,42,.07); }
+    #l3_head .l3-view-btn .chev { transition: transform .3s cubic-bezier(.2,.8,.2,1); opacity: .6; }
+    #l3_head .l3-view.open .chev { transform: rotate(180deg); }
+    #l3_head .l3-view-pop { position: absolute; top: calc(100% + 12px); left: 50%; min-width: 236px; padding: 6px; border-radius: 20px;
+      background: rgba(255,255,255,.78); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7);
+      border: 1px solid rgba(255,255,255,.8); box-shadow: 0 18px 48px rgba(15,23,42,.2), 0 2px 8px rgba(15,23,42,.08);
+      opacity: 0; visibility: hidden; transform: translate(-50%, -8px) scale(.96); transform-origin: top center;
+      transition: opacity .22s, transform .32s cubic-bezier(.2,.8,.2,1), visibility 0s .32s; }
+    #l3_head .l3-view.open .l3-view-pop { opacity: 1; visibility: visible; transform: translate(-50%, 0) scale(1); transition: opacity .22s, transform .32s cubic-bezier(.2,.8,.2,1); }
+    #l3_head .l3-view-pop .l3-sheets { display: flex; flex-direction: column !important; gap: 2px; }
+    #l3_head .l3-view-pop .sheet-tab-btn { all: unset; box-sizing: border-box; display: block; width: 100% !important; padding: 9px 14px !important; border-radius: 14px; font-size: 12px !important; font-weight: 700; color: var(--t-text, #0A0B0F); cursor: pointer; white-space: nowrap;
+      opacity: 0; transform: translateY(-6px); transition: background .15s, opacity .25s, transform .35s cubic-bezier(.2,.8,.2,1); }
+    #l3_head .l3-view.open .sheet-tab-btn { opacity: 1; transform: none; transition-delay: 0s, calc(var(--i) * 35ms + 40ms), calc(var(--i) * 35ms + 40ms); }
+    #l3_head .l3-view-pop .sheet-tab-btn:hover { background: rgba(15,23,42,.06); }
+    #l3_head .l3-view-pop .sheet-tab-btn.active { background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); }
+    #l3_head .l3-print { border-radius: 999px !important; padding: 7px 15px !important; }
+    :root[data-theme="ink"] #l3_head, :root[data-theme="ink"] #l3_head .l3-view-pop { background: rgba(28,30,38,.62); border-color: rgba(255,255,255,.1); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 10px 30px rgba(0,0,0,.45); }
+    :root[data-theme="ink"] #l3_head.scrolled { background: rgba(28,30,38,.78); }
+    :root[data-theme="ink"] #l3_head .l3-mode, :root[data-theme="ink"] #l3_head .l3-view-btn:hover, :root[data-theme="ink"] #l3_head .l3-view.open .l3-view-btn, :root[data-theme="ink"] #l3_head .l3-view-pop .sheet-tab-btn:hover { background: rgba(255,255,255,.08); }
     #l3_head .row > * { flex: none; }
     #l3_head #subrep_btn_bar, #l3_head .l3-sheets { display: flex; flex-direction: row !important; gap: 4px; }
     #l3_head #subrep_btn_bar > *, #l3_head .l3-sheets > * { margin: 0 !important; width: auto !important; white-space: nowrap; padding: 5px 10px !important; font-size: 11px; }
     #l3_head .l3-print { margin-left: auto; padding: 6px 12px; border-radius: 9px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); font-size: 11px; font-weight: 800; white-space: nowrap; cursor: pointer; }
-    #l3_stage { flex: 1; overflow: auto; padding: 16px 0; }
+    #l3_stage { flex: 1; overflow: auto; padding: 72px 0 16px; }
     /* [8] 미리보기 배율: − 100% + 맞춤 (Ctrl+휠로도) */
     #l3 .l3-zoom { position: absolute; right: 22px; bottom: 18px; z-index: 6; display: inline-flex; align-items: center; gap: 2px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
     #l3_preview.radar .l3-zoom { display: none; }
@@ -7660,8 +7733,7 @@
           if (m.address) b.address = m.address;
           if (m.phone) b.phone = m.phone;
           if (m.reviewer) b.reviewer = m.reviewer;
-          const contact = [m.mobile, m.email].filter(Boolean).join(' · ');
-          if (contact) b.contact = contact;
+          if (m.mobile) b.mobile = m.mobile;
           if (m.approver) b.approver = m.approver;
           if (m.logo !== undefined && m.logo !== null) b.logo = m.logo || b.logo;
           return b;
@@ -7708,7 +7780,19 @@
         zbox.innerHTML = '<button type="button" data-z="-" title="축소 (Ctrl+휠)" aria-label="축소">−</button><button type="button" class="pct" id="l3_zoom_pct" data-z="100" title="실제 크기(100%)">100%</button><button type="button" data-z="+" title="확대 (Ctrl+휠)" aria-label="확대">+</button><button type="button" class="fitb" id="l3_zoom_fit" data-z="fit" title="미리보기 폭에 맞춤">맞춤</button>';
         // 배율 버튼은 미리보기 칸 안 오른쪽 아래에 떠 있게(문서를 가리지 않도록 작게)
         document.getElementById('l3_preview').appendChild(zbox);
-        row2.appendChild(sheetBox);
+        // 서식 탭은 '보기옵션' 드롭다운 안에 — 떠 있는 막대에는 보고서/지원사업 · 보기옵션 · 전체 인쇄만
+        const view = document.createElement('div');
+        view.className = 'l3-view';
+        view.innerHTML = '<button type="button" class="l3-view-btn" aria-haspopup="true" aria-expanded="false"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>보기옵션</span><svg class="chev" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button><div class="l3-view-pop" role="menu"></div>';
+        view.querySelector('.l3-view-pop').appendChild(sheetBox);
+        [...sheetBox.children].forEach((b, i) => b.style.setProperty('--i', i));
+        row2.appendChild(view);
+        const viewBtn = view.querySelector('.l3-view-btn');
+        const setView = open => { view.classList.toggle('open', open); viewBtn.setAttribute('aria-expanded', open); };
+        viewBtn.addEventListener('click', () => setView(!view.classList.contains('open')));
+        sheetBox.addEventListener('click', e => { if (e.target.closest('button')) setTimeout(() => setView(false), 120); });
+        document.addEventListener('click', e => { if (!e.target.closest('.l3-view')) setView(false); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') setView(false); });
         const pr = document.createElement('button');
         pr.type = 'button'; pr.className = 'l3-print'; pr.textContent = '전체 인쇄·PDF';
         pr.onclick = () => printAllReportsBatch();
@@ -7728,6 +7812,10 @@
           if (m === 'radar') { radar.classList.remove('hidden'); updateCategoryCounts(); renderRadarAnnouncements(); } else fit();
         }
         mode.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
+        const head = document.getElementById('l3_head');
+        const onPrevScroll = el => () => requestAnimationFrame(() => head.classList.toggle('scrolled', el.scrollTop > 8));
+        document.getElementById('l3_stage').addEventListener('scroll', onPrevScroll(document.getElementById('l3_stage')));
+        radarBox.addEventListener('scroll', onPrevScroll(radarBox));
 
         // 고객 불러오기 줄: 자주 쓰는 것(불러오기·새 고객·저장)만 보이고 나머지는 더보기
         const cbar = document.getElementById('client_bar');
@@ -7823,7 +7911,7 @@
           if (document.getElementById('l3_preview').classList.contains('radar')) return;
           const el = anchorEl(i); if (!el) return;
           const st = document.getElementById('l3_stage');
-          const top = st.scrollTop + el.getBoundingClientRect().top - st.getBoundingClientRect().top - 16;
+          const top = st.scrollTop + el.getBoundingClientRect().top - st.getBoundingClientRect().top - 72;
           st.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
           document.querySelectorAll('#l3 .l3-hl').forEach(x => x.classList.remove('l3-hl'));
           if (el.classList && !el.classList.contains('a4-page-card')) {
