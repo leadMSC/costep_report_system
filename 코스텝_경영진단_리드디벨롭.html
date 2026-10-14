@@ -8777,14 +8777,14 @@
               if (error) throw error;
               Object.assign(a.profile, pp);
             }
-            meSyncMsg(a.org ? (meCanEditOrg() ? '서버에 저장됨 · 관리자 화면·다른 PC에도 같은 정보' : '내 연락처는 서버에 저장됨 · 펌 정보는 펌 관리자가 고칩니다') : '내 연락처는 서버에 저장됨 · 펌을 등록하면 펌 정보도 저장됩니다', true);
+            meSyncMsg(a.org ? (meCanEditOrg() ? '서버에 저장됨 · 관리자 화면·다른 PC에도 같은 정보' : '내 연락처는 서버에 저장됨 · 펌 정보는 펌 관리자가 고칩니다') : '아직 서버에 등록된 펌이 없습니다 — 상호를 확인하고 [펌 등록]을 누르세요 (내 연락처는 저장됨)', !!a.org);
           } catch (e) { keys.forEach(k => { meDirty[k] = true; }); meSyncMsg('서버 저장 실패: ' + (e.message || e)); }
         }
         // 이 PC에 남아 있던 예전 내 정보는 서버 칸이 비어 있을 때만 옮기고 지운다
         function meMigrateLocal() {
           const loc = readMeLocal(); if (!Object.keys(loc).length) return;
           const m = Object.assign({}, meFromServer());
-          Object.entries(loc).forEach(([k, v]) => { if (v && !m[k] && (ME_ORG[k] ? meCanEditOrg() : true)) { m[k] = v; meDirty[k] = true; } });
+          Object.entries(loc).forEach(([k, v]) => { if (v && !m[k]) { m[k] = v; if (!ME_ORG[k] || meCanEditOrg()) meDirty[k] = true; } });   // 펌 등록 전에도 화면에는 보인다
           meCache = m;
           if (!window.appState.auth.org) return;   // 펌 등록 전이면 지우지 않고 기다린다(등록할 때 상호 등으로 쓴다)
           try { localStorage.removeItem(meKey()); } catch (e) { /* 무시 */ }
