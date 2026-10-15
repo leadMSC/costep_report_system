@@ -10013,6 +10013,7 @@
   <div id="xp_modal" class="no-print" hidden></div>
   <div id="xp_toast" class="no-print" role="status" aria-live="polite"></div>
 <!-- 새 버전 알림: 열어 둔 탭은 배포 뒤에도 옛 코드로 계속 돈다(한 페이지 앱). 서버 파일의 버전 표시가 바뀌면 새로고침을 권한다 -->
+<style>#upd_bar[hidden] { display: none !important; }</style>
 <div id="upd_bar" hidden role="status" style="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 18px;border-radius:999px;background:rgba(15,23,42,.92);color:#fff;font:600 13px/1.2 system-ui,'Malgun Gothic',sans-serif;box-shadow:0 12px 32px -10px rgba(0,0,0,.45);backdrop-filter:blur(10px)">
   <span>새 버전이 올라왔어요 <span id="upd_ver" style="opacity:.6;font-weight:500"></span></span>
   <button type="button" id="upd_go" style="border:0;border-radius:999px;padding:7px 14px;background:#14b8a6;color:#04211d;font-weight:800;cursor:pointer">새로고침</button>
