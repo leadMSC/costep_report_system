@@ -671,6 +671,12 @@
     const text = redact(rawText);
     const rows = textRows(text);
     const auto = classify(rows, fileName);
+    // 사업자등록증도 맨 위 제목이 깨지기 쉬워 본문 칸 이름으로도 판별(사업자 구분 또는 등록번호 + 칸 이름 2개 이상)
+    if (auto.kind === 'unknown') {
+      const d = despace(text);
+      const labels = [/개업연월일/, /(사업장|본점)소재지/, /사업의종류/, /세무서장/, /(법인명|상호)\(?단체명/].filter(re => re.test(d)).length;
+      if ((/(법인|개인|일반과세|간이과세|면세)사업자|과세자\)/.test(d) || /등록번호:?\d{3}-?\d{2}-?\d{5}/.test(d)) && labels >= 2) Object.assign(auto, { kind: 'bizreg', title: '사업자등록증' });
+    }
     // 신분증은 제목이 깨지기 쉬워 번호 꼴 + 발급기관으로도 판별
     if (auto.kind === 'unknown' && /\d{6}-\*{7}/.test(text) && (/(시장|구청장|군수|도지사|경찰청장)/.test(despace(text)) || /[가-힣]{2,4}\s*\(/.test(text))) Object.assign(auto, { kind: 'idcard', title: '신분증' });
     const picked = forceKind && forceKind !== 'unknown' ? DOC_TYPES.find(d => d[0] === forceKind) : null;
@@ -933,8 +939,8 @@
       }
       return '';
     };
-    const name = after(/상\s*호|법\s*인\s*명(?:\s*\(단체명\))?/, /\s+(?:성\s*명|대\s*표\s*자)\s*[:：]/); if (name) f.corp_name = name;
-    const ceo = after(/성\s*명|대\s*표\s*자/, /\s+생\s*년\s*월\s*일|\s+주민|\s+법인등록/); if (ceo) f.corp_ceo = ceo.replace(/\s+/g, '');
+    const name = after(/상\s*호|법\s*인\s*명(?:\s*\([^)]*\))?/, /\s+(?:성\s*명|대\s*표\s*자)(?:\s*\([^)]*\))?\s*[:：]/); if (name) f.corp_name = name;
+    const ceo = after(/성\s*명|대\s*표\s*자(?:\s*\([^)]*\))?/, /\s+생\s*년\s*월\s*일|\s+주민|\s+법인등록/); if (ceo) f.corp_ceo = ceo.replace(/\s+/g, '');
     const birth = val(/생년월일[:：]?(\d{4})년(\d{1,2})월(\d{1,2})일/);
     if (birth) { f.corp_ceo_birth = `${birth[1]}-${birth[2].padStart(2, '0')}-${birth[3].padStart(2, '0')}`; meta.corp_ceo_birth = { conf: 0.85 }; }
     const open = val(/개업연월일[:：]?(\d{4})년(\d{1,2})월(\d{1,2})일/);
@@ -963,6 +969,12 @@
     }
     if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.75 }; }
     const reg = corpRegOf(lines.join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
+    // 법인사업자인데 검증식이 안 맞는 번호(글자 인식이 숫자 하나를 잘못 읽은 경우가 많음): 낮은 신뢰로 넣고 원본 확인을 부탁한다.
+    // 주민번호 꼴(앞 6자리가 날짜)은 redact 가 이미 가렸으므로 여기 오지 않는다
+    if (!reg && (isCorpNo(no) || (tax0 && tax0[1] === '법인사업자'))) {
+      const m = flat.match(/(?:법인|[가-힣]{2})등록번호[:：]?(\d{6})-?(\d{7})(?!\d)/);
+      if (m) { f.corp_reg_no = m[1] + '-' + m[2]; meta.corp_reg_no = { conf: 0.3, valid: false, note: '번호 검증식이 맞지 않아요 — 원본 확인' }; }
+    }
     return { fields: f, meta, notes: tax0 ? ['사업자등록증', tax0[1]] : ['사업자등록증'] };
   }
 
@@ -1032,6 +1044,14 @@
 
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
   // forceKind: 자동 판별이 틀렸을 때 사용자가 고른 종류로 같은 글자를 다시 읽는다
+  // 글자층이 깨졌는지: 한글이 거의 없고(10자 미만) 제어 문자·'/숫자' 글꼴 번호가 많으면 깨진 것으로 본다
+  function garbledText(t) {
+    const all = String(t || '').replace(/\s+/g, '');
+    if (all.length < 20) return false;
+    const han = (all.match(/[\uAC00-\uD7A3]/g) || []).length;
+    const ctrl = (all.match(/[\u0000-\u001f\uE000-\uF8FF\uFFFD]/g) || []).length + ((all.match(/\/\d{1,3}/g) || []).length * 2);
+    return han < 10 && ctrl / all.length > 0.2;
+  }
   function parseDocument(pages, fileName, forceKind) {
     const rows = pagesToRows(pages).flat();
     const chars = rows.flat().join('').length;
@@ -1040,6 +1060,8 @@
     const c = picked ? { kind: picked[0], title: picked[1] } : auto;
     const out = { kind: c.kind, title: c.title, fields: {}, debtItems: [], notes: [], status: 'ok' };
     if (chars < 20) { out.status = 'scan'; out.notes.push('사진으로 된 서류 — 글자 인식(OCR) 다음 단계'); return out; }
+    // 글자층이 깨진 PDF: 글꼴에 글자 대응표가 없어 제어 문자·글꼴 번호만 나온다(한글 0자). 스캔본처럼 글자 인식으로 넘긴다
+    if (garbledText(rows.flat().join(''))) { out.status = 'scan'; out.notes.push('글자층이 깨진 PDF — 글자 인식(OCR)으로 읽어요'); return out; }
     let r = null;
     if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows, pages);
@@ -1099,6 +1121,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

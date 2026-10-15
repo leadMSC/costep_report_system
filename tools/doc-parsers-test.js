@@ -212,6 +212,32 @@ ok('결산 재무제표: 당기·전기 두 해', () => {
   assert.strictEqual(r.kind, 'fsacct');
   assert.deepStrictEqual(r.fsList.map(y => [y.year, y.wonValues.assets, y.wonValues.equity, y.balanced]), [[2025, 900000, 400000, true], [2024, 800000, 350000, true]]);
 });
+ok('글자층이 깨진 PDF는 글자 인식으로', () => {
+  assert.ok(P.garbledText('\u0002\u0003\u0004\u000e\u000f\u0010\u0011\u0012'.repeat(10) + 'ABC 123'));
+  assert.ok(P.garbledText('/12/34/56 /78/90 /11/22/33/44/55 /66'.repeat(3)));
+  assert.ok(!P.garbledText('사업자등록증 (법인사업자) 등록번호 : 123-81-12345 법인명(단체명) : 주식회사 가나'));
+  const r = P.parseDocument([[...Array(40)].map((_, i) => ({ s: '\u0002\u0003\u0004\u000e', x: i * 10, y: 700, w: 9, h: 9 }))], 'x.pdf');
+  assert.strictEqual(r.status, 'scan');
+});
+ok('사업자등록증 제목이 깨진 글자 인식: 본문 칸 이름으로 판별', () => {
+  const t = ['Wa 국세청', 'ATS,', '=:', '( 법인사업자 )', '등록번호 : 123-81-00001', '법인 명(단체명) : 가나다라 주식회사', '대표자(가나다라) ： 홍길동',
+    '개 업 연 월 일 : 2015 년 03 월 02일   법인 등록번호 : 110111-1234569', '사업장 소 재지 ： 서울특별시 중구 시험로 1', '본 점 소 재 지 : 서울특별시 중구 시험로 1',
+    '사업의 종류 : 업태 서비스 종목 소프트웨어', '가 가 세 무 서 장'].join('\n');
+  const r = P.parseTextDocument(t, 'doc_0.pdf');
+  assert.strictEqual(r.kind, 'bizreg');
+  assert.strictEqual(r.fields.corp_biz_no, '123-81-00001');
+  assert.strictEqual(r.fields.corp_name, '가나다라 주식회사');
+  assert.strictEqual(r.fields.corp_ceo, '홍길동');
+  assert.strictEqual(r.fields.corp_reg_no, '110111-1234569');
+  assert.strictEqual(r.fields.corp_est_date, '2015-03-02');
+  assert.ok(!r.fields.corp_ceo_birth, '법인등록번호를 생년월일로 읽지 않음');
+  // 법인사업자인데 검증식이 안 맞는 법인등록번호(숫자 하나 오독): 낮은 신뢰로 넣고 원본 확인 안내
+  const r2 = P.parseTextDocument(t.replace('110111-1234569', '134511-1234561'), 'doc_0.pdf');
+  assert.strictEqual(r2.fields.corp_reg_no, '134511-1234561');
+  assert.strictEqual(r2.meta.corp_reg_no.valid, false);
+  // 칸 이름이 하나뿐이면 판별하지 않음
+  assert.strictEqual(P.parseTextDocument(['( 법인사업자 )', '등록번호 : 123-81-12345', '아무 내용'].join('\n'), 'x.png').kind, 'unknown');
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);
