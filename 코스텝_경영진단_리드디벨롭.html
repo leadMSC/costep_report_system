@@ -4831,7 +4831,7 @@
       const box = document.getElementById('fa_box'); if (!box) return;
       const d = faData();
       const has = d.Y.some(y => y.S !== null || y.A !== null) || Object.keys(vhLoad()).length;
-      box.innerHTML = has ? `<div class="fa-head"><b>재무 분석</b><span>은행·보증기관 심사와 지원사업 평가에서 보는 수치를 위 재무제표로 계산했어요</span></div>${faKpiHtml(d)}${faSignalsHtml(d)}<div class="fa-grid">${faChartsHtml(d)}</div>` : '';
+      box.innerHTML = has ? `<div class="fa-head"><b>재무 분석</b><span>은행·보증기관 심사와 지원사업 평가에서 보는 수치를 위 재무제표로 계산했어요</span></div>${faKpiHtml(d)}${faDiagHtml(faDiagnose(d))}${faSignalsHtml(d)}<div class="fa-grid">${faChartsHtml(d)}</div>` : '';
     }
     window.faRender = faRender;
     // 보고서 별첨: 재무 분석 한 쪽(그래프 + 핵심 지표)
@@ -4856,6 +4856,137 @@
         </div>`;
     }
     window.faAttachHtml = faAttachHtml;
+
+    // ───────── 재무진단: 5개 영역 판정 + 자동 문장(문장 저장소 FA_TEXT) ─────────
+    // 영역마다 지표 3개를 '비교 기준'과 견줘 양호·보통·미흡을 매기고, 전년과 비교해 개선·유지·악화를 정한다.
+    // 비교 기준 = 업종평균(KoDATA 기업 종합 보고서 등을 올렸을 때 window.faIndustry 에 들어옴), 없으면 아래 기준선.
+    // 문장은 FA_TEXT 한곳에 모아 둔다: 영역 × 등급 × 흐름 기본 문장 + 특수 상황 문장(우선). {자리}는 숫자로 바뀐다.
+    const FA_AREAS = [
+      { key: 'growth', name: '성장성', ind: [['sg', '매출액 증가율', '%', 'high', 3], ['og', '영업이익 증가율', '%', 'high', 0], ['ag', '총자산 증가율', '%', 'high', 5]] },
+      { key: 'profit', name: '수익성', ind: [['opm', '영업이익률', '%', 'high', 4], ['ebm', 'EBITDA 마진율', '%', 'high', 7], ['roa', '총자산순이익률(ROA)', '%', 'high', 3]] },
+      { key: 'struct', name: '재무구조', ind: [['dep', '차입금의존도', '%', 'low', 40], ['dr', '부채비율', '%', 'low', 200], ['cr', '유동비율', '%', 'high', 120]] },
+      { key: 'repay', name: '부채상환능력', ind: [['icr', '이자보상배수', '배', 'high', 1.5], ['ebl', 'EBITDA ÷ 총차입금', '%', 'high', 20], ['ls', '차입금 ÷ 매출액', '%', 'low', 50]] },
+      { key: 'activity', name: '활동성', ind: [['art', '매출채권회전율', '회', 'high', 6], ['tat', '총자본회전율', '회', 'high', 1], ['etr', '자기자본회전율', '회', 'high', 2]] }
+    ];
+    const FA_TEXT = {
+      grade: { good: '양호', mid: '보통', bad: '미흡', none: '판단 보류' },
+      trend: { up: '전년보다 개선되었습니다', flat: '전년과 비슷한 수준입니다', down: '전년보다 나빠졌습니다', none: '' },
+      // 기본 문장: [영역][등급][흐름]. {best}=가장 좋은 지표, {worst}=가장 약한 지표, {basis}=업종평균/기준선
+      base: {
+        growth: {
+          good: { up: '매출과 자산이 {basis}보다 빠르게 늘어 성장 흐름이 뚜렷하고, {trend}. 확장 자금 수요를 설명하기 좋은 상태입니다.', flat: '{best} 등 성장 지표가 {basis}을 웃돌아 꾸준히 성장하고 있습니다.', down: '성장 지표는 {basis}을 웃돌지만 증가 폭은 전년보다 줄었습니다. 성장 둔화 요인을 점검할 필요가 있습니다.' },
+          mid: { up: '성장 지표가 {basis}과 비슷한 수준이며, {trend}.', flat: '성장 지표가 {basis}과 비슷해 보통 수준의 성장 역량을 보이고 있습니다.', down: '성장 지표가 {basis} 수준이지만 전년보다 둔화되었습니다. {worst}의 원인을 확인할 필요가 있습니다.' },
+          bad: { up: '{worst} 등 성장 지표가 {basis}에 못 미치지만, {trend}. 회복 흐름을 이어갈 판로 확대 계획이 필요합니다.', flat: '{worst} 등 성장 지표가 {basis}에 못 미쳐 성장 역량이 낮은 편입니다. 신규 판로 확보가 과제입니다.', down: '성장 지표가 {basis}에 못 미치고 전년보다 더 둔화되었습니다. 매출 감소 원인과 대응 계획을 먼저 정리해야 합니다.' }
+        },
+        profit: {
+          good: { up: '{best}이 {basis}을 웃돌아 수익 창출 능력이 좋고, {trend}.', flat: '수익성 지표가 {basis}을 웃돌아 영업으로 안정적인 이익을 내고 있습니다.', down: '수익성은 {basis}을 웃돌지만 전년보다 낮아졌습니다. 원가·판관비 증가 요인을 점검할 필요가 있습니다.' },
+          mid: { up: '수익성 지표가 {basis}과 비슷한 수준이며, {trend}.', flat: '수익성 지표가 {basis}과 비슷해 보통 수준의 수익 창출 능력을 보이고 있습니다.', down: '수익성이 {basis} 수준이지만 전년보다 낮아졌습니다. {worst}의 개선 방안이 필요합니다.' },
+          bad: { up: '{worst} 등 수익성 지표가 {basis}에 못 미치지만, {trend}. 개선 흐름을 이어갈 원가 절감 계획을 함께 제시하는 것이 좋습니다.', flat: '{worst} 등 수익성 지표가 {basis}에 못 미쳐 수익 창출 능력이 낮습니다. 원가 구조 개선이 과제입니다.', down: '수익성 지표가 {basis}에 못 미치고 전년보다 더 나빠졌습니다. 수익 구조 개선 계획이 대출·지원사업 심사의 핵심 설명 자료가 됩니다.' }
+        },
+        struct: {
+          good: { up: '부채비율과 차입금의존도가 {basis}보다 낮아 재무구조가 안정적이며, {trend}. 추가 자금 조달 여력이 있습니다.', flat: '재무구조 지표가 {basis}보다 안정적이어서 추가 자금 조달 여력이 있습니다.', down: '재무구조는 {basis}보다 안정적이지만 전년보다 부채 부담이 늘었습니다.' },
+          mid: { up: '재무구조 지표가 {basis}과 비슷한 수준이며, {trend}.', flat: '재무구조가 {basis}과 비슷한 보통 수준입니다. 신규 차입 시 부채비율 변화를 함께 관리해야 합니다.', down: '재무구조가 {basis} 수준이지만 전년보다 부채 부담이 커졌습니다. {worst} 관리가 필요합니다.' },
+          bad: { up: '{worst} 등 재무구조 지표가 {basis}보다 불안정하지만, {trend}. 자본 확충이나 차입금 상환 계획을 함께 제시하는 것이 좋습니다.', flat: '{worst} 등 재무구조 지표가 {basis}보다 불안정합니다. 신규 차입보다 정책자금 대환·자본 확충을 먼저 검토해야 합니다.', down: '재무구조가 {basis}보다 불안정하고 전년보다 더 나빠졌습니다. 부채 구조조정 계획이 필요합니다.' }
+        },
+        repay: {
+          good: { up: '이자와 차입금을 감당할 여력이 {basis}보다 충분하며, {trend}.', flat: '영업이익과 현금창출력으로 이자·차입금을 충분히 감당하고 있습니다.', down: '상환 여력은 {basis}보다 충분하지만 전년보다 줄었습니다.' },
+          mid: { up: '부채상환능력이 {basis}과 비슷한 수준이며, {trend}.', flat: '부채상환능력이 {basis}과 비슷한 보통 수준입니다.', down: '부채상환능력이 {basis} 수준이지만 전년보다 약해졌습니다. {worst} 추이를 지켜봐야 합니다.' },
+          bad: { up: '{worst} 등 상환 지표가 {basis}에 못 미치지만, {trend}. 이익 회복 계획과 함께 상환 일정을 제시하는 것이 좋습니다.', flat: '{worst} 등 상환 지표가 {basis}에 못 미쳐 이자 부담이 큰 편입니다. 저금리 정책자금 대환을 우선 검토해야 합니다.', down: '상환 지표가 {basis}에 못 미치고 전년보다 더 약해졌습니다. 신규 차입보다 상환 부담을 줄이는 대환이 먼저입니다.' }
+        },
+        activity: {
+          good: { up: '매출채권과 자산이 빠르게 회전해 {basis}보다 효율적으로 운영되며, {trend}.', flat: '활동성 지표가 {basis}을 웃돌아 자산을 효율적으로 운영하고 있습니다.', down: '활동성은 {basis}을 웃돌지만 전년보다 회전 속도가 느려졌습니다.' },
+          mid: { up: '활동성 지표가 {basis}과 비슷한 수준이며, {trend}.', flat: '활동성 지표가 {basis}과 비슷한 보통 수준의 운영 효율을 보이고 있습니다.', down: '활동성이 {basis} 수준이지만 전년보다 회전이 느려졌습니다. {worst}을 점검할 필요가 있습니다.' },
+          bad: { up: '{worst} 등 활동성 지표가 {basis}에 못 미치지만, {trend}.', flat: '{worst} 등 활동성 지표가 {basis}에 못 미쳐 자금이 매출채권·자산에 오래 묶여 있습니다. 운전자금 수요의 근거가 됩니다.', down: '활동성이 {basis}에 못 미치고 전년보다 더 느려졌습니다. 매출채권 회수와 재고 관리 개선이 필요합니다.' }
+        }
+      },
+      // 특수 상황: 조건이 맞으면 기본 문장 앞에(우선) 붙는다. 같은 영역에서 여러 개면 모두
+      special: [
+        { id: 'loss_turn', area: 'profit', text: '당기에 영업손실로 돌아섰습니다(영업이익 {op}). 적자 원인과 흑자 회복 계획이 필요합니다.' },
+        { id: 'loss_cont', area: 'profit', text: '영업손실이 이어지고 있습니다(영업이익 {op}).' },
+        { id: 'profit_turn', area: 'profit', text: '전년 영업손실에서 당기 흑자로 돌아섰습니다(영업이익 {op}).' },
+        { id: 'capital_full', area: 'struct', text: '자본총계가 0 이하인 완전 자본잠식 상태로, 정책자금·보증 신청이 제한될 수 있습니다.' },
+        { id: 'capital_part', area: 'struct', text: '자본금보다 자본총계가 적은 부분 자본잠식 상태입니다(잠식률 {impair}%). 일부 정책자금은 신청이 제한될 수 있습니다.' },
+        { id: 'icr_3y', area: 'repay', text: '이자보상배수가 3년 연속 1 미만으로, 한계기업으로 분류될 수 있습니다.' },
+        { id: 'icr_1', area: 'repay', text: '이자보상배수가 1 미만({icr}배)이라 영업이익으로 이자를 다 갚지 못하는 구간입니다.' },
+        { id: 'sales_down_2y', area: 'growth', text: '매출이 2년 연속 감소했습니다({sg}). 판로·제품 경쟁력 점검이 우선입니다.' },
+        { id: 'sales_jump', area: 'growth', text: '매출이 전년보다 {sg} 늘어 빠르게 성장하고 있습니다. 늘어난 매출에 맞는 운전자금 확보가 필요할 수 있습니다.' },
+        { id: 'ar_slow', area: 'activity', text: '매출채권 회수에 평균 {ardays}일이 걸려 운전자금 부담이 큽니다.' },
+        { id: 'no_data', area: '*', text: '판단에 필요한 재무 자료가 부족합니다. 3개년 재무제표를 올리면 판정됩니다.' }
+      ],
+      basis: { industry: '업종평균', own: '기준선' }
+    };
+    window.FA_TEXT = FA_TEXT; window.FA_AREAS = FA_AREAS;
+
+    // 연도 j 의 15개 지표 값
+    function faIndVals(Y, j) {
+      const ok = v => v !== null && v !== undefined && isFinite(v), a = Y[j], b = Y[j + 1] || {};
+      const div = (x, y, k = 1) => ok(x) && ok(y) && y !== 0 ? x / y * k : null;
+      const chg = k => ok(a[k]) && ok(b[k]) && b[k] !== 0 ? (a[k] - b[k]) / Math.abs(b[k]) * 100 : null;
+      const avg = k => ok(a[k]) && ok(b[k]) ? (a[k] + b[k]) / 2 : a[k];
+      const ebitda = ok(a.OP) ? a.OP + (a.DEP || 0) : null;
+      return { sg: chg('S'), og: chg('OP'), ag: chg('A'), opm: div(a.OP, a.S, 100), ebm: div(ebitda, a.S, 100), roa: div(a.NI, avg('A'), 100),
+        dep: div(a.loans, a.A, 100), dr: ok(a.E) && a.E <= 0 ? Infinity : div(a.D, a.E, 100), cr: div(a.CA, a.CL, 100),
+        icr: div(a.OP, a.IE), ebl: div(ebitda, a.loans, 100), ls: div(a.loans, a.S, 100),
+        art: div(a.S, a.AR), tat: div(a.S, avg('A')), etr: div(a.S, avg('E')) };
+    }
+    // 지표 하나: 기준과 견줘 2(양호)·1(보통)·0(미흡). 기준 0 근처는 차이로
+    function faScore(v, dir, b) {
+      if (v === Infinity) return dir === 'low' ? 0 : 2;
+      if (v === null || v === undefined || !isFinite(v)) return null;
+      const d = dir === 'high' ? v - b : b - v, tol = Math.max(Math.abs(b) * 0.1, dir === 'high' && b === 0 ? 1 : 0.5);
+      return d >= tol ? 2 : d >= -tol ? 1 : 0;
+    }
+    function faDiagnose(d) {
+      d = d || faData();
+      const ind = window.faIndustry || null;   // { sg: 3.7, opm: 6.4, ... } 업종평균
+      const basis = ind ? FA_TEXT.basis.industry : FA_TEXT.basis.own;
+      const cur = faIndVals(d.Y, 0), prev = faIndVals(d.Y, 1), prev2 = faIndVals(d.Y, 2);
+      const Y0 = d.Y[0], Y1 = d.Y[1], Y2 = d.Y[2], ok = v => v !== null && v !== undefined && isFinite(v);
+      const fmtI = (v, u) => faNum(v, u === '회' ? '' : u) + (u === '회' ? '회' : '');
+      const out = FA_AREAS.map(A => {
+        const rows = A.ind.map(([k, n, u, dir, b0]) => { const b = ind && ok(ind[k]) ? ind[k] : b0; return { k, n, u, dir, b, v: cur[k], pv: prev[k], s: faScore(cur[k], dir, b), ps: faScore(prev[k], dir, b) }; });
+        const got = rows.filter(r => r.s !== null), pgot = rows.filter(r => r.ps !== null);
+        const avg = got.length ? got.reduce((a, r) => a + r.s, 0) / got.length : null, pavg = pgot.length ? pgot.reduce((a, r) => a + r.ps, 0) / pgot.length : null;
+        let grade = got.length < 2 ? 'none' : avg >= 1.4 ? 'good' : avg >= 0.7 ? 'mid' : 'bad';
+        const trend = avg === null || pavg === null || pgot.length < 2 ? 'none' : avg - pavg >= 0.34 ? 'up' : pavg - avg >= 0.34 ? 'down' : 'flat';
+        const best = got.slice().sort((a, b) => b.s - a.s)[0], worst = got.slice().sort((a, b) => a.s - b.s)[0];
+        const ph = r => !r ? '' : r.v === Infinity ? `${r.n} 계산 불가(자본잠식)` : `${r.n} ${fmtI(r.v, r.u)}(${basis} ${fmtI(r.b, r.u)})`;
+        // 특수 상황
+        const sp = [];
+        const S = id => FA_TEXT.special.find(x => x.id === id);
+        if (A.key === 'profit' && ok(Y0.OP)) {
+          if (Y0.OP < 0 && ok(Y1.OP) && Y1.OP >= 0) sp.push(S('loss_turn'));
+          else if (Y0.OP < 0) sp.push(S('loss_cont'));
+          else if (ok(Y1.OP) && Y1.OP < 0) sp.push(S('profit_turn'));
+        }
+        if (A.key === 'struct' && ok(Y0.E) && ok(Y0.CAP) && Y0.CAP > 0) { if (Y0.E <= 0) sp.push(S('capital_full')); else if (Y0.E < Y0.CAP) sp.push(S('capital_part')); }
+        if (A.key === 'repay' && ok(cur.icr) && cur.icr < 1) sp.push(ok(prev.icr) && prev.icr < 1 && ok(prev2.icr) && prev2.icr < 1 ? S('icr_3y') : S('icr_1'));
+        if (A.key === 'growth' && ok(cur.sg)) { if (cur.sg < 0 && ok(prev.sg) && prev.sg < 0) sp.push(S('sales_down_2y')); else if (cur.sg >= 30) sp.push(S('sales_jump')); }
+        const ardays = ok(Y0.AR) && ok(Y0.S) && Y0.S ? Y0.AR / Y0.S * 365 : null;
+        if (A.key === 'activity' && ok(ardays) && ardays > 90) sp.push(S('ar_slow'));
+        const fill = t => t.replace('{best}', ph(best)).replace('{worst}', ph(worst)).replace(/\{basis\}/g, basis).replace('{trend}', FA_TEXT.trend[trend] || '')
+          .replace('{op}', faMoney(Y0.OP)).replace('{icr}', faNum(cur.icr, '배').replace('배', '')).replace('{sg}', faNum(cur.sg, '%'))
+          .replace('{ardays}', ok(ardays) ? Math.round(ardays) : '').replace('{impair}', ok(Y0.E) && ok(Y0.CAP) ? Math.round((Y0.CAP - Y0.E) / Y0.CAP * 100) : '')
+          .replace(/, \./g, '.').replace(/\s{2,}/g, ' ');
+        // 특수 상황이 등급을 정한다: 완전 자본잠식·이자보상 3년 연속 1 미만 = 미흡, 부분 자본잠식 = 최고 보통
+        const ids = sp.filter(Boolean).map(x => x.id);
+        if (ids.includes('capital_full') || ids.includes('icr_3y')) grade = 'bad';
+        else if (ids.includes('capital_part') && grade === 'good') grade = 'mid';
+        let text;
+        if (grade === 'none') text = FA_TEXT.special.find(x => x.id === 'no_data').text;
+        else text = FA_TEXT.base[A.key][grade][trend === 'none' ? 'flat' : trend];
+        return { key: A.key, name: A.name, grade, gradeName: FA_TEXT.grade[grade], trend, rows, specials: sp.filter(Boolean).map(x => x.id), sentence: [...sp.filter(Boolean).map(x => fill(x.text)), fill(text)].join(' ') };
+      });
+      return { basis, areas: out };
+    }
+    window.faDiagnose = faDiagnose;
+    function faDiagHtml(dg, compact) {
+      const cls = { good: 'g', mid: 'm', bad: 'b', none: 'n' };
+      return `<div class="fa-dg"><div class="fa-dg-chips">${dg.areas.map(a => `<div class="c ${cls[a.grade]}"><span>${a.name}</span><b>${a.gradeName}</b></div>`).join('')}</div>
+        <div class="fa-dg-basis">비교 기준: ${dg.basis}${dg.basis === '기준선' ? ' (업종평균 자료가 없을 때 쓰는 기본값)' : ''}</div>
+        <table class="fa-dg-t">${dg.areas.map(a => `<tr><th class="${cls[a.grade]}">${a.name} ${a.gradeName}</th><td>${escapeHtml(a.sentence)}</td></tr>`).join('')}</table></div>`;
+    }
+    window.faDiagHtml = faDiagHtml;
 
     // 긴 표 접기: 기본은 data-fold-start 행 앞까지만 보이고, 표 아래 얇은 화살표를 누르면 부드럽게 늘어난다
     function foldLimit(box) {
@@ -5132,6 +5263,14 @@
     }
 
     function renderActiveReport() {
+      // 서식2 재무표 바로 위: 재무진단 5개 영역 판정 + 자동 문장(소·중기업이고 재무 값이 있을 때)
+      let faDiagReport = '';
+      try {
+        if ((window.appState.bizTrack || 'smb') !== 'smb' && typeof faDiagnose === 'function') {
+          const fd = faData();
+          if (fd.Y.some(y => y.S !== null || y.A !== null)) faDiagReport = `<div class="fa-dg-rep border border-slate-300 rounded-lg p-2 space-y-1"><div class="font-extrabold text-slate-900 text-[10px] border-b border-slate-200 pb-1">【 재무진단 — 5개 영역 판정 】</div>${faDiagHtml(faDiagnose(fd))}</div>`;
+        }
+      } catch (e) { faDiagReport = ''; }
       const area = document.getElementById('active_report_render_area');
       if (!area) return;
 
@@ -5557,6 +5696,7 @@
               </div>
             </div>
             ` : `
+            ${faDiagReport}
             <div class="border border-slate-300 rounded-lg p-2 bg-slate-50/50 space-y-1 text-[10px]">
               <div class="flex justify-between items-center border-b border-slate-200 pb-1">
                 <span class="font-extrabold text-slate-900">【 중소·소기업 표준재무제표 및 경영건전성 종합 지표 】</span>
@@ -7891,6 +8031,26 @@
     .fa-t .fa-up, .fa-pt .fa-up { color: #00a693; }
     .fa-t .fa-dn, .fa-pt .fa-dn { color: #ea580c; }
     .fa-t tr.fa-g td, .fa-pt tr.fa-g td { background: #f6f8fa; color: #24323d; font-weight: 700; text-align: left; font-size: 11px; padding: 6px 8px; border: 1px solid #e3e8ec; border-top: 1px solid #24323d; }
+    /* 재무진단 5개 영역: 판정 칸 + 영역별 자동 문장 */
+    .fa-dg { margin: 0 0 10px; }
+    .fa-dg-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+    .fa-dg-chips .c { padding: 5px 4px; text-align: center; border: 1px solid; }
+    .fa-dg-chips .c span { display: block; font-size: 10.5px; }
+    .fa-dg-chips .c b { display: block; font-size: 13px; font-weight: 800; }
+    .fa-dg-chips .c.g { background: #e6f6f3; border-color: #9fd9cf; color: #085041; }
+    .fa-dg-chips .c.m { background: #fdf3df; border-color: #f0d39b; color: #633806; }
+    .fa-dg-chips .c.b { background: #fdeaea; border-color: #f3b4b4; color: #791f1f; }
+    .fa-dg-chips .c.n { background: #f3f4f6; border-color: #e5e7eb; color: #6b7280; }
+    .fa-dg-basis { font-size: 10px; color: #8a98a5; margin: 4px 0; }
+    .fa-dg-t { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+    .fa-dg-t th { width: 24%; text-align: left; padding: 5px 6px; font-weight: 700; vertical-align: top; border-top: 1px solid #e3e8ec; white-space: nowrap; }
+    .fa-dg-t td { padding: 5px 6px; line-height: 1.55; border-top: 1px solid #e3e8ec; color: #334155; }
+    .fa-dg-t th.g { color: #085041; } .fa-dg-t th.m { color: #854f0b; } .fa-dg-t th.b { color: #a32d2d; } .fa-dg-t th.n { color: #6b7280; }
+    .fa-dg-rep { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .fa-dg-rep .fa-dg { margin: 0; }
+    .fa-dg-rep .fa-dg-chips .c { padding: 3px 2px; } .fa-dg-rep .fa-dg-chips .c span { font-size: 8.5px; } .fa-dg-rep .fa-dg-chips .c b { font-size: 10.5px; }
+    .fa-dg-rep .fa-dg-basis { font-size: 8px; margin: 2px 0; }
+    .fa-dg-rep .fa-dg-t { font-size: 9px; } .fa-dg-rep .fa-dg-t th, .fa-dg-rep .fa-dg-t td { padding: 2px 4px; line-height: 1.4; }
     /* 보고서 별첨: 재무 분석 한 쪽 */
     .fa-attach, .fa-attach * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .fa-attach .fa-body { --ink: #16252f; --slate: #3f6b8c; --steel: #8fb3cf; --rule: rgba(22, 37, 47, .1); --teal: #00a693; --warm: #ea580c; font-size: 10px; color: var(--ink); font-variant-numeric: tabular-nums; }
