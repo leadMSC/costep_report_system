@@ -213,6 +213,17 @@
     }
     return '';
   }
+  // 상호 칸: '상호' · '법인명' · '상호(법인명)' 옆 값 중 상호답게 생긴 첫 값(날짜·'현재'·번호는 건너뜀 —
+  // 표준재무제표증명 머리의 '상호  2023년12월31일 현재' 같은 줄을 상호로 읽던 문제)
+  function nameValue(rows) {
+    const label = /^(?:상호|법인명|상호\(법인명\)|법인명\(단체명\))$/;
+    const bad = v => /\d{4}\s*년|현\s*재$|^\(?\d[\d\-.,\s]*\)?$|^[:：]$/.test(v);
+    for (const r of rows) for (let k = 1; k < r.length; k++) {
+      if (!label.test(despace(r.slice(0, k).join('')))) continue;
+      const v = (r[k] || '').trim(); if (v && !bad(v)) return v;
+    }
+    return '';
+  }
   const ymd = s => { const m = String(s).match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/); return m ? m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0') : ''; };
   const bizNoOf = s => { const m = String(s).match(/(\d{3})-?(\d{2})-?(\d{5})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
   // 사업자번호 가운데 두 자리 81~88 이면 법인
@@ -280,7 +291,7 @@
 
   function parseBizCert(rows) {
     const f = {}, meta = {};
-    const name = labelValue(rows, /^상호/); if (name) f.corp_name = name;
+    const name = nameValue(rows); if (name) f.corp_name = name;
     const tax0 = despace(rows.flat().join('')).match(/\((일반과세자|간이과세자|면세사업자|법인사업자)\)/);
     const no = bizNoOf(labelValue(rows, /^사업자등록번호$/));
     if (no) {
@@ -344,7 +355,7 @@
     };
     if (v.net === null) { const loss = fsAmount(tk, fsLabel('당기순손실')); if (loss !== null) v.net = -Math.abs(loss); }
     const f = {};
-    const name = labelValue(rows, /^(?:상호|법인명)$/); if (name) f.corp_name = name;
+    const name = nameValue(rows); if (name) f.corp_name = name;
     const no = bizNoOf(labelValue(rows, /^사업자등록번호$/)); if (no) f.corp_biz_no = no;
     const balanced = v.assets !== null && v.debt !== null && v.equity !== null && Math.abs(v.assets - (v.debt + v.equity)) <= Math.abs(v.assets) * 0.01;
     const unit = (all.match(/단위[:：]?\(?(원|천원|백만원)/) || [])[1] || '원';
@@ -367,7 +378,7 @@
   const romanNum = s => { const v = { I: 1, V: 5, X: 10 }; let n = 0; for (let i = 0; i < s.length; i++) { const a = v[s[i]], b = v[s[i + 1]] || 0; n += a < b ? -a : a; } return n; };
   // 과목 이름 → 단계(1 로마자 · 2 (1) · 3 1. · 4 가. · 0 총계)와 화면 이름
   function fsItemLabel(raw) {
-    let s = despace(raw).replace(/\((?:[IVX]+|\d+)(?:[+\-±][IVX\d()]+)+\)$/, '');   // 끝의 계산식 괄호 (I+II) 제거
+    let s = despace(raw).replace(/\((?=[^()]*[IVX])[IVX\d+\-±~,·]+\)$/, '');   // 끝의 계산식 괄호 (I+II) · (III+~VII) 제거
     let level = 3, label = s;
     let m;
     if ((m = s.match(/^([IVX]+)\.(.+)$/))) { level = 1; label = (ROMAN[romanNum(m[1])] || m[1]) + '. ' + m[2]; }
@@ -837,7 +848,14 @@
     if (birth) { f.corp_ceo_birth = `${birth[1]}-${birth[2].padStart(2, '0')}-${birth[3].padStart(2, '0')}`; meta.corp_ceo_birth = { conf: 0.85 }; }
     const open = val(/개업연월일[:：]?(\d{4})년(\d{1,2})월(\d{1,2})일/);
     if (open) f.corp_est_date = `${open[1]}-${open[2].padStart(2, '0')}-${open[3].padStart(2, '0')}`;
-    const addr = after(/사\s*업\s*장\s*소\s*재\s*지/, /\s+본\s*점\s*소\s*재\s*지\s*[:：]/); if (addr) f.corp_address = addr;
+    let addr = after(/사\s*업\s*장\s*소\s*재\s*지/, /\s+본\s*점\s*소\s*재\s*지\s*[:：]/);
+    // 괄호가 다음 줄로 넘어간 주소('…(서초동' + 다음 줄 ')')는 이어 붙인다
+    if (addr && (addr.match(/\(/g) || []).length > (addr.match(/\)/g) || []).length) {
+      const i = lines.findIndex(l => l.replace(/\s+/g, ' ').includes(addr));
+      const nx = i >= 0 ? (lines[i + 1] || '').trim() : '';
+      if (/^[^:：]{0,12}\)$/.test(nx)) addr += nx;
+    }
+    if (addr) f.corp_address = addr;
     // 업태·종목: 위치가 있으면 '업태'·'종목' 글자 아래·오른쪽 칸을 모은다
     let up = '', jm = '';
     const items = (pages || []).flat();

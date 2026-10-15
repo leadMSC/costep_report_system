@@ -167,6 +167,7 @@ ok('재무제표 전체 과목: 표별·코드순·단계', () => {
   assert.strictEqual(is[2].label, 'Ⅲ. 매출총이익');   // 계산식 괄호 제거
   assert.strictEqual(is.find(x => x.name.startsWith('영업이익')).won, -50000);
   assert.strictEqual(is.length, 10);
+  assert.deepStrictEqual(P.parseFSFull([['표준재무상태표'], ['자본총계(III+~VII)', '50', '300']]).sections[0].rows.map(x => [x.label, x.level]), [['자본총계', 0]]);
 });
 // 부가세 과세표준증명 → 반기 매출(가짜 금액): 법인 예정+확정은 더하고, 겹치는 예정은 빼고, 1년 한 번 신고는 반기 구분 없음
 ok('부가세 반기 매출', () => {
