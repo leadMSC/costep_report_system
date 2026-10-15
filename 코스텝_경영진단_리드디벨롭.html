@@ -4309,6 +4309,12 @@
         const r = fsFindRow(m, sec, re); if (!r) return;
         FS_SUF.forEach((suf, j) => { const b = readNum(id + suf); if (b !== null) r.v[j] = Math.round(b * 1e6); });
       });
+      // 핵심 칸으로 계산되는 줄: 부채와자본총계 = 부채총계 + 자본총계, 유동자산 = 당좌자산 + 재고자산(둘 다 있을 때)
+      const row = (sec, re) => fsFindRow(m, sec, re);
+      const sumInto = (to, a, b) => { if (!to || !a || !b) return; [0, 1, 2].forEach(j => { if (to.v[j] === null && a.v[j] !== null && b.v[j] !== null) to.v[j] = a.v[j] + b.v[j]; }); };
+      sumInto(row('bs', /^부채와자본총계$/), row('bs', /^부채총계$/), row('bs', /^자본총계$/));
+      sumInto(row('bs', /^유동자산$/), row('bs', /^당좌자산$/), row('bs', /^재고자산$/));
+      m._fromKeys = true;
       return m;
     }
     const fsView = () => fsLoad() || fsFromKeys();
@@ -4345,13 +4351,15 @@
       const m = fsView();
       const fy = readNum('sme_fy_y1') || m.fy;
       const hdr = [0, 1, 2].map(j => fy ? `${fy - j}년${j === 0 ? ' (당기)' : ''}` : ['Y-1 (당기)', 'Y-2 (전기)', 'Y-3 (전전기)'][j]);
-      let h = `<table class="w-full text-xs border-collapse border border-slate-200 fs-tight fs-stmt"><thead><tr class="bg-slate-100 font-bold text-slate-700 text-center">
+      const keysOnly = !fsLoad() && fsHasData(m);
+      let h = (keysOnly ? `<div class="fs-note">예전에 저장된 핵심 값(매출·자산·부채 등 17칸)만 보여 주는 중이에요. 재무제표증명을 다시 올리면 모든 과목이 채워집니다.</div>` : '') +
+        `<table class="w-full text-xs border-collapse border border-slate-200 fs-tight fs-stmt"><thead><tr class="bg-slate-100 font-bold text-slate-700 text-center">
         <th class="p-2 border border-slate-200 text-left">과목 (단위: 원)</th>${hdr.map((t, j) => `<th class="p-2 border border-slate-200${j === 0 ? ' cur-col' : ''}">${t}</th>`).join('')}</tr></thead><tbody>`;
       m.sections.forEach((s, si) => {
         h += `<tr class="fs-sec${FS_MAIN.includes(s.key) ? '' : ' fs-detail'}"><td colspan="4">${escapeHtml(s.title)}</td></tr>`;
         s.rows.forEach((r, ri) => {
           h += `<tr class="fs-l${r.level}${fsIsDetail(s, r) ? ' fs-detail' : ''}"><td class="fs-name">${escapeHtml(r.label)}</td>` +
-            [0, 1, 2].map(j => `<td class="${j === 0 ? 'cur-col' : ''}"><input type="text" inputmode="numeric" data-fs="${si}.${ri}.${j}" value="${fsWonFmt(r.v[j])}" placeholder="0" class="form-input-control fs-in" aria-label="${escapeHtml(r.label)} ${hdr[j]}"></td>`).join('') + '</tr>';
+            [0, 1, 2].map(j => `<td class="${j === 0 ? 'cur-col' : ''}"><input type="text" inputmode="numeric" data-fs="${si}.${ri}.${j}" value="${fsWonFmt(r.v[j])}" placeholder="" class="form-input-control fs-in" aria-label="${escapeHtml(r.label)} ${hdr[j]}"></td>`).join('') + '</tr>';
         });
       });
       box.innerHTML = h + '</tbody></table>';
@@ -7782,6 +7790,7 @@
     #fs_fold:not(.open) .fs-detail { display: none; }
     #fs_fold[data-fold-mode="rows"] { max-height: none; }
     .fs-stmt th:first-child { text-align: left; }
+    #fs_fold .fs-note { margin-bottom: 6px; padding: 7px 10px; font-size: 11.5px; color: #8a4b08; background: #fff7e6; border: 1px solid #f3d7a7; }
     .fs-stmt td { border: 1px solid #e2e8f0; padding: 2px 4px; }
     .fs-stmt td.fs-name { padding: 3px 8px; color: #334155; white-space: nowrap; }
     .fs-stmt tr.fs-l1 td.fs-name { font-weight: 500; color: #0f172a; }
