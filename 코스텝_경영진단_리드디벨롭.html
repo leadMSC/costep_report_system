@@ -9807,6 +9807,9 @@
     #l3_steps { display: flex; flex-direction: column; }
     #l3_acct { margin-top: auto; position: relative; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
     #l3_acct .av { width: 32px; height: 32px; border-radius: 50%; background: var(--t-accent-text, #00A898); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; flex: none; }
+    /* 펌 로고를 올렸으면 머리글자 대신 로고(흰 바탕 동그라미 안에 잘리지 않게) */
+    #l3_acct .av.logo { background: #fff; padding: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(15,23,42,.08); }
+    #l3_acct .av.logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
     #l3_acct .who { min-width: 0; flex: 1; line-height: 1.25; }
     #l3_acct .who b { display: block; font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #l3_acct .who span { display: block; font-size: 11px; color: rgba(255,255,255,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -10153,10 +10156,10 @@
           const f = e.target.files[0]; e.target.value = ''; if (!f) return;
           // 이미지 형식 모두·10MB 이하 — 저장은 긴 변 800px 로 줄여서(SVG 는 그대로)
           imageFileToDataUrl(f, 800)
-            .then(url => { const m = readMe(); m.logo = url; writeMe(m); fillMe(); renderBrand(); live(); })
+            .then(url => { const m = readMe(); m.logo = url; writeMe(m); fillMe(); renderBrand(); renderAcct(); live(); })
             .catch(err => alert(err.message));
         });
-        document.getElementById('l3_me_logo_del').addEventListener('click', () => { const m = readMe(); m.logo = ''; writeMe(m); fillMe(); renderBrand(); live(); });
+        document.getElementById('l3_me_logo_del').addEventListener('click', () => { const m = readMe(); m.logo = ''; writeMe(m); fillMe(); renderBrand(); renderAcct(); live(); });
         // 서식 발신란: 내 정보에 적은 펌 정보가 있으면 그것을 쓴다
         const baseBrand = getBrand;
         getBrand = window.getBrand = function () {
@@ -10423,7 +10426,10 @@
           const mail = pf.email || user.email || (readMe().email || '로그인 없이 이 PC에서 사용');
           document.getElementById('l3_acct_name').textContent = name;
           document.getElementById('l3_acct_mail').textContent = mail;
-          document.getElementById('l3_acct_av').textContent = String(name).trim().charAt(0) || '나';
+          const av = document.getElementById('l3_acct_av'), logo = (getBrand() || {}).logo || '';
+          av.classList.toggle('logo', !!logo);
+          if (logo) { if (av.dataset.logo !== logo) { av.innerHTML = ''; const im = new Image(); im.alt = ''; im.src = logo; av.appendChild(im); av.dataset.logo = logo; } }
+          else { delete av.dataset.logo; av.textContent = String(name).trim().charAt(0) || '나'; }
           const menu = document.getElementById('l3_menu');
           menu.querySelector('[data-act="admin"]').classList.toggle('hidden', !['org_admin', 'operator'].includes(pf.role));
           menu.querySelector('[data-act="out"]').classList.toggle('hidden', !a.user);
