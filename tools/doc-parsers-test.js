@@ -197,6 +197,21 @@ ok('신분증: 운전면허증·주민등록증 이름·생년월일(가짜)', (
   assert.deepStrictEqual([j.corp_ceo, j.corp_ceo_birth], ['이철수', '1985-07-07']);
   assert.ok(!/1234567/.test(JSON.stringify(d)));
 });
+// 세무사 결산 재무제표(가짜 금액): 글자가 한 자씩, 당기·전기 금액 열, 기간 줄에도 '(당)기'
+ok('결산 재무제표: 당기·전기 두 해', () => {
+  const its = [];
+  const put = (str, x, y, step = 10) => [...str].forEach((c, i) => its.push({ s: c, x: x + i * step, y, w: 9, h: 9 }));
+  const amt = (str, right, y) => [...str].forEach((c, i, a) => its.push({ s: c, x: right - (a.length - i) * 4.5, y, w: 4.5, h: 9 }));
+  put('재무상태표', 200, 800, 12); put('제9(당)기2025년12월31일현재', 60, 780, 9); put('(단위:원)', 480, 760, 6);
+  put('제9(', 280, 740, 5); its.push({ s: '당', x: 300, y: 740, w: 9, h: 9 }, { s: ')', x: 309, y: 740, w: 4, h: 9 }, { s: '기', x: 314, y: 740, w: 9, h: 9 });
+  its.push({ s: '전', x: 466, y: 740, w: 9, h: 9 }, { s: ')', x: 475, y: 740, w: 4, h: 9 }, { s: '기', x: 480, y: 740, w: 9, h: 9 });
+  const row = (name, y, cur, prev) => { put(name, 60, y, 12); amt(cur, 381, y); amt(prev, 547, y); };
+  row('Ⅰ.유동자산', 700, '500,000', '400,000'); row('자산총계', 680, '900,000', '800,000'); row('부채총계', 660, '500,000', '450,000'); row('자본총계', 640, '400,000', '350,000');
+  const isPage = [...'손익계산서'].map((c, i) => ({ s: c, x: 200 + i * 12, y: 800, w: 9, h: 9 }));
+  const r = P.parseDocument([its, isPage], 'x.pdf');
+  assert.strictEqual(r.kind, 'fsacct');
+  assert.deepStrictEqual(r.fsList.map(y => [y.year, y.wonValues.assets, y.wonValues.equity, y.balanced]), [[2025, 900000, 400000, true], [2024, 800000, 350000, true]]);
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

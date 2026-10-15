@@ -4334,7 +4334,9 @@
 
     // 입력 화면 표: 기본보기 = 재무상태표·손익계산서의 로마자 과목과 총계, 상세보기 = 나머지 과목과 다른 표까지
     const FS_MAIN = ['bs', 'is'];
-    const fsIsDetail = (s, r) => !FS_MAIN.includes(s.key) || (r.level !== 1 && r.level !== 0);
+    // 세 해 모두 0·빈칸인 줄은 로마자·총계라도 상세보기에서만
+    const fsZero = r => !r.v.some(x => x !== null && x !== 0);
+    const fsIsDetail = (s, r) => !FS_MAIN.includes(s.key) || (r.level !== 1 && r.level !== 0) || fsZero(r);
     function fsRender() {
       const box = document.getElementById('fs_fold'); if (!box) return;
       if (box.contains(document.activeElement)) return;   // 입력 중에는 다시 그리지 않음(커서 유지)
@@ -4372,6 +4374,8 @@
     // 서류에서 읽은 재무제표(연도별 전체 과목)를 표로 합친다. 서류가 없는 해는 지금 표 값을 그대로 둔다
     function fsMergeDocs(list) {
       list = (list || []).filter(x => x && x.year && x.full && x.full.sections && x.full.sections.length).sort((a, b) => b.year - a.year);
+      // 같은 해 서류가 둘(표준재무제표증명 + 세무사 결산 재무제표)이면 표준을 쓴다
+      list = list.filter((x, i) => !list.some((y, k) => k !== i && y.year === x.year && ((x.full.source === 'acct' && y.full.source !== 'acct') || (x.full.source === y.full.source && k < i))));
       if (!list.length) return false;
       const old = fsLoad() || fsFromKeys(), oldFy = old.fy || readNum('sme_fy_y1');
       const fy = Math.max(list[0].year, oldFy || 0);
@@ -4420,8 +4424,8 @@
       const fy = readNum('sme_fy_y1') || m.fy;
       const hdr = [0, 1, 2].map(j => fy ? `${fy - j}년${j === 0 ? '<br>(당기)' : ''}` : ['당기', '전기', '전전기'][j]);
       const cell = v => v === null || v === undefined ? '' : (v < 0 ? '△' + Math.abs(v).toLocaleString('ko-KR') : v.toLocaleString('ko-KR'));
-      // 금액이 세 해 모두 비었거나 0인 세부 과목은 뺀다(로마자·총계 줄은 남김)
-      const keep = r => r.level === 1 || r.level === 0 || r.v.some(x => x !== null && x !== 0);
+      // 금액이 세 해 모두 비었거나 0인 줄은 뺀다(로마자·총계 줄도)
+      const keep = r => r.v.some(x => x !== null && x !== 0);
       const secs = fsHasData(m) ? m.sections.filter(s => FS_MAIN.includes(s.key)) : [];
       const head = first => `<thead><tr><th class="fsa-n">${first}</th>${hdr.map((t, j) => `<th class="${j === 0 ? 'fsa-cur' : ''}">${t}</th>`).join('')}</tr></thead>`;
       const tr = r => `<tr class="fsa-l${r.level}"><td class="fsa-n">${escapeHtml(r.label)}</td>${[0, 1, 2].map(j => `<td class="${j === 0 ? 'fsa-cur' : ''}">${cell(r.v[j])}</td>`).join('')}</tr>`;
@@ -7537,7 +7541,7 @@
       <div class="hd"><h4 id="docs_modal_t">업로드로 자동채우기</h4><button type="button" data-x aria-label="닫기">×</button></div>
       <div class="bd">
         <div class="lock">파일은 이 기기 안에서만 읽고 저장하지 않아요. 읽은 값은 아래 표에서 고른 칸만 들어갑니다.</div>
-        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.txt,text/plain" multiple hidden><br>PDF · 사진(JPG·PNG·WebP) · 20MB 이하 · 여러 개 한꺼번에 · 스캔 PDF 는 첫 쪽을 글자 인식</div>
+        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.txt,text/plain" multiple hidden><br>PDF · 사진(JPG·PNG·WebP) · 20MB 이하 · 여러 개 한꺼번에 · 스캔 PDF 는 30쪽까지 글자 인식</div>
         <div class="sup" id="docs_sup">
           <b>읽을 수 있는 서류</b><br>
           <b>사업자등록증명</b> <span>— 상호 · 사업자등록번호 · 사업자구분·과세유형 · 대표자 · 소재지 · 개업일 · 업태/종목</span><br>
@@ -7833,6 +7837,7 @@
   const DOC_TYPES = [
     ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
     ['fs', '표준재무제표증명', t => /표준재무제표증명|표준재무상태표|표준손익계산서/.test(t)],
+    ['fsacct', '결산 재무제표(세무사)', t => /재무상태표|대차대조표/.test(t) && /손익계산서/.test(t)],
     ['vat', '부가가치세 과세표준증명', t => /과세표준증명/.test(t)],
     ['ins', '4대보험 사업장 가입자명부', t => /사업장가입자명부/.test(t)],
     ['share', '주주명부', t => /주주명부/.test(t)],
@@ -7977,6 +7982,90 @@
     return { unit, sections };
   }
 
+  // 세무사 결산 재무제표(재무상태표·손익계산서·이익잉여금처분계산서·합계잔액시산표 묶음): 과목 코드가 없고
+  // 당기·전기가 나란히, 해마다 금액 열이 둘(세부·합계). 글자가 한 자씩 떨어져 찍히므로 위치(x·y)로 줄과 열을 다시 세운다.
+  // 결과: 해마다 { year, full: { sections }, wonValues } — 표준재무제표증명과 같은 모양
+  const FS_KEYS = {
+    sales: ['is', /^매출액$/], profit: ['is', /^영업(이익|손익|손실)/, 1], net: ['is', /^당기순(이익|손익|손실)/, 1], interest: ['is', /^이자비용$/], intInc: ['is', /^이자수익$/],
+    assets: ['bs', /^자산총계$/], debt: ['bs', /^부채총계$/], equity: ['bs', /^자본총계$/], capital: ['bs', /^자본금$/], quick: ['bs', /^당좌자산$/], curLiab: ['bs', /^유동부채$/],
+    inv: ['bs', /^재고자산$/], ar: ['bs', /^(매출채권|외상매출금)$/], ap: ['bs', /^(매입채무|외상매입금)$/], unpaid: ['bs', /^미지급금$/], stLoan: ['bs', /^단기차입금$/], ltLoan: ['bs', /^장기차입금$/],
+    loanToCeo: ['bs', /^(주임종단기채권|가지급금)$/]
+  };
+  function fsWonValues(sections, j) {
+    const v = {};
+    Object.entries(FS_KEYS).forEach(([k, [sec, re, loss]]) => {
+      const s = sections.find(x => x.key === sec); const r = s && s.rows.find(x => re.test(x.name.replace(/\(.*?\)/g, '')));
+      let w = r ? r.vals[j] : null;
+      if (w !== null && w !== undefined && loss && /손실$/.test(r.name.replace(/\(.*?\)/g, '')) && w > 0) w = -w;
+      v[k] = w === undefined ? null : w;
+    });
+    return v;
+  }
+  function parseFSAcct(pages) {
+    const AMT = /^[\d,().\-△]$/;
+    const secs = {}; let year = null;
+    (pages || []).forEach(items => {
+      const its = items.filter(i => String(i.s).trim());
+      const flat = despace(its.slice().sort((a, b) => b.y - a.y || a.x - b.x).map(i => i.s).join(''));
+      const head = flat.slice(0, 80);
+      const key = /합계잔액시산표/.test(head) ? null : /이익잉여금처분|결손금처리/.test(head) ? 're' : /원가명세서/.test(head) ? 'cost' : /손익계산서/.test(head) ? 'is' : /재무상태표|대차대조표/.test(head) ? 'bs' : null;
+      if (!key) return;
+      if (!year) { const m = flat.match(/당\)?\d*기(\d{4})년/); if (m) year = +m[1]; }
+      const unit = (flat.match(/단위[:：]?\(?(원|천원|백만원)/) || [])[1] || '원';
+      const mul = unit === '천원' ? 1000 : unit === '백만원' ? 1e6 : 1;
+      // 줄 묶기(y 차이 2 이내)
+      const lines = []; its.slice().sort((a, b) => b.y - a.y || a.x - b.x).forEach(i => {
+        let l = lines.find(L => Math.abs(L.y - i.y) <= 2); if (!l) { l = { y: i.y, items: [] }; lines.push(l); } l.items.push(i);
+      });
+      // 금액 덩어리: 숫자·쉼표·괄호 글자가 3px 안으로 붙어 있는 것
+      const groups = l => {
+        const xs = l.items.filter(i => AMT.test(String(i.s).trim()) || /^[\d,]+$/.test(String(i.s).trim())).sort((a, b) => a.x - b.x);
+        const out = []; xs.forEach(i => { const g = out[out.length - 1]; if (g && i.x - g.r <= 3) { g.t += String(i.s).trim(); g.r = Math.max(g.r, i.x + i.w); } else out.push({ t: String(i.s).trim(), l: i.x, r: i.x + i.w }); });
+        return out.filter(g => /\d/.test(g.t) && g.t.replace(/[^\d]/g, '').length >= 1);
+      };
+      // 금액 열: 오른쪽 끝 위치를 모아 무리 짓기 → 왼쪽 두 무리 = 당기, 오른쪽 두 무리 = 전기
+      const lineGroups = lines.map(l => ({ l, g: groups(l) }));
+      // 머리의 '(당)기'·'(전)기' 글자(괄호 사이 한 글자) 위치
+      // 기간 줄('제9(당)기 2025년 1월 1일부터…')에도 같은 글자가 있으므로, 당기·전기 글자가 한 줄에 나란한 금액 열 머리만 쓴다
+      const parens = ch => its.filter(i => String(i.s).trim() === ch && its.some(j => String(j.s).trim() === ')' && j.x >= i.x + i.w - 2 && j.x - (i.x + i.w) < 8 && Math.abs(j.y - i.y) < 3));
+      let hD = null, hJ = null;
+      for (const d of parens('당')) { const j = parens('전').find(x => Math.abs(x.y - d.y) < 3 && x.x > d.x); if (j) { hD = d; hJ = j; break; } }
+      // 과목 이름 칸 끝 = 당기 머리 글자에서 조금 왼쪽(머리가 없으면 쉼표 있는 금액이 처음 나오는 곳). 처분계산서 안쪽 '당기 … 원' 금액에 이름이 잘리지 않게
+      const amtL = lim => Math.min(...lineGroups.flatMap(x => x.g.filter(g => /\d,\d{3}/.test(g.t) && g.l >= lim).map(g => g.l)), Infinity);
+      const firstAmtX = hD ? Math.min(amtL(hD.x - 120), hD.x) - 2 : amtL(-Infinity);
+      const edges = lineGroups.flatMap(x => x.g.filter(g => g.l >= firstAmtX - 5).map(g => Math.round(g.r))).sort((a, b) => a - b);
+      const cl = []; edges.forEach(e => { const c = cl[cl.length - 1]; if (c && e - c.max <= 25) { c.max = e; c.n++; } else cl.push({ min: e, max: e, n: 1 }); });
+      const cols = cl.filter(c => c.n >= 2);
+      if (cols.length < 2) return;
+      // 해 경계: 머리의 '(당)기'·'(전)기' 글자 위치 — 각 해 금액 열은 그 글자 근처에서 오른쪽으로 펼쳐지므로
+      // 전기 글자에서 두 글자 사이 거리의 1/4 만큼 왼쪽을 경계로. 머리를 못 찾으면 금액 열 무리로 추정
+      const split = (hD && hJ && hJ.x > hD.x) ? hJ.x - (hJ.x - hD.x) / 4
+        : cols.length >= 4 ? (cols[1].max + cols[2].min) / 2 : (cols[0].max + cols[cols.length - 1].min) / 2;
+      const sec = secs[key] || (secs[key] = []);
+      lineGroups.forEach(({ l, g }) => {
+        // 과목 이름 = 줄의 마지막 한글·로마자 글자까지(당기 머리 글자보다 왼쪽), 금액 = 그 오른쪽 숫자 덩어리
+        const nameEnd = Math.max(...l.items.filter(i => /[가-힣ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]/.test(i.s) && (!hD || i.x < hD.x - 20)).map(i => i.x + i.w), -Infinity);
+        const nameChars = l.items.filter(i => i.x + i.w <= nameEnd + 1).sort((a, b) => a.x - b.x).map(i => String(i.s).trim()).join('');
+        const raw = nameChars.replace(/\s+/g, '');
+        if (raw.replace(/[^가-힣]/g, '').length < 2 || /^(과목|금액|제\d*\(?[당전]|회사명)/.test(raw) || /기\d{4}년|단위/.test(raw)) return;
+        const amts = g.filter(x => x.l >= nameEnd && x.l >= firstAmtX - 60);
+        const vals = [null, null];
+        amts.forEach(x => { const v = signed(x.t); if (v === null) return; vals[x.r <= split ? 0 : 1] = v * mul; });   // 같은 해에 둘이면 오른쪽(합계 열)
+        const it = fsItemLabel(norm(raw));
+        sec.push({ label: it.label, name: it.name, level: it.level, vals });
+      });
+    });
+    const sections = FS_SECTIONS.filter(([k]) => secs[k] && secs[k].length).map(([key, title]) => ({ key, title, rows: secs[key] }));
+    if (!year || !sections.length) return { years: [], notes: ['결산 연도나 표를 찾지 못함'] };
+    const years = [0, 1].map(j => ({
+      year: year - j,
+      full: { unit: '원', source: 'acct', sections: sections.map(s => ({ key: s.key, title: s.title, rows: s.rows.filter(r => r.vals[j] !== null || r.level <= 1).map(r => ({ label: r.label, name: r.name, level: r.level, won: r.vals[j] })) })) },
+      wonValues: fsWonValues(sections, j)
+    })).filter(y => y.full.sections.some(s => s.rows.some(r => r.won !== null)));
+    years.forEach(y => { const v = y.wonValues; y.balanced = v.assets !== null && v.debt !== null && v.equity !== null && Math.abs(v.assets - (v.debt + v.equity)) <= Math.abs(v.assets) * 0.01; });
+    return { years, notes: [year + '년 결산(당기)·' + (year - 1) + '년(전기) — 세무사 결산 재무제표'] };
+  }
+
   // 부가세 과세표준증명: 기간별(부터·까지·계) → 최근 12개월 월평균 매출(만원)
   function parseVAT(rows) {
     const periods = [];
@@ -8045,6 +8134,7 @@
       // 뒷자리는 OCR 이 ) | l 같은 잡음을 섞어 읽기도 하므로 그런 글자까지 함께 지운다
       .replace(/(^|[^\d])(\d{6})\s*[-–—~_.]\s*([1-8][\d)(|lIoO*]{4,9})/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
       .replace(/(^|[^\d])(\d{6})\s+([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
+      .replace(/(^|[^\d])(\d{6})([1-8]\d{6})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
       .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**')   // 운전면허번호
       .replace(/\u0000(\d+)\u0000/g, (all, i) => keep[+i]);
   }
@@ -8125,8 +8215,13 @@
     if (nm && okName(nm[1])) name = nm[1];
     if (!name) {
       const i = lines.findIndex(l => /\d{6}\s*[-–—]\s*[\d*]/.test(l));
-      const cands = i < 0 ? [] : [lines[i].split(/\d{6}/)[0], lines[i - 1] || '', lines[i - 2] || ''];
+      const cands = i < 0 ? [] : [lines[i].split(/\d{6}/)[0].replace(/[^가-힣\s]/g, ' '), lines[i - 1] || '', lines[i - 2] || ''];
       for (const c of cands) { const w = (c.match(/[가-힣]{2,4}/g) || []).filter(okName); if (w.length === 1 || (w.length && c.trim().length <= 6)) { name = w[w.length - 1]; break; } }
+    }
+    if (!name) {
+      const SUR = /^(김|이|박|최|정|강|조|윤|장|임|한|오|서|신|권|황|안|송|류|유|전|홍|고|문|양|손|배|백|허|남|심|노|하|곽|성|차|주|우|구|민|진|나|지|엄|채|원|천|방|공|현|함|변|염|여|추|도|소|석|선|설|마|길|연|위|표|명|기|반|왕|금|옥|육|인|맹|제|모|탁|국|어|은|편|용|예|경|봉|사|부|황보|남궁|제갈|선우|독고)/;
+      const l = lines.map(x => x.replace(/[^가-힣]/g, '')).find(x => /^[가-힣]{2,4}$/.test(x) && SUR.test(x) && okName(x));
+      if (l) name = l;
     }
     if (name) { f.corp_ceo = name; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
     const rr = t.match(/(\d{2})(\d{2})(\d{2})\s*[-–—]\s*\*{7}/) || t.match(/(?:^|[^\d])(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\s*[-–—]\s*[\d*●xX#]/m);
@@ -8516,6 +8611,14 @@
     if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows, pages);
     else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced, full: parseFSFull(rows) }; }
+    else if (c.kind === 'fsacct') {
+      const a = parseFSAcct(pages);
+      if (!a.years.length) { out.status = 'skip'; out.notes = a.notes; return out; }
+      // 같은 서류에 두 해(당기·전기) — 앞의 것이 당기
+      out.fsList = a.years.map(y => ({ year: y.year, wonValues: y.wonValues, balanced: y.balanced, full: y.full }));
+      out.fs = out.fsList[0];
+      r = { fields: {}, notes: a.notes };
+    }
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
@@ -8537,7 +8640,9 @@
 
   // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
   function fsToFields(fsList) {
-    const list = fsList.filter(x => x && x.year).sort((a, b) => b.year - a.year);
+    // 같은 해가 둘이면 세무사 결산(acct)을 먼저 넣어 표준재무제표증명 값이 덮게
+    const isAcct = x => !!(x.full && x.full.source === 'acct');
+    const list = fsList.filter(x => x && x.year).sort((a, b) => b.year - a.year || (isAcct(b) - isAcct(a)));
     if (!list.length) return {};
     const top = list[0].year, f = {}, src = {}, conf = {};
     const suf = { 0: '', 1: '_2024', 2: '_2023' };
@@ -8561,7 +8666,7 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -8681,6 +8786,20 @@
         bmp.close && bmp.close();
         return c;
       }
+      // 신분증 사진용: 검은 인쇄 글자만 남기기 — 어둡고(밝기 < th) 색이 거의 없는(채도 < sat) 점만 글자로,
+      // r>0 이면 가는 선(홀로그램·무늬 선)을 지우는 열기(깎고 다시 불리기). 사진 얼굴·책상 무늬도 대부분 사라진다
+      function darkInkCopy(src, th, sat, r) {
+        const W = src.width, H = src.height, c = document.createElement('canvas'); c.width = W; c.height = H;
+        const ctx = c.getContext('2d'); ctx.drawImage(src, 0, 0);
+        const img = ctx.getImageData(0, 0, W, H), d = img.data; let m = new Uint8Array(W * H);
+        for (let p = 0, i = 0; p < W * H; p++, i += 4) { const y = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000, mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); m[p] = (y < th && mx - mn < sat) ? 1 : 0; }
+        // 열기: 가로·세로로 나눠 깎기(최소)·불리기(최대) — 정사각 창과 같고 훨씬 빠름
+        const run = (src0, keepAll, horiz) => { const o = new Uint8Array(W * H); for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) { let all = 1, any = 0; for (let k = -r; k <= r; k++) { const X = horiz ? xx + k : xx, Y = horiz ? yy : yy + k; const v = (X < 0 || Y < 0 || X >= W || Y >= H) ? 0 : src0[Y * W + X]; if (v) any = 1; else all = 0; } o[yy * W + xx] = keepAll ? all : any; } return o; };
+        if (r) m = run(run(run(run(m, true, true), true, false), false, true), false, false);
+        for (let p = 0, i = 0; p < W * H; p++, i += 4) { const v = m[p] ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; }
+        ctx.putImageData(img, 0, 0);
+        return c;
+      }
       // 사진 두 번째 읽기용: 회색조 + 밝기 늘이기(아래위 2%를 끝으로) — 신분증 무늬·홀로그램·흐린 조명에서 글자를 또렷하게(흑백으로 자르지는 않음)
       function enhancedCopy(src) {
         const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
@@ -8783,7 +8902,7 @@
             const m = (r.meta || {})[id] || {};
             cands.push({ id, value: String(v), conf: m.conf ?? 0.9, valid: m.valid !== false, note: m.note || '', src: m.src, file: f.name });
           });
-          if (r.fs) fsList.push(Object.assign({ file: f.name }, r.fs));
+          (r.fsList || (r.fs ? [r.fs] : [])).forEach(x => fsList.push(Object.assign({ file: f.name }, x)));
           (r.ipItems || []).forEach((it, i) => cands.push({ id: '_ip:' + f.name + ':' + i, ip: it, value: [it.kind, it.regNo, it.title].filter(Boolean).join(' · '), conf: Object.values(it).filter(Boolean).length >= 7 ? 0.8 : 0.6, valid: true, note: [it.appNo && '출원 ' + it.appNo, it.appDate, it.applicant, it.inventor && '발명 ' + it.inventor, it.regDate && '등록 ' + it.regDate].filter(Boolean).join(' · '), file: f.name }));
           (r.debtItems || []).forEach((d, i) => cands.push({ id: '_debt:' + f.name + ':' + i, debt: d, value: `${d.institution} · ${d.type} · ${fmt(d.balance)}만원`, conf: 0.8, valid: true, note: d._from === '채권자변동정보(발생금액)' ? '발생 당시 금액 — 지금 잔액 확인 필요' : '금리는 직접 입력', file: f.name }));
         });
@@ -8793,7 +8912,7 @@
         files.forEach(f => {
           const r = f.res; if (!r || r.status !== 'ok') return;
           Object.entries(r.vatYears || {}).forEach(([y, won]) => { const id = yearField(+y); if (id && won) cands.push({ id, value: String(Math.round(won / 1e4)), conf: +y === yNow ? 0.7 : 0.8, valid: true, src: won, year: +y, note: '부가세 과세표준 합계' + (+y === yNow ? ' (올해 누적)' : ''), file: f.name }); });
-          if (r.fs && r.fs.year && r.fs.wonValues && r.fs.wonValues.sales) { const id = yearField(r.fs.year); if (id) cands.push({ id, value: String(Math.round(r.fs.wonValues.sales / 1e4)), conf: 0.9, valid: true, src: r.fs.wonValues.sales, year: r.fs.year, note: '재무제표 매출액', file: f.name }); }
+          (r.fsList || (r.fs ? [r.fs] : [])).forEach(fx => { if (fx && fx.year && fx.wonValues && fx.wonValues.sales) { const id = yearField(fx.year); if (id) cands.push({ id, value: String(Math.round(fx.wonValues.sales / 1e4)), conf: 0.9, valid: true, src: fx.wonValues.sales, year: fx.year, note: '재무제표 매출액', file: f.name }); } });
         });
         if (fsList.length) {
           const fx = P().fsToFields(fsList);
@@ -8986,8 +9105,27 @@
                   // 신분증이거나 종류를 못 알아본 사진에서 칸을 2개 미만 읽었으면, 보정한 그림으로 한 번 더 읽고 더 많이 읽힌 쪽을 쓴다
                   const r1 = P().parseTextDocument(texts[0], file.name);
                   if (['idcard', 'unknown'].includes(r1.kind) && Object.keys(r1.fields || {}).length < 2) {
-                    const e = enhancedCopy(c);
-                    try { second = await ocrPage(e, x => progress(file.name + ' (다시 읽기)', 0, 0, x)); } finally { freeCanvas(e); }
+                    // 여러 방식으로 다시 읽고(보정·검은 글자만·무늬 선 지움, 글자 배치 가정도 바꿔 가며) 읽힌 칸을 합친다. 이름·생년월일이 다 나오면 멈춤
+                    const tries = [[() => enhancedCopy(c), '3'], [() => darkInkCopy(c, 130, 80, 2), '11'], [() => darkInkCopy(c, 110, 80, 0), '6'], [() => darkInkCopy(c, 100, 70, 0), '11'], [() => c, '6']];
+                    const got = { kind: r1.kind, fields: Object.assign({}, r1.fields), meta: Object.assign({}, r1.meta), texts: [texts[0]] };
+                    const w = await getWorker('kor+eng');
+                    try {
+                      // 이름이 두 번 이상 같은 글로 읽히고 생년월일까지 나오면 멈춤
+                      const settled = () => { if (Object.keys(got.fields).length < 2) return false; const n = got.fields.corp_ceo; return !n || got.texts.filter(tx => tx.replace(/[^가-힣]/g, '').includes(n)).length >= 2; };
+                      for (let t = 0; t < tries.length && !settled(); t++) {
+                        const [mk, psm] = tries[t]; const e = mk();
+                        try { await w.setParameters({ tessedit_pageseg_mode: psm }); ocrProg = x => progress(file.name + ` (다시 읽기 ${t + 1}/${tries.length})`, 0, 0, x); const tx = P().redact((await w.recognize(e)).data.text || ''); got.texts.push(tx);
+                          const r = P().parseTextDocument(tx, file.name, 'idcard');
+                          Object.entries(r.fields || {}).forEach(([k, v]) => { if (!(k in got.fields)) { got.fields[k] = v; got.meta[k] = (r.meta || {})[k]; } });
+                        } finally { ocrProg = null; if (e !== c) freeCanvas(e); }
+                      }
+                    } finally { await w.setParameters({ tessedit_pageseg_mode: '3' }); }
+                    // 이름은 여러 번 읽은 글에 가장 자주 나온 후보로(한 번만 잘못 읽힌 낱말보다 여러 번 같은 이름이 믿을 만함)
+                    const names = got.texts.map(tx => (P().parseTextDocument(tx, file.name, 'idcard').fields || {}).corp_ceo).filter(Boolean);
+                    const score = n => got.texts.filter(tx => tx.replace(/[^가-힣]/g, '').includes(n)).length;
+                    const best = [...new Set(names)].sort((x, y) => score(y) - score(x))[0];
+                    if (best) got.fields.corp_ceo = best;
+                    if (Object.keys(got.fields).length > Object.keys(r1.fields || {}).length) second = got;
                   }
                 } finally { freeCanvas(c); }
               } else {
@@ -9000,9 +9138,10 @@
               f.text = texts.join('\n<<PAGE>>\n');
               f.res = P().parseTextDocument(f.text, file.name);
               if (second) {
-                const r2 = P().parseTextDocument(second, file.name, f.res.kind === 'unknown' ? undefined : f.res.kind);
-                const cnt = r => r && r.status === 'ok' ? Object.keys(r.fields || {}).length : -1;
-                if (cnt(r2) > cnt(f.res)) { f.res = r2; f.text = second; }
+                // 여러 번 읽어 합친 신분증 결과
+                f.res = { kind: 'idcard', title: '신분증', status: 'ok', ocr: true, fields: second.fields, meta: second.meta, debtItems: [], notes: ['여러 방식으로 다시 읽어 합침 — 확인해 주세요', '주소·번호 뒷자리는 저장하지 않아요'] };
+                Object.keys(f.res.meta).forEach(k => { f.res.meta[k] = Object.assign({}, f.res.meta[k] || {}, { conf: Math.min(0.6, (f.res.meta[k] || {}).conf || 0.6) }); });
+                f.text = second.texts.join('\n<<PAGE>>\n');
               }
               if (window.__DOCS_DEBUG) (window.__docsDebug = window.__docsDebug || []).push({ name: file.name, text: f.text, res: f.res });   // 점검 도구 전용
               if (f.more && f.res && f.res.notes) f.res.notes.push(`30쪽까지만 읽었어요(나머지 ${f.more}쪽은 나눠 올려 주세요)`);
@@ -9038,7 +9177,7 @@
         if (typeof renderDebtTable === 'function') renderDebtTable();
         // 재무제표 값을 하나라도 넣었으면, 읽은 전체 과목(원)을 3개년 재무제표 표로 합친다
         if (sel.some(g => /^sme_/.test(g.id)) && typeof fsMergeDocs === 'function')
-          fsMergeDocs(files.filter(f => f.res && f.res.fs && f.res.fs.full).map(f => ({ year: f.res.fs.year, full: f.res.fs.full })));
+          fsMergeDocs(files.filter(f => f.res && f.res.status === 'ok').flatMap(f => (f.res.fsList || (f.res.fs ? [f.res.fs] : [])).filter(x => x && x.full).map(x => ({ year: x.year, full: x.full }))));
         if (typeof vhMerge === 'function') vhMerge(files.filter(f => f.res && f.res.status === 'ok' && f.res.vatHalves).map(f => f.res.vatHalves));
         calcSmbMetrics(); calcDebtTotals(); syncCompanyData();
         document.getElementById('screen_input').dispatchEvent(new Event('change', { bubbles: true }));

@@ -270,6 +270,7 @@
   const DOC_TYPES = [
     ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
     ['fs', '표준재무제표증명', t => /표준재무제표증명|표준재무상태표|표준손익계산서/.test(t)],
+    ['fsacct', '결산 재무제표(세무사)', t => /재무상태표|대차대조표/.test(t) && /손익계산서/.test(t)],
     ['vat', '부가가치세 과세표준증명', t => /과세표준증명/.test(t)],
     ['ins', '4대보험 사업장 가입자명부', t => /사업장가입자명부/.test(t)],
     ['share', '주주명부', t => /주주명부/.test(t)],
@@ -414,6 +415,90 @@
     return { unit, sections };
   }
 
+  // 세무사 결산 재무제표(재무상태표·손익계산서·이익잉여금처분계산서·합계잔액시산표 묶음): 과목 코드가 없고
+  // 당기·전기가 나란히, 해마다 금액 열이 둘(세부·합계). 글자가 한 자씩 떨어져 찍히므로 위치(x·y)로 줄과 열을 다시 세운다.
+  // 결과: 해마다 { year, full: { sections }, wonValues } — 표준재무제표증명과 같은 모양
+  const FS_KEYS = {
+    sales: ['is', /^매출액$/], profit: ['is', /^영업(이익|손익|손실)/, 1], net: ['is', /^당기순(이익|손익|손실)/, 1], interest: ['is', /^이자비용$/], intInc: ['is', /^이자수익$/],
+    assets: ['bs', /^자산총계$/], debt: ['bs', /^부채총계$/], equity: ['bs', /^자본총계$/], capital: ['bs', /^자본금$/], quick: ['bs', /^당좌자산$/], curLiab: ['bs', /^유동부채$/],
+    inv: ['bs', /^재고자산$/], ar: ['bs', /^(매출채권|외상매출금)$/], ap: ['bs', /^(매입채무|외상매입금)$/], unpaid: ['bs', /^미지급금$/], stLoan: ['bs', /^단기차입금$/], ltLoan: ['bs', /^장기차입금$/],
+    loanToCeo: ['bs', /^(주임종단기채권|가지급금)$/]
+  };
+  function fsWonValues(sections, j) {
+    const v = {};
+    Object.entries(FS_KEYS).forEach(([k, [sec, re, loss]]) => {
+      const s = sections.find(x => x.key === sec); const r = s && s.rows.find(x => re.test(x.name.replace(/\(.*?\)/g, '')));
+      let w = r ? r.vals[j] : null;
+      if (w !== null && w !== undefined && loss && /손실$/.test(r.name.replace(/\(.*?\)/g, '')) && w > 0) w = -w;
+      v[k] = w === undefined ? null : w;
+    });
+    return v;
+  }
+  function parseFSAcct(pages) {
+    const AMT = /^[\d,().\-△]$/;
+    const secs = {}; let year = null;
+    (pages || []).forEach(items => {
+      const its = items.filter(i => String(i.s).trim());
+      const flat = despace(its.slice().sort((a, b) => b.y - a.y || a.x - b.x).map(i => i.s).join(''));
+      const head = flat.slice(0, 80);
+      const key = /합계잔액시산표/.test(head) ? null : /이익잉여금처분|결손금처리/.test(head) ? 're' : /원가명세서/.test(head) ? 'cost' : /손익계산서/.test(head) ? 'is' : /재무상태표|대차대조표/.test(head) ? 'bs' : null;
+      if (!key) return;
+      if (!year) { const m = flat.match(/당\)?\d*기(\d{4})년/); if (m) year = +m[1]; }
+      const unit = (flat.match(/단위[:：]?\(?(원|천원|백만원)/) || [])[1] || '원';
+      const mul = unit === '천원' ? 1000 : unit === '백만원' ? 1e6 : 1;
+      // 줄 묶기(y 차이 2 이내)
+      const lines = []; its.slice().sort((a, b) => b.y - a.y || a.x - b.x).forEach(i => {
+        let l = lines.find(L => Math.abs(L.y - i.y) <= 2); if (!l) { l = { y: i.y, items: [] }; lines.push(l); } l.items.push(i);
+      });
+      // 금액 덩어리: 숫자·쉼표·괄호 글자가 3px 안으로 붙어 있는 것
+      const groups = l => {
+        const xs = l.items.filter(i => AMT.test(String(i.s).trim()) || /^[\d,]+$/.test(String(i.s).trim())).sort((a, b) => a.x - b.x);
+        const out = []; xs.forEach(i => { const g = out[out.length - 1]; if (g && i.x - g.r <= 3) { g.t += String(i.s).trim(); g.r = Math.max(g.r, i.x + i.w); } else out.push({ t: String(i.s).trim(), l: i.x, r: i.x + i.w }); });
+        return out.filter(g => /\d/.test(g.t) && g.t.replace(/[^\d]/g, '').length >= 1);
+      };
+      // 금액 열: 오른쪽 끝 위치를 모아 무리 짓기 → 왼쪽 두 무리 = 당기, 오른쪽 두 무리 = 전기
+      const lineGroups = lines.map(l => ({ l, g: groups(l) }));
+      // 머리의 '(당)기'·'(전)기' 글자(괄호 사이 한 글자) 위치
+      // 기간 줄('제9(당)기 2025년 1월 1일부터…')에도 같은 글자가 있으므로, 당기·전기 글자가 한 줄에 나란한 금액 열 머리만 쓴다
+      const parens = ch => its.filter(i => String(i.s).trim() === ch && its.some(j => String(j.s).trim() === ')' && j.x >= i.x + i.w - 2 && j.x - (i.x + i.w) < 8 && Math.abs(j.y - i.y) < 3));
+      let hD = null, hJ = null;
+      for (const d of parens('당')) { const j = parens('전').find(x => Math.abs(x.y - d.y) < 3 && x.x > d.x); if (j) { hD = d; hJ = j; break; } }
+      // 과목 이름 칸 끝 = 당기 머리 글자에서 조금 왼쪽(머리가 없으면 쉼표 있는 금액이 처음 나오는 곳). 처분계산서 안쪽 '당기 … 원' 금액에 이름이 잘리지 않게
+      const amtL = lim => Math.min(...lineGroups.flatMap(x => x.g.filter(g => /\d,\d{3}/.test(g.t) && g.l >= lim).map(g => g.l)), Infinity);
+      const firstAmtX = hD ? Math.min(amtL(hD.x - 120), hD.x) - 2 : amtL(-Infinity);
+      const edges = lineGroups.flatMap(x => x.g.filter(g => g.l >= firstAmtX - 5).map(g => Math.round(g.r))).sort((a, b) => a - b);
+      const cl = []; edges.forEach(e => { const c = cl[cl.length - 1]; if (c && e - c.max <= 25) { c.max = e; c.n++; } else cl.push({ min: e, max: e, n: 1 }); });
+      const cols = cl.filter(c => c.n >= 2);
+      if (cols.length < 2) return;
+      // 해 경계: 머리의 '(당)기'·'(전)기' 글자 위치 — 각 해 금액 열은 그 글자 근처에서 오른쪽으로 펼쳐지므로
+      // 전기 글자에서 두 글자 사이 거리의 1/4 만큼 왼쪽을 경계로. 머리를 못 찾으면 금액 열 무리로 추정
+      const split = (hD && hJ && hJ.x > hD.x) ? hJ.x - (hJ.x - hD.x) / 4
+        : cols.length >= 4 ? (cols[1].max + cols[2].min) / 2 : (cols[0].max + cols[cols.length - 1].min) / 2;
+      const sec = secs[key] || (secs[key] = []);
+      lineGroups.forEach(({ l, g }) => {
+        // 과목 이름 = 줄의 마지막 한글·로마자 글자까지(당기 머리 글자보다 왼쪽), 금액 = 그 오른쪽 숫자 덩어리
+        const nameEnd = Math.max(...l.items.filter(i => /[가-힣ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]/.test(i.s) && (!hD || i.x < hD.x - 20)).map(i => i.x + i.w), -Infinity);
+        const nameChars = l.items.filter(i => i.x + i.w <= nameEnd + 1).sort((a, b) => a.x - b.x).map(i => String(i.s).trim()).join('');
+        const raw = nameChars.replace(/\s+/g, '');
+        if (raw.replace(/[^가-힣]/g, '').length < 2 || /^(과목|금액|제\d*\(?[당전]|회사명)/.test(raw) || /기\d{4}년|단위/.test(raw)) return;
+        const amts = g.filter(x => x.l >= nameEnd && x.l >= firstAmtX - 60);
+        const vals = [null, null];
+        amts.forEach(x => { const v = signed(x.t); if (v === null) return; vals[x.r <= split ? 0 : 1] = v * mul; });   // 같은 해에 둘이면 오른쪽(합계 열)
+        const it = fsItemLabel(norm(raw));
+        sec.push({ label: it.label, name: it.name, level: it.level, vals });
+      });
+    });
+    const sections = FS_SECTIONS.filter(([k]) => secs[k] && secs[k].length).map(([key, title]) => ({ key, title, rows: secs[key] }));
+    if (!year || !sections.length) return { years: [], notes: ['결산 연도나 표를 찾지 못함'] };
+    const years = [0, 1].map(j => ({
+      year: year - j,
+      full: { unit: '원', source: 'acct', sections: sections.map(s => ({ key: s.key, title: s.title, rows: s.rows.filter(r => r.vals[j] !== null || r.level <= 1).map(r => ({ label: r.label, name: r.name, level: r.level, won: r.vals[j] })) })) },
+      wonValues: fsWonValues(sections, j)
+    })).filter(y => y.full.sections.some(s => s.rows.some(r => r.won !== null)));
+    years.forEach(y => { const v = y.wonValues; y.balanced = v.assets !== null && v.debt !== null && v.equity !== null && Math.abs(v.assets - (v.debt + v.equity)) <= Math.abs(v.assets) * 0.01; });
+    return { years, notes: [year + '년 결산(당기)·' + (year - 1) + '년(전기) — 세무사 결산 재무제표'] };
+  }
+
   // 부가세 과세표준증명: 기간별(부터·까지·계) → 최근 12개월 월평균 매출(만원)
   function parseVAT(rows) {
     const periods = [];
@@ -482,6 +567,7 @@
       // 뒷자리는 OCR 이 ) | l 같은 잡음을 섞어 읽기도 하므로 그런 글자까지 함께 지운다
       .replace(/(^|[^\d])(\d{6})\s*[-–—~_.]\s*([1-8][\d)(|lIoO*]{4,9})/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
       .replace(/(^|[^\d])(\d{6})\s+([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
+      .replace(/(^|[^\d])(\d{6})([1-8]\d{6})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
       .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**')   // 운전면허번호
       .replace(/\u0000(\d+)\u0000/g, (all, i) => keep[+i]);
   }
@@ -562,8 +648,13 @@
     if (nm && okName(nm[1])) name = nm[1];
     if (!name) {
       const i = lines.findIndex(l => /\d{6}\s*[-–—]\s*[\d*]/.test(l));
-      const cands = i < 0 ? [] : [lines[i].split(/\d{6}/)[0], lines[i - 1] || '', lines[i - 2] || ''];
+      const cands = i < 0 ? [] : [lines[i].split(/\d{6}/)[0].replace(/[^가-힣\s]/g, ' '), lines[i - 1] || '', lines[i - 2] || ''];
       for (const c of cands) { const w = (c.match(/[가-힣]{2,4}/g) || []).filter(okName); if (w.length === 1 || (w.length && c.trim().length <= 6)) { name = w[w.length - 1]; break; } }
+    }
+    if (!name) {
+      const SUR = /^(김|이|박|최|정|강|조|윤|장|임|한|오|서|신|권|황|안|송|류|유|전|홍|고|문|양|손|배|백|허|남|심|노|하|곽|성|차|주|우|구|민|진|나|지|엄|채|원|천|방|공|현|함|변|염|여|추|도|소|석|선|설|마|길|연|위|표|명|기|반|왕|금|옥|육|인|맹|제|모|탁|국|어|은|편|용|예|경|봉|사|부|황보|남궁|제갈|선우|독고)/;
+      const l = lines.map(x => x.replace(/[^가-힣]/g, '')).find(x => /^[가-힣]{2,4}$/.test(x) && SUR.test(x) && okName(x));
+      if (l) name = l;
     }
     if (name) { f.corp_ceo = name; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
     const rr = t.match(/(\d{2})(\d{2})(\d{2})\s*[-–—]\s*\*{7}/) || t.match(/(?:^|[^\d])(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\s*[-–—]\s*[\d*●xX#]/m);
@@ -953,6 +1044,14 @@
     if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows, pages);
     else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced, full: parseFSFull(rows) }; }
+    else if (c.kind === 'fsacct') {
+      const a = parseFSAcct(pages);
+      if (!a.years.length) { out.status = 'skip'; out.notes = a.notes; return out; }
+      // 같은 서류에 두 해(당기·전기) — 앞의 것이 당기
+      out.fsList = a.years.map(y => ({ year: y.year, wonValues: y.wonValues, balanced: y.balanced, full: y.full }));
+      out.fs = out.fsList[0];
+      r = { fields: {}, notes: a.notes };
+    }
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
@@ -974,7 +1073,9 @@
 
   // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
   function fsToFields(fsList) {
-    const list = fsList.filter(x => x && x.year).sort((a, b) => b.year - a.year);
+    // 같은 해가 둘이면 세무사 결산(acct)을 먼저 넣어 표준재무제표증명 값이 덮게
+    const isAcct = x => !!(x.full && x.full.source === 'acct');
+    const list = fsList.filter(x => x && x.year).sort((a, b) => b.year - a.year || (isAcct(b) - isAcct(a)));
     if (!list.length) return {};
     const top = list[0].year, f = {}, src = {}, conf = {};
     const suf = { 0: '', 1: '_2024', 2: '_2023' };
@@ -998,6 +1099,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
