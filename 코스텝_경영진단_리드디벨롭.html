@@ -9824,6 +9824,7 @@
     /* 펌 로고를 올렸으면 머리글자 대신 로고(흰 바탕 동그라미 안에 잘리지 않게) */
     #l3_acct .av.logo { background: #fff; padding: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(15,23,42,.08); }
     #l3_acct .av.logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    #l3_acct .av.logo.dark { box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }   /* 어두운 바탕을 고른 경우 카드와 구분되게 */
     #l3_acct .who { min-width: 0; flex: 1; line-height: 1.25; }
     #l3_acct .who b { display: block; font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #l3_acct .who span { display: block; font-size: 11px; color: rgba(255,255,255,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -10434,6 +10435,56 @@
         box.addEventListener('scroll', () => requestAnimationFrame(placeNav));
 
         // 왼쪽 아래 계정 상자: 이름·메일 + 톱니바퀴(내 정보 수정·관리·테마·로그아웃)
+        // 로고 뒤 바탕색 고르기: 로고 그림의 색을 읽어 흰 바탕과 대비가 모자라면(밝은·연한 로고) 로고 색조의 어두운 바탕으로.
+        // 로고에 제 바탕(네 귀퉁이가 같은 불투명 색)이 있으면 그 색으로 채워 이어 보이게. 읽지 못하면 흰 바탕
+        const logoBgCache = {};
+        function logoBackdrop(src) {
+          if (logoBgCache[src]) return logoBgCache[src];
+          const lum = (r, g, b) => { const f = c => { c /= 255; return c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+          const contrast = (a, b) => (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+          return (logoBgCache[src] = new Promise(done => {
+            const white = { color: '#fff', dark: false };
+            const im = new Image();
+            im.onerror = () => done(white);
+            im.onload = () => {
+              try {
+                const N = 48, c = document.createElement('canvas'); c.width = c.height = N;
+                const x = c.getContext('2d', { willReadFrequently: true });
+                const k = Math.min(N / (im.naturalWidth || N), N / (im.naturalHeight || N));
+                const w = Math.max(1, Math.round((im.naturalWidth || N) * k)), h = Math.max(1, Math.round((im.naturalHeight || N) * k));
+                x.drawImage(im, (N - w) / 2, (N - h) / 2, w, h);
+                const d = x.getImageData((N - w) / 2 | 0, (N - h) / 2 | 0, w, h).data;
+                const px = i => [d[i], d[i + 1], d[i + 2], d[i + 3]];
+                // 네 귀퉁이가 모두 불투명하고 비슷한 색이면 로고 자체 바탕
+                const cs = [0, (w - 1) * 4, (h - 1) * w * 4, ((h - 1) * w + w - 1) * 4].map(px);
+                if (cs.every(p => p[3] > 240) && cs.every(p => Math.abs(p[0] - cs[0][0]) + Math.abs(p[1] - cs[0][1]) + Math.abs(p[2] - cs[0][2]) < 40)) {
+                  const L = lum(cs[0][0], cs[0][1], cs[0][2]);
+                  return done({ color: `rgb(${cs[0][0]},${cs[0][1]},${cs[0][2]})`, dark: L < .35 });
+                }
+                // 불투명한 점들의 평균 색·밝기
+                let n = 0, R = 0, G = 0, B = 0, Ls = 0;
+                for (let i = 0; i < d.length; i += 4) {
+                  if (d[i + 3] < 128) continue;
+                  n++; R += d[i]; G += d[i + 1]; B += d[i + 2]; Ls += lum(d[i], d[i + 1], d[i + 2]);
+                }
+                if (!n) return done(white);
+                R /= n; G /= n; B /= n; const L = Ls / n;
+                if (contrast(1, L) >= 2.6) return done(white);   // 흰 바탕에서도 잘 보임
+                // 대비가 모자라면 로고 색조를 살린 어두운 바탕(채도 낮으면 남색)
+                const mx = Math.max(R, G, B) / 255, mn = Math.min(R, G, B) / 255, dl = mx - mn;
+                let hue = 0;
+                if (dl > .0001) {
+                  const r = R / 255, g = G / 255, b = B / 255;
+                  hue = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4;
+                  hue = Math.round(hue * 60 + 360) % 360;
+                }
+                const sat = mx + mn > 0 && mx + mn < 2 ? dl / (1 - Math.abs(mx + mn - 1)) : 0;
+                done({ color: sat < .15 ? '#0A1F44' : `hsl(${hue}, ${Math.round(Math.min(sat, .55) * 100)}%, 16%)`, dark: true });
+              } catch (e) { done(white); }   // 다른 사이트 그림 등 읽을 수 없는 경우
+            };
+            im.src = src;
+          }));
+        }
         function renderAcct() {
           const a = window.appState.auth || {}, pf = a.profile || {}, user = a.user || {};
           const name = pf.name || (cons && cons.value) || readMe().consultant || '내 계정';
@@ -10442,8 +10493,14 @@
           document.getElementById('l3_acct_mail').textContent = mail;
           const av = document.getElementById('l3_acct_av'), logo = (getBrand() || {}).logo || '';
           av.classList.toggle('logo', !!logo);
-          if (logo) { if (av.dataset.logo !== logo) { av.innerHTML = ''; const im = new Image(); im.alt = ''; im.src = logo; av.appendChild(im); av.dataset.logo = logo; } }
-          else { delete av.dataset.logo; av.textContent = String(name).trim().charAt(0) || '나'; }
+          if (logo) {
+            if (av.dataset.logo !== logo) {
+              av.innerHTML = ''; const im = new Image(); im.alt = ''; im.src = logo; av.appendChild(im); av.dataset.logo = logo;
+              av.style.background = ''; av.classList.remove('dark');
+              logoBackdrop(logo).then(bg => { if (av.dataset.logo !== logo) return; av.style.background = bg.color; av.classList.toggle('dark', bg.dark); });
+            }
+          }
+          else { delete av.dataset.logo; av.style.background = ''; av.classList.remove('dark'); av.textContent = String(name).trim().charAt(0) || '나'; }
           const menu = document.getElementById('l3_menu');
           menu.querySelector('[data-act="admin"]').classList.toggle('hidden', !['org_admin', 'operator'].includes(pf.role));
           menu.querySelector('[data-act="out"]').classList.toggle('hidden', !a.user);
