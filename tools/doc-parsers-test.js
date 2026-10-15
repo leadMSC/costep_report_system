@@ -231,10 +231,14 @@ ok('사업자등록증 제목이 깨진 글자 인식: 본문 칸 이름으로 �
   assert.strictEqual(r.fields.corp_reg_no, '110111-1234569');
   assert.strictEqual(r.fields.corp_est_date, '2015-03-02');
   assert.ok(!r.fields.corp_ceo_birth, '법인등록번호를 생년월일로 읽지 않음');
-  // 법인사업자인데 검증식이 안 맞는 법인등록번호(숫자 하나 오독): 낮은 신뢰로 넣고 원본 확인 안내
-  const r2 = P.parseTextDocument(t.replace('110111-1234569', '134511-1234561'), 'doc_0.pdf');
-  assert.strictEqual(r2.fields.corp_reg_no, '134511-1234561');
-  assert.strictEqual(r2.meta.corp_reg_no.valid, false);
+  // '법인등록번호' 라벨이 있으면 검증식이 안 맞아도(실제 번호에 있음) 앞자리가 날짜 꼴이어도 그대로 법인번호
+  const r2 = P.parseTextDocument(t.replace('110111-1234569', '110111-1234561'), 'doc_0.pdf');
+  assert.strictEqual(r2.fields.corp_reg_no, '110111-1234561');
+  assert.strictEqual(r2.meta.corp_reg_no.valid, undefined);
+  // 라벨이 깨져 '법인'을 못 읽고 검증식도 안 맞으면: 낮은 신뢰 + 원본 확인
+  const r3 = P.parseTextDocument(t.replace('법인 등록번호 : 110111-1234569', '가가 등록번호 : 134511-1234561'), 'doc_0.pdf');
+  assert.strictEqual(r3.fields.corp_reg_no, '134511-1234561');
+  assert.strictEqual(r3.meta.corp_reg_no.valid, false);
   // 칸 이름이 하나뿐이면 판별하지 않음
   assert.strictEqual(P.parseTextDocument(['( 법인사업자 )', '등록번호 : 123-81-12345', '아무 내용'].join('\n'), 'x.png').kind, 'unknown');
 });

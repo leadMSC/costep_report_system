@@ -241,7 +241,7 @@
     const t = String(text || ''), corpBiz = /\d{3}\s*-?\s*8[1-8]\s*-?\s*\d{5}/.test(t);
     for (const m of t.matchAll(CORP_REG_RE)) {
       if (/주\s*민/.test(m[1]) && !corpBiz) continue;   // 개인 사업자의 '주민(법인)' 칸은 주민번호
-      if (corpRegValid(m[2] + m[3])) return m[2] + '-' + m[3];
+      if (corpRegValid(m[2] + m[3]) || /^법\s*인/.test(m[1])) return m[2] + '-' + m[3];
     }
     return '';
   }
@@ -560,7 +560,7 @@
     const keep = [];
     const src = String(text || '').replace(CORP_REG_RE, (all, label, a, b) => {
       const corpBiz = /\d{3}\s*-?\s*8[1-8]\s*-?\s*\d{5}/.test(String(text));
-      if ((/주\s*민/.test(label) && !corpBiz) || !corpRegValid(a + b)) return all;
+      if ((/주\s*민/.test(label) && !corpBiz) || (!corpRegValid(a + b) && !/^법\s*인/.test(label))) return all;   // '법인등록번호' 라벨이면 검증식이 안 맞아도 법인번호(실제 번호 중 검증식이 안 맞는 것이 있음)
       keep.push(a + '-' + b); return label + ' \u0000' + (keep.length - 1) + '\u0000';
     });
     return src
