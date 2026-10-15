@@ -1255,6 +1255,7 @@
               <button type="button" class="fold-btn no-print" data-fold="fin_ind_table" aria-expanded="false" aria-label="표 펼치기"><svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l7 6 7-6"/></svg></button>
             </div>
           </div>
+          <div id="fa_box" class="fa-box"></div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
             <div>
               <label class="font-bold text-slate-700 block mb-1">NICE 개인신용평점 (1~1000점)</label>
@@ -4252,7 +4253,8 @@
     }
     window.finIndTableHtml = finIndTableHtml;
     function renderFinInd() {
-      const box = document.getElementById('fin_ind_table'); if (box) { box.innerHTML = finIndTableHtml(false); foldFit(box); }
+      const box = document.getElementById('fin_ind_table'); if (box) { box.innerHTML = typeof faTableHtml === 'function' ? faTableHtml(faData()) : finIndTableHtml(false); foldFit(box); }
+      if (typeof faRender === 'function') faRender();
       if (typeof fsRender === 'function') fsRender();
       if (typeof vhRender === 'function') vhRender();
       const m = computeFinIndicators();
@@ -4533,6 +4535,310 @@
       return `<table class="fsa-t fsa-vh"><thead><tr><th class="fsa-n">반기별 매출 (부가세 과세표준)</th><th>상반기</th><th>하반기</th><th class="fsa-cur">연간 합계</th></tr></thead><tbody>` +
         ys.map(y => `<tr><td class="fsa-n">${y}년</td><td>${c(vhNum(m[y + '-1']))}</td><td>${c(vhNum(m[y + '-2']))}</td><td class="fsa-cur">${c(vhSum(m, y))}</td></tr>`).join('') + '</tbody></table>';
     }
+
+    // ───────── 재무 분석(대출·지원사업 관점): 지표 A·B·C, 위험 신호, 유리판 그래프 ─────────
+    // 값은 3개년 재무제표 표(원)에서 계산. j = 0 당기 · 1 전기 · 2 전전기
+    function faRowSum(m, secs, re, j) {
+      let tot = null;
+      m.sections.filter(s => secs.includes(s.key)).forEach(s => {
+        const hit = s.rows.filter(r => re.test(fsKey(r.label)) && r.v[j] !== null && r.v[j] !== undefined);
+        // 같은 이름의 상위·하위 줄이 함께 걸리면 하위(더 깊은 단계)만
+        const deep = hit.filter(r => !hit.some(o => o !== r && o.level > r.level));
+        deep.forEach(r => { tot = (tot || 0) + r.v[j]; });
+      });
+      return tot;
+    }
+    function faData() {
+      const m = fsView(), fy = readNum('sme_fy_y1') || m.fy;
+      const W = (id, j) => fsWon(id, j);
+      const R = (secs, re, j) => faRowSum(m, secs, re, j);
+      const Y = [0, 1, 2].map(j => {
+        const S = W('sme_sales', j), OP = W('sme_profit', j), NI = W('sme_net', j), IE = W('sme_int_exp', j), II = W('sme_int_inc', j);
+        const A = W('sme_assets', j), D = W('sme_debt', j), E = W('sme_equity', j), CAP = W('sme_capital', j);
+        const CL = W('sme_cur_liab', j), Q = W('sme_quick', j), INV = W('sme_inv', j), AR = W('sme_ar', j), AP = W('sme_ap', j);
+        const ST = W('sme_st_loan', j), LT = W('sme_lt_loan', j);
+        const CUR = R(['bs'], /^유동성장기(부채|차입금)$/, j), BOND = R(['bs'], /^사채$/, j);
+        const loans = [ST, LT, CUR, BOND].some(v => v !== null) ? (ST || 0) + (LT || 0) + (CUR || 0) + (BOND || 0) : null;
+        return {
+          year: fy ? fy - j : null, S, OP, NI, IE, II, A, D, E, CAP, CL, Q, INV, AR, AP, ST, LT: (LT || 0) + (CUR || 0) + (BOND || 0) || LT, loans,
+          CA: R(['bs'], /^유동자산$/, j), NCA: R(['bs'], /^비유동자산$/, j), NCL: R(['bs'], /^비유동부채$/, j),
+          COGS: R(['is'], /^매출원가$/, j),
+          DEP: R(['is', 'cost'], /^(감가상각비|무형자산상각비)$/, j),
+          RND: R(['is', 'cost'], /^(경상)?(연구)?개발비$|^경상연구개발비$/, j),
+          LAB: R(['is', 'cost'], /^(급여|임원급여|직원급여|상여금|잡급|퇴직급여|임금|제수당)$/, j),
+          TAX: R(['is', 'cost'], /^세금과공과(금)?$/, j), RENT: R(['is', 'cost'], /^임차료$/, j),
+          CIT: R(['is'], /^법인세(비용|등)?$/, j),
+          LTC: R(['bs'], /^(주임종단기채권|가지급금|주주임원종업원단기대여금|주주임원종업원장기대여금)$/, j),
+          CASH: R(['bs'], /^현금(및현금성자산)?$|^현금및현금등가물$/, j)
+        };
+      });
+      const ok = v => v !== null && v !== undefined && isFinite(v);
+      const div = (a, b, k = 1) => ok(a) && ok(b) && b !== 0 ? a / b * k : null;
+      const chg = (k, j) => j < 2 && ok(Y[j][k]) && ok(Y[j + 1][k]) && Y[j + 1][k] !== 0 ? (Y[j][k] - Y[j + 1][k]) / Math.abs(Y[j + 1][k]) * 100 : null;
+      const avg = (k, j) => j < 2 && ok(Y[j][k]) && ok(Y[j + 1][k]) ? (Y[j][k] + Y[j + 1][k]) / 2 : Y[j][k];
+      const ebitda = j => ok(Y[j].OP) ? Y[j].OP + (Y[j].DEP || 0) : null;
+      const va = j => ok(Y[j].OP) ? Y[j].OP + (Y[j].LAB || 0) + (Y[j].IE || 0) + (Y[j].DEP || 0) + (Y[j].TAX || 0) + (Y[j].RENT || 0) : null;
+      const days = (a, b) => div(a, b, 365);
+      const emp = readNum('sme_employees');
+      const per = f => [0, 1, 2].map(f);
+      // 현금흐름(간이): 영업이익 + 감가상각 − 운전자본 증가 → 이자·법인세 후 → 투자 후 (전년 대비 증감이 필요해 당기·전기만)
+      const cf = per(j => {
+        if (j === 2) return null;
+        const a = Y[j], b = Y[j + 1]; if (!ok(a.OP)) return null;
+        const wc = x => (x.AR || 0) + (x.INV || 0) - (x.AP || 0);
+        const op = a.OP + (a.DEP || 0) - (wc(a) - wc(b));
+        const afterInt = op - (a.IE || 0) + (a.II || 0) - (a.CIT || 0);
+        const capex = ok(a.NCA) && ok(b.NCA) ? (a.NCA - b.NCA) + (a.DEP || 0) : null;
+        return { op, afterInt, afterInv: capex === null ? null : afterInt - capex, dLoans: ok(a.loans) && ok(b.loans) ? a.loans - b.loans : null };
+      });
+      const groups = [
+        { key: 'A', title: 'A. 대출·보증 심사', rows: [
+          ['부채비율', per(j => div(Y[j].D, Y[j].E, 100)), '%', 'low', 200],
+          ['자기자본비율', per(j => div(Y[j].E, Y[j].A, 100)), '%', 'high', 30],
+          ['차입금의존도', per(j => div(Y[j].loans, Y[j].A, 100)), '%', 'low', 50],
+          ['매출 대비 차입금', per(j => div(Y[j].loans, Y[j].S, 100)), '%', 'low', 100],
+          ['차입금 ÷ 월매출', per(j => div(Y[j].loans, ok(Y[j].S) ? Y[j].S / 12 : null)), '개월', 'low', 12],
+          ['이자보상배수', per(j => div(Y[j].OP, Y[j].IE)), '배', 'high', 1],
+          ['EBITDA ÷ 금융비용', per(j => div(ebitda(j), Y[j].IE)), '배', 'high', 1],
+          ['차입금 평균이자율', per(j => div(Y[j].IE, avg('loans', j), 100)), '%', 'low', 7],
+          ['유동비율', per(j => div(Y[j].CA, Y[j].CL, 100)), '%', 'high', 100],
+          ['당좌비율', per(j => div(Y[j].Q, Y[j].CL, 100)), '%', 'high', 70],
+          ['가지급금 ÷ 총자산', per(j => div(Y[j].LTC, Y[j].A, 100)), '%', 'low', 5],
+          ['매출채권 회전기간', per(j => days(Y[j].AR, Y[j].S)), '일', 'low', null],
+          ['재고자산 회전기간', per(j => days(Y[j].INV, Y[j].COGS || Y[j].S)), '일', 'low', null],
+          ['매입채무 회전기간', per(j => days(Y[j].AP, Y[j].COGS || Y[j].S)), '일', 'high', null],
+          ['현금전환주기', per(j => { const a = days(Y[j].AR, Y[j].S), b = days(Y[j].INV, Y[j].COGS || Y[j].S), c = days(Y[j].AP, Y[j].COGS || Y[j].S); return a === null && b === null ? null : (a || 0) + (b || 0) - (c || 0); }), '일', 'low', null]
+        ] },
+        { key: 'B', title: 'B. 지원사업 평가(성장·수익·고용·기술)', rows: [
+          ['매출액 증가율', per(j => chg('S', j)), '%', 'high', 0],
+          ['영업이익 증가율', per(j => chg('OP', j)), '%', 'high', 0],
+          ['순이익 증가율', per(j => chg('NI', j)), '%', 'high', 0],
+          ['영업이익률', per(j => div(Y[j].OP, Y[j].S, 100)), '%', 'high', 0],
+          ['순이익률', per(j => div(Y[j].NI, Y[j].S, 100)), '%', 'high', 0],
+          ['ROE (자기자본이익률)', per(j => div(Y[j].NI, avg('E', j), 100)), '%', 'high', 0],
+          ['ROA (총자산이익률)', per(j => div(Y[j].NI, avg('A', j), 100)), '%', 'high', 0],
+          ['연구개발비 ÷ 매출', per(j => div(Y[j].RND, Y[j].S, 100)), '%', 'high', null],
+          ['부가가치', per(j => va(j)), '원', 'high', null],
+          ['부가가치율', per(j => div(va(j), Y[j].S, 100)), '%', 'high', null],
+          ['1인당 매출 (상시근로자)', per(j => j === 0 && emp ? div(Y[j].S, emp) : null), '원', 'high', null],
+          ['1인당 부가가치', per(j => j === 0 && emp ? div(va(j), emp) : null), '원', 'high', null]
+        ] },
+        { key: 'C', title: 'C. 현금흐름(재무제표로 추정)', rows: [
+          ['현금영업이익', per(j => cf[j] && cf[j].op), '원', 'high', 0],
+          ['이자·세금 지급 후', per(j => cf[j] && cf[j].afterInt), '원', 'high', 0],
+          ['투자 후 현금흐름', per(j => cf[j] && cf[j].afterInv), '원', 'high', 0],
+          ['차입금 증감', per(j => cf[j] && cf[j].dLoans), '원', 'low', null],
+          ['EBITDA', per(j => ebitda(j)), '원', 'high', 0]
+        ] }
+      ];
+      // 위험·강점 신호(당기 기준, 근거 수치와 함께)
+      const s = [], y0 = Y[0];
+      if (ok(y0.E) && ok(y0.CAP) && y0.CAP > 0) {
+        if (y0.E <= 0) s.push(['bad', '완전 자본잠식', `자본총계 ${faMoney(y0.E)} — 정책자금·보증 신청이 제한될 수 있어요`]);
+        else if (y0.E < y0.CAP) s.push(['bad', '부분 자본잠식', `잠식률 ${Math.round((y0.CAP - y0.E) / y0.CAP * 100)}% (자본금 ${faMoney(y0.CAP)} > 자본총계 ${faMoney(y0.E)})`]);
+      }
+      const icr = per(j => div(Y[j].OP, Y[j].IE));
+      if (ok(icr[0]) && icr[0] < 1) s.push(['bad', icr.every(v => ok(v) && v < 1) ? '3년 연속 이자보상배수 1 미만' : '이자보상배수 1 미만', `영업이익으로 이자를 다 못 갚는 구간(당기 ${faNum(icr[0], '배')}) — 한계기업 판정 기준`]);
+      else if (ok(icr[0]) && icr[0] >= 3) s.push(['good', '이자 감당 여력 충분', `이자보상배수 ${faNum(icr[0], '배')}`]);
+      const dr = div(y0.D, y0.E, 100); if (ok(dr) && dr > 200) s.push(['warn', '부채비율 200% 초과', `당기 ${faNum(dr, '%')} — 보증기관 심사에서 설명이 필요해요`]);
+      const dep = div(y0.loans, y0.A, 100); if (ok(dep) && dep > 50) s.push(['warn', '차입금의존도 50% 초과', `당기 ${faNum(dep, '%')}`]);
+      const ltc = div(y0.LTC, y0.A, 100); if (ok(ltc) && ltc >= 1) s.push(['warn', '가지급금 있음', `${faMoney(y0.LTC)} (총자산의 ${faNum(ltc, '%')}) — 보증 심사 감점 요인`]);
+      const rate = div(y0.IE, avg('loans', 0), 100); if (ok(rate) && rate >= 7) s.push(['warn', '평균 이자율 높음', `차입금 평균 ${faNum(rate, '%')} — 정책자금 대환 검토`]);
+      if (cf[0] && ok(cf[0].op) && cf[0].op < 0) s.push(['warn', '현금영업이익 마이너스', `영업으로 현금이 들어오지 않음(${faMoney(cf[0].op)}) — 운전자금 수요 근거`]);
+      const sg = chg('S', 0); if (ok(sg)) s.push(sg >= 10 ? ['good', '매출 성장', `전년 대비 ${faNum(sg, '%')}`] : sg < 0 ? ['warn', '매출 감소', `전년 대비 ${faNum(sg, '%')}`] : ['info', '매출 보합', `전년 대비 ${faNum(sg, '%')}`]);
+      return { Y, cf, groups, signals: s, fy };
+    }
+    window.faData = faData;
+    // 금액 줄여 쓰기: 1억 이상은 억(소수 1자리), 그 아래는 만원
+    function faMoney(v) {
+      if (v === null || v === undefined || !isFinite(v)) return '—';
+      const a = Math.abs(v), sg = v < 0 ? '-' : '';
+      return a >= 1e8 ? sg + (Math.round(a / 1e7) / 10).toLocaleString('ko-KR') + '억' : a >= 1e4 ? sg + Math.round(a / 1e4).toLocaleString('ko-KR') + '만' : sg + Math.round(a).toLocaleString('ko-KR') + '원';
+    }
+    function faNum(v, u) {
+      if (v === null || v === undefined || !isFinite(v)) return '—';
+      if (u === '원') return faMoney(v);
+      const r = u === '배' ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10;
+      return r.toLocaleString('ko-KR') + (u === '%' ? '%' : u === '배' ? '배' : u === '일' ? '일' : u === '개월' ? '개월' : '');
+    }
+    // 기준선과 비교해 색(좋음·주의): dir high = 클수록 좋음
+    const faTone = (v, dir, th) => (v === null || th === null || th === undefined || !isFinite(v)) ? '' : (dir === 'high' ? (v >= th ? 'fa-up' : 'fa-dn') : (v <= th ? 'fa-up' : 'fa-dn'));
+    // 지표 표(입력 화면): 묶음 머리줄 + 당기 → 전기 → 전전기
+    function faTableHtml(d) {
+      const hdr = [0, 1, 2].map(j => d.fy ? `${d.fy - j}년${j === 0 ? ' (당기)' : ''}` : ['Y-1 (당기)', 'Y-2 (전기)', 'Y-3 (전전기)'][j]);
+      let first = true;
+      return `<table class="w-full text-xs border-collapse text-center fin-ind-t fa-t"><thead><tr class="bg-slate-100 font-bold text-slate-800"><th class="px-2 py-1.5 border border-slate-200 text-left">지표</th>${hdr.map((h, i) => `<th class="px-2 py-1.5 border border-slate-200${i === 0 ? ' text-[#0f766e] cur-col' : ''}">${h}</th>`).join('')}<th class="px-2 py-1.5 border border-slate-200 text-slate-500 font-semibold">기준</th></tr></thead><tbody>` +
+        d.groups.map(g => `<tr class="fa-g"${g.key === 'B' ? ' data-fold-start' : ''}><td colspan="5">${g.title}</td></tr>` + g.rows.map(([n, v, u, dir, th]) => {
+          const thTxt = th === null || th === undefined ? '' : (dir === 'high' ? '≥ ' : '≤ ') + faNum(th, u);
+          return `<tr><td class="px-2 py-1.5 border border-slate-200 text-left font-bold text-slate-700">${n}</td>${v.map((x, i) => `<td class="px-2 py-1.5 border border-slate-200 font-mono ${i === 0 ? 'font-black cur-col ' : ''}${faTone(x, dir, th)}">${faNum(x, u)}</td>`).join('')}<td class="px-2 py-1.5 border border-slate-200 text-[10px] text-slate-400">${thTxt}</td></tr>`;
+        }).join('')).join('') + '</tbody></table>';
+    }
+
+    // ── 그래프: 신용 검토서처럼 절제 — 지난 해는 회색, 당기는 청록, 마이너스는 주황. 그라데이션·광택 없음 ──
+    const FA_C = { ink: '#16252f', slate: '#3f6b8c', steel: '#8fb3cf', mist: '#c6dcec', teal: '#00a693', tealL: '#5fd3c2', sand: '#e8c37a', clay: '#c08a3e', warm: '#ea580c' };
+    let faUid = 0;
+    function faScale(vals) {
+      const v = vals.filter(x => x !== null && x !== undefined && isFinite(x));
+      let lo = Math.min(0, ...v), hi = Math.max(0, ...v); if (hi === lo) hi = lo + 1;
+      const raw = (hi - lo) / 4, step = Math.pow(10, Math.floor(Math.log10(raw)));
+      const nice = [1, 2, 2.5, 5, 10].map(k => k * step).find(k => k >= raw) || step * 10;
+      hi = Math.ceil(hi * 1.12 / nice) * nice; lo = Math.floor(lo / nice) * nice;
+      return { lo, hi, ticks: Array.from({ length: Math.round((hi - lo) / nice) + 1 }, (_, i) => lo + i * nice) };
+    }
+    const faPath = pts => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    // bars: [{name, color, vals, stack, emph:'last'}] · lines: [{name, color, vals, right, dash}]
+    function faChart({ title, note, cats, bars = [], lines = [], fmt = faMoney, fmtR, area = false, barLabels = true }) {
+      const Wd = 520, Ht = 214, L = 50, Rm = lines.some(l => l.right) ? 44 : 12, T = 14, B = 26;
+      const pw = Wd - L - Rm, ph = Ht - T - B;
+      const stacks = []; bars.forEach(b => { const k = b.stack || b.name; if (!stacks.includes(k)) stacks.push(k); });
+      const tot = cats.map((_, i) => stacks.map(k => { let p = 0, n = 0; bars.filter(b => (b.stack || b.name) === k).forEach(b => { const v = b.vals[i] || 0; if (v >= 0) p += v; else n += v; }); return [p, n]; }));
+      const sL = faScale([...tot.flat(2), ...lines.filter(l => !l.right).flatMap(l => l.vals)]);
+      const sR = lines.some(l => l.right) ? faScale(lines.filter(l => l.right).flatMap(l => l.vals)) : sL;
+      const y = (v, s) => T + ph - (v - s.lo) / (s.hi - s.lo) * ph;
+      const gx = pw / cats.length, bw = Math.min(30, gx * 0.5 / Math.max(1, stacks.length)), gap = 4;
+      const id = 'fg' + (++faUid);
+      // 유리 기둥: 입체 음영(좌 밝음 → 우 어두움), 위쪽 반사광, 바닥 그림자
+      let g = `<svg viewBox="0 0 ${Wd} ${Ht}" class="fa-svg" role="img" aria-label="${escapeHtml(title)}"><defs>
+        <linearGradient id="${id}-vol" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".22" stop-color="#fff" stop-opacity=".12"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#0b2a3a" stop-opacity=".22"/></linearGradient>
+        <linearGradient id="${id}-spec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+        <radialGradient id="${id}-bead" cx=".35" cy=".3" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="#fff" stop-opacity=".15"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+        <filter id="${id}-sh" x="-30%" y="-10%" width="160%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0b2a3a" flood-opacity=".18"/></filter>
+      </defs>`;
+      sL.ticks.forEach(t => { const yy = y(t, sL).toFixed(1); g += `<line x1="${L}" x2="${L + pw}" y1="${yy}" y2="${yy}" class="${t === 0 ? 'fa-zero' : 'fa-grid'}"/><text x="${L - 8}" y="${+yy + 3.5}" text-anchor="end" class="fa-ax">${fmt(t)}</text>`; });
+      if (lines.some(l => l.right)) sR.ticks.forEach(t => { g += `<text x="${L + pw + 8}" y="${y(t, sR) + 3.5}" class="fa-ax">${(fmtR || fmt)(t)}</text>`; });
+      cats.forEach((c, i) => {
+        const cx = L + gx * (i + .5), newest = i === cats.length - 1;
+        g += `<text x="${cx}" y="${Ht - 8}" text-anchor="middle" class="fa-cat${newest ? ' fa-now' : ''}">${escapeHtml(c)}</text>`;
+        stacks.forEach((k, si) => {
+          const x0 = cx - (stacks.length * bw + (stacks.length - 1) * gap) / 2 + si * (bw + gap);
+          let up = 0, dn = 0; const ser = bars.filter(b => (b.stack || b.name) === k);
+          ser.forEach(b => {
+            const v = b.vals[i]; if (v === null || v === undefined || !isFinite(v) || v === 0) return;
+            const from = v >= 0 ? up : dn, to = from + v; if (v >= 0) up = to; else dn = to;
+            const ya = y(Math.max(from, to), sL), h = Math.max(1, y(Math.min(from, to), sL) - ya);
+            const col = v < 0 ? FA_C.warm : b.emph === 'last' ? (newest ? FA_C.teal : FA_C.mist) : FA_C[b.color];
+            const X = x0.toFixed(1), Yy = ya.toFixed(1), Wb = bw.toFixed(1), Hb = h.toFixed(1);
+            g += `<rect x="${X}" y="${Yy}" width="${Wb}" height="${Hb}" fill="${col}" fill-opacity=".78" stroke="${col}" stroke-opacity=".9" stroke-width=".8" filter="url(#${id}-sh)"/>` +
+              `<rect x="${X}" y="${Yy}" width="${Wb}" height="${Hb}" fill="url(#${id}-vol)"/>` +
+              `<rect x="${(x0 + 1).toFixed(1)}" y="${(ya + 1).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${Math.min(h - 1, Math.max(4, h * .28)).toFixed(1)}" fill="url(#${id}-spec)" opacity=".55"/>` +
+              `<line x1="${(x0 + 1.6).toFixed(1)}" x2="${(x0 + 1.6).toFixed(1)}" y1="${(ya + 1).toFixed(1)}" y2="${(ya + h - 1).toFixed(1)}" stroke="#fff" stroke-opacity=".8" stroke-width="1.1"/>` +
+              `<line x1="${X}" x2="${(x0 + bw).toFixed(1)}" y1="${(ya + .5).toFixed(1)}" y2="${(ya + .5).toFixed(1)}" stroke="#fff" stroke-opacity=".9" stroke-width="1"/>`;
+          });
+          // 막대 값: 단일 막대는 끝에, 누적은 합계만
+          const sum = up + dn;
+          if (barLabels && (up || dn) && (ser.length === 1 || stacks.length === 1) && (stacks.length < 3 || newest)) g += `<text x="${(x0 + bw / 2).toFixed(1)}" y="${(sum >= 0 ? y(up, sL) - 5 : y(dn, sL) + 11).toFixed(1)}" text-anchor="middle" class="fa-val${newest ? ' fa-now' : ''}">${fmt(sum)}</text>`;
+        });
+      });
+      lines.forEach(l => {
+        const s = l.right ? sR : sL, col = FA_C[l.color];
+        const pts = l.vals.map((v, i) => v === null || v === undefined || !isFinite(v) ? null : [L + gx * (i + .5), y(v, s)]);
+        const seg = pts.filter(Boolean);
+        if (area && seg.length > 1) g += `<path d="${faPath(seg)} L${seg[seg.length - 1][0]},${y(Math.max(s.lo, 0), s)} L${seg[0][0]},${y(Math.max(s.lo, 0), s)} Z" fill="${FA_C.teal}" opacity=".07"/>`;
+        // 유리관: 색 선(굵게, 반투명) 위에 얇은 흰 반사선
+        if (seg.length > 1) g += `<path d="${faPath(seg)}" fill="none" stroke="${col}" stroke-opacity=".85" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" filter="url(#${id}-sh)" ${l.dash ? 'stroke-dasharray="6 4"' : ''}/>` +
+          `<path d="${faPath(seg.map(([a, b]) => [a, b - .9]))}" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".9" stroke-linejoin="round" ${l.dash ? 'stroke-dasharray="6 4"' : ''}/>`;
+        const lastI = pts.map((p, i) => p ? i : -1).filter(i => i >= 0).pop();
+        pts.forEach((p, i) => {
+          if (!p) return;
+          const last = i === lastI;
+          // 유리구슬: 색 구슬 + 왼쪽 위 반사광
+          const r = last ? 4.6 : 3.4;
+          g += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${r}" fill="${col}" fill-opacity="${last ? .95 : .7}" stroke="#fff" stroke-width="1.2"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${r}" fill="url(#${id}-bead)"/>`;
+          if (last || l.allLabels) g += `<text x="${(p[0] + (last && !l.allLabels ? 7 : 0)).toFixed(1)}" y="${(p[1] - (last && !l.allLabels ? -3.5 : 7)).toFixed(1)}" ${last && !l.allLabels ? '' : 'text-anchor="middle"'} class="fa-val" fill="${col}">${(l.right ? (fmtR || fmt) : fmt)(l.vals[i])}</text>`;
+        });
+      });
+      g += '</svg>';
+      // 범례는 제목 줄 오른쪽에 글자로(색 점 + 이름)
+      const seen = new Set(), leg = [];
+      bars.forEach(b => { if (seen.has(b.name)) return; seen.add(b.name); leg.push(`<i style="background:${b.emph === 'last' ? FA_C.teal : FA_C[b.color]}"></i>${escapeHtml(b.name)}`); });
+      lines.forEach(l => leg.push(`<i class="ln${l.dash ? ' ds' : ''}" style="border-color:${FA_C[l.color]}"></i>${escapeHtml(l.name)}${l.right ? ' (오른쪽)' : ''}`));
+      return `<figure class="fa-fig"><figcaption><b>${escapeHtml(title)}</b><span class="fa-leg">${leg.map(x => `<span>${x}</span>`).join('')}</span></figcaption>${g}${note ? `<p class="fa-fnote">${escapeHtml(note)}</p>` : ''}</figure>`;
+    }
+    function faChartsHtml(d) {
+      const order = [2, 1, 0].filter(j => d.Y[j].S !== null || d.Y[j].A !== null);   // 시간 순(왼쪽이 과거)
+      const cats = order.map(j => d.Y[j].year ? d.Y[j].year + '년' : ['당기', '전기', '전전기'][j]);
+      const pick = k => order.map(j => d.Y[j][k]);
+      const out = [];
+      if (order.length) {
+        out.push(faChart({ title: '자산·부채·자본', cats, barLabels: false, bars: [{ name: '부채', color: 'steel', vals: pick('D'), stack: 'bs' }, { name: '자본', color: 'teal', vals: pick('E'), stack: 'bs' }], lines: [{ name: '자산총계', color: 'ink', vals: pick('A') }] }));
+        out.push(faChart({ title: '매출과 이익', cats, bars: [{ name: '매출액', color: 'teal', vals: pick('S'), emph: 'last' }], lines: [{ name: '영업이익', color: 'ink', vals: pick('OP'), right: true }, { name: '순이익', color: 'slate', vals: pick('NI'), right: true, dash: true }] }));
+        if (order.some(j => d.Y[j].CA !== null || d.Y[j].NCL !== null)) {
+          const cats2 = order.flatMap(j => [(d.Y[j].year ? String(d.Y[j].year).slice(2) + '년 ' : '') + '자산', '조달']);
+          const ser = (k, side) => order.flatMap(j => side === 'a' ? [d.Y[j][k], null] : [null, d.Y[j][k]]);
+          out.push(faChart({ title: '자산 구성과 조달', note: '해마다 왼쪽은 자산, 오른쪽은 그 자산을 부채·자본으로 어떻게 마련했는지', cats: cats2, bars: [
+            { name: '유동자산', color: 'mist', vals: ser('CA', 'a'), stack: 's' }, { name: '비유동자산', color: 'slate', vals: ser('NCA', 'a'), stack: 's' },
+            { name: '유동부채', color: 'sand', vals: ser('CL', 'b'), stack: 's' }, { name: '비유동부채', color: 'clay', vals: ser('NCL', 'b'), stack: 's' }, { name: '자본', color: 'teal', vals: ser('E', 'b'), stack: 's' }] }));
+        }
+        out.push(faChart({ title: '차입금과 이자비용', cats, bars: [{ name: '단기차입금', color: 'sand', vals: pick('ST'), stack: 'l' }, { name: '장기차입금', color: 'slate', vals: pick('LT'), stack: 'l' }], lines: [{ name: '이자비용', color: 'warm', vals: pick('IE'), right: true }] }));
+        const cfo = [1, 0].filter(j => d.cf[j]);
+        if (cfo.length) out.push(faChart({ title: '현금흐름(추정)', note: '영업이익+감가상각−운전자본 증가 → 이자·법인세 지급 후 → 설비 등 투자 후', cats: cfo.map(j => d.Y[j].year ? d.Y[j].year + '년' : ['당기', '전기'][j]), bars: [
+          { name: '현금영업이익', color: 'teal', vals: cfo.map(j => d.cf[j].op) }, { name: '이자·세금 후', color: 'slate', vals: cfo.map(j => d.cf[j].afterInt) }, { name: '투자 후', color: 'steel', vals: cfo.map(j => d.cf[j].afterInv) }] }));
+      }
+      const vh = vhLoad();
+      if (Object.keys(vh).length) {
+        const ys = vhYears(vh).slice().reverse(), pts = [], cat = [];
+        ys.forEach(yv => [1, 2].forEach(h => { cat.push(`${String(yv).slice(2)}${h === 1 ? '상' : '하'}`); pts.push(vhNum(vh[yv + '-' + h])); }));
+        while (pts.length && pts[0] === null) { pts.shift(); cat.shift(); }
+        while (pts.length && pts[pts.length - 1] === null) { pts.pop(); cat.pop(); }
+        if (pts.length >= 2) {
+          const last = pts.length - 1, yoy = last >= 2 && pts[last - 2] ? (pts[last] - pts[last - 2]) / pts[last - 2] * 100 : null;
+          out.push(faChart({ title: '반기 매출(부가세 과세표준)', note: yoy === null ? '' : `최근 반기는 전년 같은 반기보다 ${yoy >= 0 ? '+' : ''}${faNum(yoy, '%')}`, cats: cat, lines: [{ name: '반기 매출', color: 'ink', vals: pts, allLabels: false }], area: true }));
+        }
+      }
+      return out.join('');
+    }
+    // 핵심 네 수치: 큰 숫자 + 3년 흐름(작은 선, 기준선 점선)
+    function faKpiHtml(d) {
+      const find = n => d.groups.flatMap(g => g.rows).find(r => r[0] === n);
+      const items = ['부채비율', '이자보상배수', '차입금 ÷ 월매출', '현금영업이익'].map(find).filter(Boolean);
+      return `<div class="fa-kpi">${items.map(([n, v, u, dir, th]) => {
+        const cur = v[0], bad = faTone(cur, dir, th) === 'fa-dn';
+        const seq = [2, 1, 0].map(j => v[j]), ok = seq.filter(x => x !== null && isFinite(x));
+        let spark = '';
+        if (ok.length >= 2) {
+          const all = [...ok, ...(th !== null && th !== undefined ? [th] : [])], lo = Math.min(...all), hi = Math.max(...all), sp = hi - lo || 1;
+          const P = seq.map((x, i) => x === null || !isFinite(x) ? null : [4 + i * 36, 22 - (x - lo) / sp * 18]).filter(Boolean);
+          spark = `<svg viewBox="0 0 80 26" class="fa-spark">${th !== null && th !== undefined ? `<line x1="0" x2="80" y1="${(22 - (th - lo) / sp * 18).toFixed(1)}" y2="${(22 - (th - lo) / sp * 18).toFixed(1)}" class="th"/>` : ''}<path d="${faPath(P)}"/>${P.map((p, i) => `<circle cx="${p[0]}" cy="${p[1].toFixed(1)}" r="${i === P.length - 1 ? 2.6 : 1.8}"${i === P.length - 1 ? ' class="now"' : ''}/>`).join('')}</svg>`;
+        }
+        const prev = v[1], delta = cur !== null && prev !== null && isFinite(cur) && isFinite(prev) ? cur - prev : null;
+        const dTxt = delta === null ? '' : `전기 ${faNum(prev, u)}`;
+        const thTxt = th === null || th === undefined ? '' : `기준 ${dir === 'high' ? '≥' : '≤'} ${faNum(th, u)}`;
+        return `<div class="fa-k${bad ? ' bad' : ''}"><span class="n">${escapeHtml(n)}</span><span class="v">${faNum(cur, u)}</span>${spark}<span class="s">${[dTxt, thTxt].filter(Boolean).join(', ')}</span></div>`;
+      }).join('')}</div>`;
+    }
+    function faSignalsHtml(d) {
+      if (!d.signals.length) return '';
+      return `<ul class="fa-sig">${d.signals.map(([t, h, b]) => `<li class="t-${t}"><b>${escapeHtml(h)}</b> ${escapeHtml(b)}</li>`).join('')}</ul>`;
+    }
+    function faRender() {
+      const box = document.getElementById('fa_box'); if (!box) return;
+      const d = faData();
+      const has = d.Y.some(y => y.S !== null || y.A !== null) || Object.keys(vhLoad()).length;
+      box.innerHTML = has ? `<div class="fa-head"><b>재무 분석</b><span>은행·보증기관 심사와 지원사업 평가에서 보는 수치를 위 재무제표로 계산했어요</span></div>${faKpiHtml(d)}${faSignalsHtml(d)}<div class="fa-grid">${faChartsHtml(d)}</div>` : '';
+    }
+    window.faRender = faRender;
+    // 보고서 별첨: 재무 분석 한 쪽(그래프 + 핵심 지표)
+    function faAttachHtml(corp) {
+      if ((window.appState.bizTrack || 'smb') === 'smb') return '';
+      const d = faData(); if (!d.Y.some(y => y.S !== null || y.A !== null)) return '';
+      const keyRows = { A: ['부채비율', '자기자본비율', '차입금의존도', '차입금 ÷ 월매출', '이자보상배수', '차입금 평균이자율', '유동비율', '현금전환주기'], B: ['매출액 증가율', '영업이익률', 'ROE (자기자본이익률)', '연구개발비 ÷ 매출', '부가가치율'], C: ['현금영업이익', '투자 후 현금흐름'] };
+      const hdr = [0, 1, 2].map(j => d.fy ? `${d.fy - j}` : ['당기', '전기', '전전기'][j]);
+      const part = g => `<tr class="fa-g"><td colspan="4">${g.title}</td></tr>` + g.rows.filter(r => keyRows[g.key].includes(r[0])).map(([n, v, u, dir, th]) => `<tr><td>${n}</td>${v.map((x, i) => `<td class="${i === 0 ? 'fa-cur ' : ''}${faTone(x, dir, th)}">${faNum(x, u)}</td>`).join('')}</tr>`).join('');
+      const head = `<thead><tr><th>핵심 지표</th>${hdr.map((h, i) => `<th class="${i === 0 ? 'fa-cur' : ''}">${h}${i === 0 ? ' 당기' : ''}</th>`).join('')}</tr></thead>`;
+      const tbl = `<div class="fa-tables"><table class="fa-pt">${head}<tbody>${part(d.groups[0])}</tbody></table><table class="fa-pt">${head}<tbody>${part(d.groups[1])}${part(d.groups[2])}</tbody></table></div>`;
+      return `<div class="print-page-break"></div>
+        <div id="print_target_report_fa" class="a4-page-card fa-attach" data-attach-of="print_target_report">
+          <div class="fa-body">
+            <div class="fsa-head"><span>[별첨] 재무 분석 (대출·지원사업 관점)</span><span class="fsa-unit">${escapeHtml(corp || '')}</span></div>
+            ${faKpiHtml(d)}
+            ${faSignalsHtml(d)}
+            <div class="fa-grid fa-print">${faChartsHtml(d)}</div>
+            ${tbl}
+            <div class="fa-note">※ 표준재무제표 값으로 계산. 현금흐름은 재무상태표 증감으로 추정한 값이며 실제 현금흐름표와 다를 수 있습니다.</div>
+          </div>
+        </div>`;
+    }
+    window.faAttachHtml = faAttachHtml;
 
     // 긴 표 접기: 기본은 data-fold-start 행 앞까지만 보이고, 표 아래 얇은 화살표를 누르면 부드럽게 늘어난다
     function foldLimit(box) {
@@ -5480,7 +5786,8 @@
         </div>
       `;
 
-      const fsAttach = typeof fsAttachHtml === 'function' ? fsAttachHtml(document.getElementById('corp_name')?.value.trim() || '') : '';
+      const fsAttach = (typeof fsAttachHtml === 'function' ? fsAttachHtml(document.getElementById('corp_name')?.value.trim() || '') : '') +
+        (typeof faAttachHtml === 'function' ? faAttachHtml(document.getElementById('corp_name')?.value.trim() || '') : '');
       // Filter by activeSheet
       let finalHtml = '';
       if (activeSheet === 'official') {
@@ -7487,23 +7794,100 @@
     .fs-stmt th:first-child { text-align: left; }
     .fs-stmt td { border: 1px solid #e2e8f0; padding: 2px 4px; }
     .fs-stmt td.fs-name { padding: 3px 8px; color: #334155; white-space: nowrap; }
-    .fs-stmt tr.fs-l1 td.fs-name, .fs-stmt tr.fs-l0 td.fs-name { font-weight: 800; color: #0f172a; }
-    .fs-stmt tr.fs-l0 td { background: #f8fafc; }
+    .fs-stmt tr.fs-l1 td.fs-name { font-weight: 500; color: #0f172a; }
+    .fs-stmt tr.fs-l0 td.fs-name { font-weight: 800; color: #0f172a; }
+    .fs-stmt tr.fs-l0 td { background: #eef2f5; border-top: 1px solid #94a3b8; }
     .fs-stmt tr.fs-l2 td.fs-name { padding-left: 16px; }
     .fs-stmt tr.fs-l3 td.fs-name { padding-left: 26px; font-weight: 500; }
     .fs-stmt tr.fs-l4 td.fs-name { padding-left: 36px; font-weight: 500; color: #64748b; }
     .fs-stmt tr.fs-sec td { background: #0f766e; color: #fff; font-weight: 800; padding: 4px 8px; font-size: 11px; letter-spacing: .02em; }
-    .fs-stmt .fs-in { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; min-width: 104px; padding: 3px 6px !important; height: auto !important; }
-    .fs-stmt tr.fs-l1 .fs-in, .fs-stmt tr.fs-l0 .fs-in { font-weight: 800; }
+    .fs-stmt .fs-in { text-align: right; font-family: 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; font-size: 11.5px; min-width: 104px; padding: 3px 6px !important; height: auto !important; }
+    .fs-stmt .fs-in { font-weight: 400; }
+    .fs-stmt tr.fs-l0 .fs-in { font-weight: 800; color: #0f172a; border-color: #94a3b8; }
+    /* 당기 열 강조 규칙(굵게)보다 우선: 총계 줄만 굵게 */
+    #section_sme_input .fs-stmt tr:not(.fs-l0) td.cur-col .fs-in { font-weight: 400; }
+    #section_sme_input .fs-stmt tr.fs-l0 td.cur-col .fs-in { font-weight: 800; }
     #vat_half_box { margin-top: 4px; }
     #vat_half_box .vh-title { font-size: 12px; font-weight: 800; color: #0f172a; margin: 6px 0 6px; }
     #vat_half_box .vh-title span { font-weight: 500; color: #64748b; font-size: 11px; margin-left: 6px; }
     #vat_half_box .vh-t td { text-align: right; }
     #vat_half_box .vh-t td.fs-name { text-align: left; }
-    #vat_half_box .vh-tot { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; padding: 3px 8px; }
+    #vat_half_box .vh-tot { font-family: 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; font-weight: 800; padding: 3px 8px; }
     #vat_half_box tr.vh-cur td.fs-name { color: #0f766e; }
     #vat_half_box .vh-note { font-family: inherit; font-weight: 500; font-size: 10px; color: #64748b; }
     .fs-attach .fsa-vhwrap { margin-top: .9em; }
+    /* 재무 분석: 신용 검토서처럼 절제. 유리판은 패널 한 장에만(반투명 흰 판 + 흐림), 안쪽은 가는 선으로 나눔 */
+    .fa-box:empty { display: none; }
+    .fa-box { --ink: #16252f; --slate: #3f6b8c; --steel: #8fb3cf; --rule: rgba(22, 37, 47, .1); --teal: #00a693; --warm: #ea580c;
+      margin-top: 14px; padding: 16px 18px 6px; border-radius: 0; color: var(--ink); font-variant-numeric: tabular-nums;
+      background: #fbfcfd; border: 1px solid #e3e8ec; border-top: 2px solid var(--ink); }
+    .fa-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 12px; }
+    .fa-head b { font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
+    .fa-head span { font-size: 11.5px; color: var(--slate); }
+    /* 핵심 네 수치 — 이 패널에서 유일하게 큰 글자 */
+    .fa-box, .fa-attach .fa-body { container-type: inline-size; }
+    @container (min-width: 620px) { .fa-kpi { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+    .fa-kpi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: rgba(22, 37, 47, .08); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); margin-bottom: 10px; }
+    .fa-k { display: grid; grid-template-areas: "n" "v" "sp" "s"; gap: 3px; padding: 10px 12px 9px; background: #fff; }
+    .fa-k .v { white-space: nowrap; }
+    .fa-k .n { grid-area: n; font-size: 11.5px; color: var(--slate); }
+    .fa-k .v { grid-area: v; font-size: 23px; line-height: 1.1; font-weight: 700; letter-spacing: -.02em; }
+    .fa-k .s { grid-area: s; font-size: 10.5px; color: #8a98a5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fa-k.bad .v { color: var(--warm); }
+    .fa-spark { grid-area: sp; width: 84px; height: 27px; overflow: visible; }
+    .fa-spark path { fill: none; stroke: var(--steel); stroke-width: 1.4; }
+    .fa-spark circle { fill: #fff; stroke: var(--steel); stroke-width: 1.2; }
+    .fa-spark circle.now { fill: var(--teal); stroke: var(--teal); }
+    .fa-k.bad .fa-spark circle.now { fill: var(--warm); stroke: var(--warm); }
+    .fa-spark .th { stroke: var(--warm); stroke-width: .8; stroke-dasharray: 2 2; opacity: .6; }
+    /* 판정 줄: 점 + 한 줄 */
+    .fa-sig { list-style: none; margin: 0 0 6px; padding: 0; }
+    .fa-sig li { position: relative; padding: 5px 0 5px 16px; font-size: 12px; color: var(--slate); border-bottom: 1px dotted var(--rule); }
+    .fa-sig li:last-child { border-bottom: 0; }
+    .fa-sig li::before { content: ''; position: absolute; left: 2px; top: 11px; width: 7px; height: 7px; background: var(--steel); }
+    .fa-sig li b { color: var(--ink); font-weight: 700; margin-right: 4px; }
+    .fa-sig .t-bad::before { background: var(--warm); } .fa-sig .t-bad b { color: var(--warm); }
+    .fa-sig .t-warn::before { background: #d4a017; }
+    .fa-sig .t-good::before { background: var(--teal); }
+    /* 그래프: 카드 대신 가는 선으로 나눈 2단 */
+    .fa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); border-top: 1px solid var(--rule); }
+    .fa-fig { margin: 0; padding: 12px 6px 10px; border-bottom: 1px solid var(--rule); }
+    .fa-fig figcaption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 4px; }
+    .fa-fig figcaption b { font-size: 12.5px; font-weight: 700; }
+    .fa-leg { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 10.5px; color: var(--slate); }
+    .fa-leg > span { display: inline-flex; align-items: center; gap: 4px; }
+    .fa-leg i { display: inline-block; width: 8px; height: 8px; }
+    .fa-leg i.ln { width: 12px; height: 0; border-top: 1.6px solid; }
+    .fa-leg i.ln.ds { border-top-style: dashed; }
+    .fa-fnote { margin: 2px 0 0; font-size: 10.5px; color: #8a98a5; }
+    .fa-svg { width: 100%; height: auto; display: block; overflow: visible; font-family: inherit; }
+    .fa-svg .fa-grid { stroke: var(--rule, #e3e8ec); stroke-width: .8; }
+    .fa-svg .fa-zero { stroke: #9aa8b4; stroke-width: 1; }
+    .fa-svg .fa-ax { font-size: 10px; fill: #8a98a5; }
+    .fa-svg .fa-cat { font-size: 10.5px; fill: #5b6f80; }
+    .fa-svg .fa-cat.fa-now { fill: #00a693; font-weight: 700; }
+    .fa-svg .fa-val { font-size: 10px; fill: #5b6f80; }
+    .fa-svg .fa-val.fa-now { fill: #24323d; font-weight: 700; }
+    /* 3개년 재무 카드 안 숫자는 Noto Sans(같은 폭 숫자)로 — 모노 글꼴은 숫자 모양이 어색함 */
+    #section_sme_input .font-mono, #section_sme_input .form-input-control { font-family: 'Noto Sans KR', sans-serif !important; font-variant-numeric: tabular-nums; }
+    .fa-t .fa-up, .fa-pt .fa-up { color: #00a693; }
+    .fa-t .fa-dn, .fa-pt .fa-dn { color: #ea580c; }
+    .fa-t tr.fa-g td, .fa-pt tr.fa-g td { background: #f6f8fa; color: #24323d; font-weight: 700; text-align: left; font-size: 11px; padding: 6px 8px; border: 1px solid #e3e8ec; border-top: 1px solid #24323d; }
+    /* 보고서 별첨: 재무 분석 한 쪽 */
+    .fa-attach, .fa-attach * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .fa-attach .fa-body { --ink: #16252f; --slate: #3f6b8c; --steel: #8fb3cf; --rule: rgba(22, 37, 47, .1); --teal: #00a693; --warm: #ea580c; font-size: 10px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .fa-attach .fa-k { padding: 6px 8px; } .fa-attach .fa-k .v { font-size: 17px; } .fa-attach .fa-k .n { font-size: 9.5px; } .fa-attach .fa-k .s { font-size: 8.5px; }
+    .fa-attach .fa-sig li { font-size: 9.5px; padding: 3px 0 3px 13px; } .fa-attach .fa-sig li::before { top: 7px; width: 6px; height: 6px; }
+    .fa-attach .fa-grid { grid-template-columns: 1fr 1fr; column-gap: 14px; }
+    .fa-attach .fa-fig { padding: 5px 0 3px; } .fa-attach .fa-fig figcaption b { font-size: 10.5px; } .fa-attach .fa-leg, .fa-attach .fa-fnote { font-size: 8.5px; }
+    .fa-attach .fa-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; margin-top: 8px; }
+    .fa-attach .fa-pt { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+    .fa-attach .fa-pt tr.fa-g td { font-size: 9px; padding: 3px 6px; }
+    .fa-attach .fa-pt th, .fa-attach .fa-pt td { border: 1px solid var(--rule); padding: 2px 6px; text-align: right; }
+    .fa-attach .fa-pt th { background: #f6f8fa; text-align: center; font-weight: 700; border-bottom: 1px solid var(--ink); }
+    .fa-attach .fa-pt td:first-child { text-align: left; }
+    .fa-attach .fa-pt .fa-cur { font-weight: 700; }
+    .fa-attach .fa-note { margin-top: 4px; font-size: 8px; color: #8a98a5; }
     /* 보고서 별첨: 3개년 재무제표 한 쪽 */
     .fs-attach .fsa-body { font-size: 9px; color: #0f172a; }
     .fs-attach .fsa-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #0f172a; padding-bottom: .4em; margin-bottom: .6em; font-weight: 800; font-size: 1.45em; }
