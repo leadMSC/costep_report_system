@@ -4417,6 +4417,11 @@
         }));
       });
       m.sections.forEach(s => s.rows.forEach(r => { delete r._y0; delete r._y1; delete r._y2; }));
+      // 그해 서류가 있는데 그 표에 없는 과목 = 그해 금액 없음 → 0 (홈택스는 쓴 과목만 찍음). 서류가 없는 해는 빈칸(모름) 그대로
+      list.forEach(d => {
+        const j = fy - d.year; if (j < 0 || j > 2) return;
+        d.full.sections.forEach(ds => { const sc = sec(ds.key); if (sc) sc.rows.forEach(r => { if (r.v[j] === null || r.v[j] === undefined) r.v[j] = 0; }); });
+      });
       const order = ['bs', 'is', 'cost', 're'];
       m.sections.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
       fsStore(m); fsDerive(m);
@@ -9244,7 +9249,7 @@
       const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const LABEL = {
         sme_kcb: 'KCB 신용평점', sme_nice: 'NICE 신용평점', smb_chk_tax_ok: '국세·지방세 완납', smb_chk_insurance: '사회보험 가입', corp_certs: '보유 인증', corp_main_bank: '주거래은행',
-        corp_reg_no: '법인등록번호',
+        corp_reg_no: '법인등록번호', _fsfull: '3개년 재무제표 전체 과목 (원)', _vathalf: '반기 매출 (부가세 과세표준)',
         corp_name: '상호', corp_biz_no: '사업자등록번호', corp_form: '사업자구분 · 과세유형', corp_ceo: '대표자 성명',
         corp_address: '본점 / 주사업장 소재지', corp_est_date: '개업일', corp_biz_type: '주요 업태 및 주생산품', corp_ceo_share: '주주현황 (대표 지분)',
         sme_sales: '매출액', sme_profit: '영업이익', sme_debt: '부채총계', sme_equity: '자본총계',
@@ -9307,6 +9312,21 @@
           if (fx._fsTopYear) cands.push({ id: 'sme_fy_y1', value: String(fx._fsTopYear), conf: 0.9, valid: true, file: fsList.map(x => x.file).join(', '), note: '재무제표 결산연도' });
           if (fx._monthlyFromFs && !cands.some(c => c.id === 'smb_monthly_sales')) cands.push({ id: 'smb_monthly_sales', value: String(fx._monthlyFromFs), conf: 0.6, valid: true, src: Math.round(fx._src._monthlyFromFs), note: '재무제표 연매출 ÷ 12', file: fsList[0].file });
         }
+        // 3개년 재무제표 전체 과목: 핵심 칸과 따로 한 줄(값이 지금과 같아도 전체 과목은 들어가게)
+        const fullDocs = fsList.filter(x => x.full && x.full.sections && x.full.sections.length && x.year);
+        if (fullDocs.length) {
+          const ys = [...new Set(fullDocs.map(x => x.year))].sort((a, b) => b - a);
+          const cnt = k => Math.max(0, ...fullDocs.map(x => (x.full.sections.find(sc => sc.key === k) || { rows: [] }).rows.length));
+          const parts = [['bs', '재무상태표'], ['is', '손익계산서'], ['cost', '원가명세서'], ['re', '이익잉여금처분']].filter(([k]) => cnt(k)).map(([k, t]) => `${t} ${cnt(k)}과목`);
+          cands.push({ id: '_fsfull', value: `${ys.join('·')}년 · ${parts.join(', ')}`, conf: 0.95, valid: true, file: [...new Set(fullDocs.map(x => x.file))].join(', '), fsDocs: fullDocs.map(x => ({ year: x.year, full: x.full })), years: ys });
+        }
+        // 반기 매출(부가세 과세표준증명)
+        const halves = {}; let hf = [];
+        files.forEach(f => { const r = f.res; if (r && r.status === 'ok' && r.vatHalves && Object.keys(r.vatHalves).length) { Object.assign(halves, r.vatHalves); hf.push(f.name); } });
+        if (Object.keys(halves).length) {
+          const ks = Object.keys(halves).sort(), lab = k => { const [y, h] = k.split('-'); return y + (h === '1' ? ' 상반기' : h === '2' ? ' 하반기' : ' 연간'); };
+          cands.push({ id: '_vathalf', value: `${lab(ks[0])} ~ ${lab(ks[ks.length - 1])} (${ks.length}개)`, conf: 0.9, valid: true, file: hf.join(', '), halves });
+        }
         derivedRows(cands).forEach(c => cands.push(c));
         const by = new Map();
         cands.forEach(c => {
@@ -9320,7 +9340,7 @@
           g.pick = 0;
           return checkState(g);
         });
-        const rank = id => { if (id.startsWith('_ip')) return 80; if (id === '_industry') return -2; if (id === '_track') return -1; const i = ORDER.indexOf(id); return i >= 0 ? i : id.startsWith('sme_') ? 50 : id.startsWith('_debt') ? 90 : 60; };
+        const rank = id => { if (id === '_fsfull') return 55; if (id === '_vathalf') return 56; if (id.startsWith('_ip')) return 80; if (id === '_industry') return -2; if (id === '_track') return -1; const i = ORDER.indexOf(id); return i >= 0 ? i : id.startsWith('sme_') ? 50 : id.startsWith('_debt') ? 90 : 60; };
         rows.sort((a, b) => rank(a.id) - rank(b.id) || (b.opts[0].year || 0) - (a.opts[0].year || 0));
       }
       // 업태·종목 → 주업종(②) 추정. 앞에서부터 먼저 맞는 것
@@ -9379,6 +9399,23 @@
           g.cur = ''; g.checked = !dup; g.why = dup ? '대출표에 이미 있어요' : '';
           return g;
         }
+        if (g.id === '_fsfull') {
+          const m = typeof fsLoad === 'function' ? fsLoad() : null;
+          const curRows = m ? m.sections.reduce((a, sc) => a + sc.rows.length, 0) : 0;
+          const docRows = Math.max(...o.fsDocs.map(d => d.full.sections.reduce((a, sc) => a + sc.rows.length, 0)));
+          const sameYears = m && o.years.every(y => y <= m.fy && y > m.fy - 3);
+          g.cur = m ? `${m.fy}년 기준 ${curRows}과목` : (typeof fsView === 'function' && fsHasData(fsView()) ? '핵심 값만(예전 저장)' : '');
+          g.checked = !(m && sameYears && curRows >= docRows);
+          g.why = g.checked ? '' : '지금 표에 이미 같은 해 전체 과목이 있어요';
+          return g;
+        }
+        if (g.id === '_vathalf') {
+          const cur = typeof vhLoad === 'function' ? vhLoad() : {};
+          const same2 = Object.entries(o.halves).every(([k, v]) => Number(cur[k]) === Number(v));
+          g.cur = Object.keys(cur).length ? `${Object.keys(cur).length}개 반기` : '';
+          g.checked = !same2; g.why = same2 ? '지금 값과 같아요' : '';
+          return g;
+        }
         if (g.id === '_industry' || g.id === '_track') {
           const cur = g.id === '_industry' ? window.appState.industryTrack : window.appState.bizTrack;
           g.cur = g.id === '_industry' ? IND_NAME[cur] : TIER_NAME[cur];
@@ -9396,7 +9433,7 @@
       const displayRaw = (id, v) => { const el = document.getElementById(id); return el && el.tagName === 'SELECT' ? ([...el.options].find(x => x.value === v)?.text || v) : v; };
       function showVal(g, o) {
         const unit = g.id.startsWith('sme_') && g.id !== 'sme_employees' ? '백만원' : (g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' || g.id.startsWith('smb_sales_')) ? '만원' : g.id === 'sme_employees' ? '명' : '';
-        const main = g.id === '_industry' ? IND_NAME[o.value] : g.id === '_track' ? TIER_NAME[o.value] : unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
+        const main = (g.id === '_fsfull' || g.id === '_vathalf') ? o.value : g.id === '_industry' ? IND_NAME[o.value] : g.id === '_track' ? TIER_NAME[o.value] : unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
         const raw = o.src !== undefined && o.src !== null ? `원문 ${fmt(Math.round(o.src))}원${g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' ? '/월' : ''}` : '';
         return { main, raw };
       }
@@ -9546,6 +9583,8 @@
         if (tr) { setBizTrack(tr.opts[tr.pick].value); n++; }
         sel.filter(g => g !== ind && g !== tr).forEach(g => {
           const o = g.opts[g.pick];
+          if (g.id === '_fsfull') { if (typeof fsMergeDocs === 'function' && fsMergeDocs(o.fsDocs)) n++; return; }
+          if (g.id === '_vathalf') { if (typeof vhMerge === 'function' && vhMerge([o.halves])) n++; return; }
           if (g.id.startsWith('_ip')) { if (window.ipMerge) ipMerge(o.ip); else if (window.ipAdd) ipAdd(o.ip); n++; return; }
           if (g.id.startsWith('_debt')) {
             (window.appState.debtItems = window.appState.debtItems || []).push({ institution: o.debt.institution, type: o.debt.type, balance: o.debt.balance, rate: '', monthlyInterest: '', payback: o.debt.payback });
@@ -9558,10 +9597,6 @@
           el.classList.add('doc-filled'); n++;
         });
         if (typeof renderDebtTable === 'function') renderDebtTable();
-        // 재무제표 값을 하나라도 넣었으면, 읽은 전체 과목(원)을 3개년 재무제표 표로 합친다
-        if (sel.some(g => /^sme_/.test(g.id)) && typeof fsMergeDocs === 'function')
-          fsMergeDocs(files.filter(f => f.res && f.res.status === 'ok').flatMap(f => (f.res.fsList || (f.res.fs ? [f.res.fs] : [])).filter(x => x && x.full).map(x => ({ year: x.year, full: x.full }))));
-        if (typeof vhMerge === 'function') vhMerge(files.filter(f => f.res && f.res.status === 'ok' && f.res.vatHalves).map(f => f.res.vatHalves));
         calcSmbMetrics(); calcDebtTotals(); syncCompanyData();
         document.getElementById('screen_input').dispatchEvent(new Event('change', { bubbles: true }));
         // 재무제표 값을 넣은 뒤 주요 재무지표·접힘 높이를 바로 다시(지표 표는 3개년 칸 안쪽 입력에만 반응해서 적용으로는 안 바뀌었음)
