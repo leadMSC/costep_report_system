@@ -337,6 +337,54 @@
     return { year: year ? Number(year) : null, wonValues: v, balanced, fields: f, notes };
   }
 
+  // 재무제표 전체 과목: 서류에 찍힌 모든 '과목 | 코드 | 금액'을 표별(재무상태표·손익계산서·원가명세서…)로 모은다.
+  // 두 단 배치라 글 순서가 과목 순서와 다르므로 표 안에서는 코드 순으로 다시 세운다. 금액은 원 단위
+  const FS_SECTIONS = [
+    ['bs', '재무상태표', /재무상태표|대차대조표/],
+    ['is', '손익계산서', /손익계산서/],
+    ['cost', '원가명세서', /원가명세서/],
+    ['re', '이익잉여금처분계산서', /이익잉여금처분계산서|결손금처리계산서/]
+  ];
+  const ROMAN = ['', 'Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ', 'Ⅷ', 'Ⅸ', 'Ⅹ', 'Ⅺ', 'Ⅻ'];
+  const romanNum = s => { const v = { I: 1, V: 5, X: 10 }; let n = 0; for (let i = 0; i < s.length; i++) { const a = v[s[i]], b = v[s[i + 1]] || 0; n += a < b ? -a : a; } return n; };
+  // 과목 이름 → 단계(1 로마자 · 2 (1) · 3 1. · 4 가. · 0 총계)와 화면 이름
+  function fsItemLabel(raw) {
+    let s = despace(raw).replace(/\((?:[IVX]+|\d+)(?:[+\-±][IVX\d()]+)+\)$/, '');   // 끝의 계산식 괄호 (I+II) 제거
+    let level = 3, label = s;
+    let m;
+    if ((m = s.match(/^([IVX]+)\.(.+)$/))) { level = 1; label = (ROMAN[romanNum(m[1])] || m[1]) + '. ' + m[2]; }
+    else if ((m = s.match(/^(\(\d+\))(.+)$/))) { level = 2; label = m[1] + ' ' + m[2]; }
+    else if ((m = s.match(/^(\d+)\.(.+)$/))) { level = 3; label = m[1] + '. ' + m[2]; }
+    else if ((m = s.match(/^([가-하])\.(.+)$/))) { level = 4; label = m[1] + '. ' + m[2]; }
+    else if (/총계$|합계$/.test(s)) level = 0;
+    const name = (m ? m[2] : s);
+    return { level, label, name };
+  }
+  function parseFSFull(rows) {
+    const tk = fsTokens(rows);
+    const all = despace(rows.flat().join(' '));
+    const unit = (all.match(/단위[:：]?\(?(원|천원|백만원)/) || [])[1] || '원';
+    const mul = unit === '천원' ? 1000 : unit === '백만원' ? 1e6 : 1;
+    const secs = {};
+    let cur = 'bs';
+    for (let i = 0; i < tk.length; i++) {
+      const t = despace(tk[i]);
+      const head = FS_SECTIONS.find(([, , re]) => re.test(t));
+      if (head && !/^\d{2,3}$/.test(tk[i + 1] || '')) { cur = head[0]; continue; }
+      if (!/[가-힣]/.test(t) || !/^\d{2,3}$/.test(tk[i + 1] || '')) continue;
+      const amt = signed(tk[i + 2] || '');
+      const it = fsItemLabel(t);
+      if (!it.name || /^(과목|코드|금액|계정과목)$/.test(it.name)) continue;
+      const sec = secs[cur] || (secs[cur] = []);
+      sec.push({ code: Number(tk[i + 1]), label: it.label, name: it.name, level: it.level, won: amt === null ? null : amt * mul, seq: sec.length });
+      i += amt === null ? 1 : 2;
+    }
+    const sections = FS_SECTIONS.filter(([k]) => secs[k] && secs[k].length).map(([key, title]) => ({
+      key, title, rows: secs[key].sort((a, b) => a.code - b.code || a.seq - b.seq).map(({ code, label, name, level, won }) => ({ code, label, name, level, won }))
+    }));
+    return { unit, sections };
+  }
+
   // 부가세 과세표준증명: 기간별(부터·까지·계) → 최근 12개월 월평균 매출(만원)
   function parseVAT(rows) {
     const periods = [];
@@ -356,12 +404,19 @@
     for (const p of periods) { if (m >= 12) break; m += months(p); sum += p.total; }
     const yearTotals = {};
     periods.forEach(p => { const y = +p.from.slice(0, 4); yearTotals[y] = (yearTotals[y] || 0) + p.total; });
+    // 반기별(원): 'YYYY-1' 상반기 · 'YYYY-2' 하반기. 1년을 한 번에 신고한 기간(1~12월)은 'YYYY-0'(반기 구분 없음)
+    const halfTotals = {};
+    periods.forEach(p => {
+      const y = +p.from.slice(0, 4), a = +p.from.slice(5, 7), b = +p.to.slice(5, 7);
+      const h = (b <= 6) ? 1 : (a >= 7) ? 2 : 0;
+      halfTotals[y + '-' + h] = (halfTotals[y + '-' + h] || 0) + p.total;
+    });
     const f = {};
     const meta = {};
     if (m) { f.smb_monthly_sales = won2man(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
     const no = bizNoOf(labelValue(rows, /사업자등록번호$/) || ''); if (no) f.corp_biz_no = no;
     const ceo = labelValue(rows, /^성명\(대표자\)$/); if (ceo) f.corp_ceo = ceo.split(/\s*주민/)[0].trim();
-    return { fields: f, meta, yearTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
+    return { fields: f, meta, yearTotals, halfTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
   }
 
   // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
@@ -830,7 +885,7 @@
     let r = null;
     if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows, pages);
-    else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced }; }
+    else if (c.kind === 'fs') { r = parseFS(rows); out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced, full: parseFSFull(rows) }; }
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
@@ -845,6 +900,7 @@
     } else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '종류를 알 수 없음' : '아직 읽는 규칙이 없는 서류'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes;
     if (r.yearTotals) out.vatYears = r.yearTotals;
+    if (r.halfTotals) out.vatHalves = r.halfTotals;
     return out;
   }
 
@@ -874,6 +930,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
