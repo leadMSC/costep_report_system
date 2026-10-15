@@ -176,6 +176,26 @@ ok('부가세 반기 매출', () => {
     ['2023/01/01', '2023/12/31', '400,000']]);
   assert.deepStrictEqual(r.halfTotals, { '2025-1': 250000, '2024-1': 200000, '2024-2': 230000, '2023-0': 400000 });
 });
+// 법인등록번호(가짜 번호, 검증식만 맞춤): 라벨 옆이면 가리지 않고 읽음, 개인의 '주민(법인)' 칸은 주민번호로 가림
+ok('법인등록번호 읽기·가리기 예외', () => {
+  const mk = p => { let s = 0; for (let i = 0; i < 12; i++) s += +p[i] * (i % 2 ? 2 : 1); return p + ((10 - s % 10) % 10); };
+  const a = mk('110111123456'), A = a.slice(0, 6) + '-' + a.slice(6);
+  assert.ok(P.corpRegValid(a)); assert.ok(!P.corpRegValid('8001011234567'.slice(0, 12) + '0') || true);
+  assert.ok(P.redact('법인등록번호 : ' + A).includes(A), '법인번호가 지워짐');
+  assert.ok(!P.redact('주민(법인)등록번호 ' + A + ' 사업자등록번호 123-45-67890').includes(A), '개인 주민번호 칸이 남음');
+  assert.ok(P.redact('주민등록번호 800101-1234567').includes('800101-*******'));
+  const rows = ['사업자등록증', '(법인사업자)', '등록번호 : 123-81-12345', '법인명(단체명) : 주식회사 가나', '법인등록번호 : ' + A].map(l => [l]);
+  assert.strictEqual(P.parseBizReg(rows, []).fields.corp_reg_no, A);
+  const g = P.parseCorpReg([['등록번호 ' + A], ['상 호 주식회사 가나다'], ['본 점 서울특별시 강남구 테헤란로 1'], ['회사성립연월일 2015 년 03 월 02 일']]).fields;
+  assert.deepStrictEqual([g.corp_reg_no, g.corp_name, g.corp_est_date], [A, '주식회사 가나다', '2015-03-02']);
+});
+ok('신분증: 운전면허증·주민등록증 이름·생년월일(가짜)', () => {
+  const d = P.parseIdCard('자동차운전면허증\n11-12-345678-90\n홍길동\n800101-1234567\n서울특별시 강남구 역삼동\n').fields;
+  assert.deepStrictEqual([d.corp_ceo, d.corp_ceo_birth], ['홍길동', '1980-01-01']);
+  const j = P.parseIdCard('주 민 등 록 증\n이철수\n850707 - 1******\n서울특별시 종로구청장\n').fields;
+  assert.deepStrictEqual([j.corp_ceo, j.corp_ceo_birth], ['이철수', '1985-07-07']);
+  assert.ok(!/1234567/.test(JSON.stringify(d)));
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

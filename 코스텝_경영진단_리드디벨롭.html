@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 배포 때 tools/deploy.sh 가 커밋 번호·시각으로 바꿔 넣는다(개발본은 dev) -->
+  <meta name="msc-build" content="dev">
   <title>MSC Report Generator · 경영지원센터 리포트 생성기</title>
   <link rel="icon" href="brand/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="brand/favicon.ico" sizes="16x16 32x32 48x48 64x64">
@@ -6735,6 +6737,11 @@
       draftTimer = setTimeout(() => { autosaveDraft(); setClientStatus('자동 저장됨 · ' + timeLabel(new Date().toISOString())); }, 600);
     }
     window.autosaveDraft = autosaveDraft;
+    // 새로고침 직전: 기다리던 저장을 바로 끝낸다(서버 저장이면 끝날 때까지 기다림)
+    window.flushDraftSave = async () => {
+      if (cloudOn()) { if (cloud.dirty) await cloudSaveNow(); return; }
+      if (storageScope !== 'signed-out') { clearTimeout(draftTimer); autosaveDraft(); }
+    };
     function restoreDraft() {
       try {
         const d = JSON.parse(safeStorage.getItem(scopedKey(DRAFT_KEY)) || 'null');
@@ -7773,6 +7780,23 @@
   const bizNoOf = s => { const m = String(s).match(/(\d{3})-?(\d{2})-?(\d{5})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
   // 사업자번호 가운데 두 자리 81~88 이면 법인
   const isCorpNo = b => { const m = /^\d{3}-(\d{2})-/.exec(b || ''); return !!m && +m[1] >= 81 && +m[1] <= 88; };
+  // 법인등록번호 검증식: 앞 12자리에 1,2,1,2… 를 곱해 더한 값 → (10 - 합 % 10) % 10 = 끝자리
+  function corpRegValid(s) {
+    const d = String(s || '').replace(/\D/g, '');
+    if (d.length !== 13) return false;
+    let sum = 0; for (let i = 0; i < 12; i++) sum += +d[i] * (i % 2 ? 2 : 1);
+    return (10 - sum % 10) % 10 === +d[12];
+  }
+  // '법인등록번호 : 110111-1234567' · '등록번호 110111-1234567'(등기부) · '주민(법인)등록번호'(법인 사업자일 때만). 검증식이 맞는 번호만
+  const CORP_REG_RE = /(법\s*인\s*등\s*록\s*번\s*호|주\s*민\s*\(\s*법\s*인\s*\)\s*등\s*록\s*번\s*호|등\s*록\s*번\s*호)\s*[:：]?\s*(\d{6})\s*[-–—~]?\s*(\d{7})(?!\d)/g;
+  function corpRegOf(text) {
+    const t = String(text || ''), corpBiz = /\d{3}\s*-?\s*8[1-8]\s*-?\s*\d{5}/.test(t);
+    for (const m of t.matchAll(CORP_REG_RE)) {
+      if (/주\s*민/.test(m[1]) && !corpBiz) continue;   // 개인 사업자의 '주민(법인)' 칸은 주민번호
+      if (corpRegValid(m[2] + m[3])) return m[2] + '-' + m[3];
+    }
+    return '';
+  }
   // 국세청 사업자등록번호 검증식(가중치 1,3,7,1,3,7,1,3,5)
   function bizNoValid(b) {
     const d = String(b || '').replace(/\D/g, '').split('').map(Number);
@@ -7836,6 +7860,7 @@
     const iu = idx(/^업태$/), ij = idx(/^종목$/);
     const up = iu > 0 ? rows[iu - 1].join(' ') : '', jm = ij > 0 ? rows[ij - 1].join(' ') : '';
     if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.7 }; }
+    const reg = corpRegOf(rows.map(r => r.join(' ')).join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
     return { fields: f, meta, notes: tax0 ? [tax0[1]] : [] };
   }
 
@@ -7999,11 +8024,18 @@
   // 개인정보 가리기: 주민·외국인등록번호 뒷자리는 읽자마자 지운다(앞 6자리가 날짜 꼴일 때만 — 금액 오인 방지)
   function redact(text) {
     const dateLike = s => { const m = +s.slice(2, 4), d = +s.slice(4, 6); return m >= 1 && m <= 12 && d >= 1 && d <= 31; };
-    return String(text || '')
+    const keep = [];
+    const src = String(text || '').replace(CORP_REG_RE, (all, label, a, b) => {
+      const corpBiz = /\d{3}\s*-?\s*8[1-8]\s*-?\s*\d{5}/.test(String(text));
+      if ((/주\s*민/.test(label) && !corpBiz) || !corpRegValid(a + b)) return all;
+      keep.push(a + '-' + b); return label + ' \u0000' + (keep.length - 1) + '\u0000';
+    });
+    return src
       // 뒷자리는 OCR 이 ) | l 같은 잡음을 섞어 읽기도 하므로 그런 글자까지 함께 지운다
       .replace(/(^|[^\d])(\d{6})\s*[-–—~_.]\s*([1-8][\d)(|lIoO*]{4,9})/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
       .replace(/(^|[^\d])(\d{6})\s+([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
-      .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**');   // 운전면허번호
+      .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**')   // 운전면허번호
+      .replace(/\u0000(\d+)\u0000/g, (all, i) => keep[+i]);
   }
   // 줄 → 칸: 공백 2칸 이상이나 | 로 나눔
   const textRows = text => String(text || '').split(/\r?\n/).map(l => l.split(/\s{2,}|\|/).map(norm).filter(Boolean)).filter(r => r.length);
@@ -8057,14 +8089,36 @@
     return { fields: f, meta, notes };
   }
 
+  // 법인 등기사항증명서: 등록번호(법인등록번호)·상호·본점 주소·회사성립연월일
+  function parseCorpReg(rows) {
+    const lines = rows.map(r => r.join(' ').replace(/\s+/g, ' ').trim());
+    const f = {}, meta = {};
+    const reg = corpRegOf(lines.join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
+    const after = re => { for (const l of lines) { const m = l.match(re); if (m && m[1].trim()) return m[1].trim(); } return ''; };
+    const name = after(/^상\s*호\s*[:：]?\s*(.+?)(?:\s+\d{4}\.\d{2}\.\d{2}.*)?$/); if (name) { f.corp_name = name; meta.corp_name = { conf: 0.8 }; }
+    const addr = after(/^본\s*점\s*[:：]?\s*(.+?)(?:\s+\d{4}\.\d{2}\.\d{2}.*)?$/); if (addr) { f.corp_address = addr; meta.corp_address = { conf: 0.75, note: '등기상 본점 — 실제 사업장과 다를 수 있어요' }; }
+    const est = ymd(after(/회\s*사\s*성\s*립\s*연\s*월\s*일\s*[:：]?\s*(.+)$/)); if (est) { f.corp_est_date = est; meta.corp_est_date = { conf: 0.8, note: '회사성립연월일' }; }
+    return { fields: f, meta, notes: ['법인 등기사항증명서'] };
+  }
+
   // 신분증(주민등록증·운전면허증): 이름, 생년월일(앞 6자리 — 세기는 추정). 주소는 저장하지 않고 참고만
   function parseIdCard(text) {
     const t = redact(text);
     const lines = t.split(/\r?\n/).map(norm).filter(Boolean);
     const f = {}, meta = {};
+    // 이름: ① '홍길동(洪吉童)' ② '성명 홍길동' ③ 주민번호 줄 바로 위(또는 같은 줄 앞)의 한글 2~4자 한 낱말(운전면허증)
+    const NOT_NAME = /^(주민등록증|운전면허증|자동차|면허증|대한민국|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|특별시|광역시|시장|구청장|군수|도지사|경찰청장|적성검사|갱신기간|조건|발급|재발급|주소|성명|암호|일련번호|기간|면허|종류|보통|대형|특수|소형|원동기)$/;
+    const okName = s => /^[가-힣]{2,4}$/.test(s) && !NOT_NAME.test(s);
+    let name = '';
     const nm = t.match(/([가-힣]{2,4})\s*\(\s*[^\s)]{1,8}\s*\)/) || t.match(/성\s*명\s*[:：]?\s*([가-힣]{2,4})/);
-    if (nm) { f.corp_ceo = nm[1]; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
-    const rr = t.match(/(\d{2})(\d{2})(\d{2})-\*{7}/);
+    if (nm && okName(nm[1])) name = nm[1];
+    if (!name) {
+      const i = lines.findIndex(l => /\d{6}\s*[-–—]\s*[\d*]/.test(l));
+      const cands = i < 0 ? [] : [lines[i].split(/\d{6}/)[0], lines[i - 1] || '', lines[i - 2] || ''];
+      for (const c of cands) { const w = (c.match(/[가-힣]{2,4}/g) || []).filter(okName); if (w.length === 1 || (w.length && c.trim().length <= 6)) { name = w[w.length - 1]; break; } }
+    }
+    if (name) { f.corp_ceo = name; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
+    const rr = t.match(/(\d{2})(\d{2})(\d{2})\s*[-–—]\s*\*{7}/) || t.match(/(?:^|[^\d])(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\s*[-–—]\s*[\d*●xX#]/m);
     if (rr) {
       const yy = +rr[1], now = new Date().getFullYear() % 100;
       f.corp_ceo_birth = (yy > now ? '19' : '20') + rr[1] + '-' + rr[2] + '-' + rr[3];
@@ -8091,6 +8145,7 @@
     else if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'corpreg') r = parseCorpReg(rows);
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
     // 사진 인식은 한 단계 낮은 정확도로
@@ -8361,6 +8416,7 @@
       if (m) { up = m[1].trim(); jm = m[2].trim(); }
     }
     if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.75 }; }
+    const reg = corpRegOf(lines.join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
     return { fields: f, meta, notes: tax0 ? ['사업자등록증', tax0[1]] : ['사업자등록증'] };
   }
 
@@ -8445,6 +8501,7 @@
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'corpreg') r = parseCorpReg(rows);
     else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     else if (c.kind === 'ledger' || c.kind === 'creditor') {
       const parsed = parseDebtDocument(pagesToCells(pages));
@@ -8486,7 +8543,7 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -8596,11 +8653,28 @@
       // 사진: 긴 변 3000px 이하로 줄여 인식(사진에는 흑백화를 하지 않는다 — 조명 얼룩에서 글자가 지워짐)
       async function imageToCanvas(file) {
         const bmp = await createImageBitmap(file);
-        const k = Math.min(1, 3000 / Math.max(bmp.width, bmp.height));
+        // 긴 변 3000px 이하로 줄이고, 작은 사진(신분증 확대 사진 등)은 2000px 까지 키워 글자를 크게
+        const long = Math.max(bmp.width, bmp.height);
+        const k = long > 3000 ? 3000 / long : long < 2000 ? 2000 / long : 1;
         const c = document.createElement('canvas');
         c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(bmp, 0, 0, c.width, c.height);
         bmp.close && bmp.close();
+        return c;
+      }
+      // 사진 두 번째 읽기용: 회색조 + 밝기 늘이기(아래위 2%를 끝으로) — 신분증 무늬·홀로그램·흐린 조명에서 글자를 또렷하게(흑백으로 자르지는 않음)
+      function enhancedCopy(src) {
+        const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+        const ctx = c.getContext('2d'); ctx.drawImage(src, 0, 0);
+        const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data, hist = new Uint32Array(256);
+        for (let i = 0; i < d.length; i += 4) { const y = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; d[i] = y; hist[y]++; }
+        const n = d.length / 4; let lo = 0, hi = 255, acc = 0;
+        for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > n * 0.02) { lo = v; break; } }
+        acc = 0; for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc > n * 0.02) { hi = v; break; } }
+        const span = Math.max(1, hi - lo);
+        for (let i = 0; i < d.length; i += 4) { const y = Math.max(0, Math.min(255, (d[i] - lo) * 255 / span)); d[i] = d[i + 1] = d[i + 2] = y; }
+        ctx.putImageData(img, 0, 0);
         return c;
       }
       // 스캔 PDF: 첫 쪽을 3.5배로 그리고 흑백화 + 표 선 지우기 후 인식(kor+eng — 숫자는 영어 모델이 잘 잡음)
@@ -8650,6 +8724,7 @@
       const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const LABEL = {
         sme_kcb: 'KCB 신용평점', sme_nice: 'NICE 신용평점', smb_chk_tax_ok: '국세·지방세 완납', smb_chk_insurance: '사회보험 가입', corp_certs: '보유 인증', corp_main_bank: '주거래은행',
+        corp_reg_no: '법인등록번호',
         corp_name: '상호', corp_biz_no: '사업자등록번호', corp_form: '사업자구분 · 과세유형', corp_ceo: '대표자 성명',
         corp_address: '본점 / 주사업장 소재지', corp_est_date: '개업일', corp_biz_type: '주요 업태 및 주생산품', corp_ceo_share: '주주현황 (대표 지분)',
         sme_sales: '매출액', sme_profit: '영업이익', sme_debt: '부채총계', sme_equity: '자본총계',
@@ -8885,9 +8960,18 @@
               // 사진·스캔: 글자 인식 → 번호 뒷자리를 지운 글만 들고 있는다
               f.pages = null; f.res = null; render();
               const texts = [];
+              let second = null;
               if (isImg) {
                 const c = await imageToCanvas(file);
-                try { texts.push(await ocrPage(c, x => progress(file.name, 0, 0, x))); } finally { freeCanvas(c); }
+                try {
+                  texts.push(await ocrPage(c, x => progress(file.name, 0, 0, x)));
+                  // 신분증이거나 종류를 못 알아본 사진에서 칸을 2개 미만 읽었으면, 보정한 그림으로 한 번 더 읽고 더 많이 읽힌 쪽을 쓴다
+                  const r1 = P().parseTextDocument(texts[0], file.name);
+                  if (['idcard', 'unknown'].includes(r1.kind) && Object.keys(r1.fields || {}).length < 2) {
+                    const e = enhancedCopy(c);
+                    try { second = await ocrPage(e, x => progress(file.name + ' (다시 읽기)', 0, 0, x)); } finally { freeCanvas(e); }
+                  }
+                } finally { freeCanvas(c); }
               } else {
                 // 스캔 PDF 는 모든 쪽(최대 30쪽)을 읽는다 — 합본 등록증·여러 쪽 서류
                 const info = await scanPdfPages(file, async (c, p, n) => {
@@ -8897,6 +8981,11 @@
               }
               f.text = texts.join('\n<<PAGE>>\n');
               f.res = P().parseTextDocument(f.text, file.name);
+              if (second) {
+                const r2 = P().parseTextDocument(second, file.name, f.res.kind === 'unknown' ? undefined : f.res.kind);
+                const cnt = r => r && r.status === 'ok' ? Object.keys(r.fields || {}).length : -1;
+                if (cnt(r2) > cnt(f.res)) { f.res = r2; f.text = second; }
+              }
               if (window.__DOCS_DEBUG) (window.__docsDebug = window.__docsDebug || []).push({ name: file.name, text: f.text, res: f.res });   // 점검 도구 전용
               if (f.more && f.res && f.res.notes) f.res.notes.push(`30쪽까지만 읽었어요(나머지 ${f.more}쪽은 나눠 올려 주세요)`);
             }
@@ -9923,5 +10012,40 @@
   <!-- 내보내기 팝업·알림 자리 (내용은 xpModal 이 채움) -->
   <div id="xp_modal" class="no-print" hidden></div>
   <div id="xp_toast" class="no-print" role="status" aria-live="polite"></div>
+<!-- 새 버전 알림: 열어 둔 탭은 배포 뒤에도 옛 코드로 계속 돈다(한 페이지 앱). 서버 파일의 버전 표시가 바뀌면 새로고침을 권한다 -->
+<div id="upd_bar" hidden role="status" style="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 18px;border-radius:999px;background:rgba(15,23,42,.92);color:#fff;font:600 13px/1.2 system-ui,'Malgun Gothic',sans-serif;box-shadow:0 12px 32px -10px rgba(0,0,0,.45);backdrop-filter:blur(10px)">
+  <span>새 버전이 올라왔어요 <span id="upd_ver" style="opacity:.6;font-weight:500"></span></span>
+  <button type="button" id="upd_go" style="border:0;border-radius:999px;padding:7px 14px;background:#14b8a6;color:#04211d;font-weight:800;cursor:pointer">새로고침</button>
+  <button type="button" id="upd_x" aria-label="닫기" style="border:0;background:transparent;color:#fff;opacity:.6;cursor:pointer;font-size:16px;padding:0 4px">×</button>
+</div>
+<script>
+  (() => {
+    const mine = (document.querySelector('meta[name="msc-build"]') || {}).content || 'dev';
+    if (mine === 'dev' || !/^https?:/.test(location.protocol)) return;   // 개발본·파일 열기에서는 끔
+    let dismissed = '', latest = '';
+    async function check() {
+      try {
+        const r = await fetch(location.pathname + '?_v=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return;
+        const m = (await r.text()).match(/<meta name="msc-build" content="([^"]+)">/);
+        const live = m && m[1];
+        if (!live || live === mine || live === dismissed) return;
+        latest = live;
+        document.getElementById('upd_ver').textContent = live.split(' ')[0];
+        document.getElementById('upd_bar').hidden = false;
+      } catch (e) { /* 연결 끊김 — 다음에 다시 */ }
+    }
+    document.getElementById('upd_go').onclick = async () => {
+      // 작성 중 내용은 자동 저장되지만, 막 고친 칸이 있으면 저장을 먼저 끝낸 뒤 새로고침
+      try { if (typeof window.flushDraftSave === 'function') await window.flushDraftSave(); } catch (e) { }
+      location.reload();
+    };
+    document.getElementById('upd_x').onclick = () => { dismissed = latest; document.getElementById('upd_bar').hidden = true; };
+    setInterval(check, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    window.addEventListener('focus', check);
+    window.mscBuild = mine;
+  })();
+</script>
 </body>
 </html>

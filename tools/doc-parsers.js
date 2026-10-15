@@ -217,6 +217,23 @@
   const bizNoOf = s => { const m = String(s).match(/(\d{3})-?(\d{2})-?(\d{5})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
   // 사업자번호 가운데 두 자리 81~88 이면 법인
   const isCorpNo = b => { const m = /^\d{3}-(\d{2})-/.exec(b || ''); return !!m && +m[1] >= 81 && +m[1] <= 88; };
+  // 법인등록번호 검증식: 앞 12자리에 1,2,1,2… 를 곱해 더한 값 → (10 - 합 % 10) % 10 = 끝자리
+  function corpRegValid(s) {
+    const d = String(s || '').replace(/\D/g, '');
+    if (d.length !== 13) return false;
+    let sum = 0; for (let i = 0; i < 12; i++) sum += +d[i] * (i % 2 ? 2 : 1);
+    return (10 - sum % 10) % 10 === +d[12];
+  }
+  // '법인등록번호 : 110111-1234567' · '등록번호 110111-1234567'(등기부) · '주민(법인)등록번호'(법인 사업자일 때만). 검증식이 맞는 번호만
+  const CORP_REG_RE = /(법\s*인\s*등\s*록\s*번\s*호|주\s*민\s*\(\s*법\s*인\s*\)\s*등\s*록\s*번\s*호|등\s*록\s*번\s*호)\s*[:：]?\s*(\d{6})\s*[-–—~]?\s*(\d{7})(?!\d)/g;
+  function corpRegOf(text) {
+    const t = String(text || ''), corpBiz = /\d{3}\s*-?\s*8[1-8]\s*-?\s*\d{5}/.test(t);
+    for (const m of t.matchAll(CORP_REG_RE)) {
+      if (/주\s*민/.test(m[1]) && !corpBiz) continue;   // 개인 사업자의 '주민(법인)' 칸은 주민번호
+      if (corpRegValid(m[2] + m[3])) return m[2] + '-' + m[3];
+    }
+    return '';
+  }
   // 국세청 사업자등록번호 검증식(가중치 1,3,7,1,3,7,1,3,5)
   function bizNoValid(b) {
     const d = String(b || '').replace(/\D/g, '').split('').map(Number);
@@ -280,6 +297,7 @@
     const iu = idx(/^업태$/), ij = idx(/^종목$/);
     const up = iu > 0 ? rows[iu - 1].join(' ') : '', jm = ij > 0 ? rows[ij - 1].join(' ') : '';
     if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.7 }; }
+    const reg = corpRegOf(rows.map(r => r.join(' ')).join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
     return { fields: f, meta, notes: tax0 ? [tax0[1]] : [] };
   }
 
@@ -443,11 +461,18 @@
   // 개인정보 가리기: 주민·외국인등록번호 뒷자리는 읽자마자 지운다(앞 6자리가 날짜 꼴일 때만 — 금액 오인 방지)
   function redact(text) {
     const dateLike = s => { const m = +s.slice(2, 4), d = +s.slice(4, 6); return m >= 1 && m <= 12 && d >= 1 && d <= 31; };
-    return String(text || '')
+    const keep = [];
+    const src = String(text || '').replace(CORP_REG_RE, (all, label, a, b) => {
+      const corpBiz = /\d{3}\s*-?\s*8[1-8]\s*-?\s*\d{5}/.test(String(text));
+      if ((/주\s*민/.test(label) && !corpBiz) || !corpRegValid(a + b)) return all;
+      keep.push(a + '-' + b); return label + ' \u0000' + (keep.length - 1) + '\u0000';
+    });
+    return src
       // 뒷자리는 OCR 이 ) | l 같은 잡음을 섞어 읽기도 하므로 그런 글자까지 함께 지운다
       .replace(/(^|[^\d])(\d{6})\s*[-–—~_.]\s*([1-8][\d)(|lIoO*]{4,9})/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
       .replace(/(^|[^\d])(\d{6})\s+([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g, (all, pre, front) => dateLike(front) ? pre + front + '-*******' : all)
-      .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**');   // 운전면허번호
+      .replace(/\b(\d{2}-\d{2}-\d{6}-\d{2})\b/g, '**-**-******-**')   // 운전면허번호
+      .replace(/\u0000(\d+)\u0000/g, (all, i) => keep[+i]);
   }
   // 줄 → 칸: 공백 2칸 이상이나 | 로 나눔
   const textRows = text => String(text || '').split(/\r?\n/).map(l => l.split(/\s{2,}|\|/).map(norm).filter(Boolean)).filter(r => r.length);
@@ -501,14 +526,36 @@
     return { fields: f, meta, notes };
   }
 
+  // 법인 등기사항증명서: 등록번호(법인등록번호)·상호·본점 주소·회사성립연월일
+  function parseCorpReg(rows) {
+    const lines = rows.map(r => r.join(' ').replace(/\s+/g, ' ').trim());
+    const f = {}, meta = {};
+    const reg = corpRegOf(lines.join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
+    const after = re => { for (const l of lines) { const m = l.match(re); if (m && m[1].trim()) return m[1].trim(); } return ''; };
+    const name = after(/^상\s*호\s*[:：]?\s*(.+?)(?:\s+\d{4}\.\d{2}\.\d{2}.*)?$/); if (name) { f.corp_name = name; meta.corp_name = { conf: 0.8 }; }
+    const addr = after(/^본\s*점\s*[:：]?\s*(.+?)(?:\s+\d{4}\.\d{2}\.\d{2}.*)?$/); if (addr) { f.corp_address = addr; meta.corp_address = { conf: 0.75, note: '등기상 본점 — 실제 사업장과 다를 수 있어요' }; }
+    const est = ymd(after(/회\s*사\s*성\s*립\s*연\s*월\s*일\s*[:：]?\s*(.+)$/)); if (est) { f.corp_est_date = est; meta.corp_est_date = { conf: 0.8, note: '회사성립연월일' }; }
+    return { fields: f, meta, notes: ['법인 등기사항증명서'] };
+  }
+
   // 신분증(주민등록증·운전면허증): 이름, 생년월일(앞 6자리 — 세기는 추정). 주소는 저장하지 않고 참고만
   function parseIdCard(text) {
     const t = redact(text);
     const lines = t.split(/\r?\n/).map(norm).filter(Boolean);
     const f = {}, meta = {};
+    // 이름: ① '홍길동(洪吉童)' ② '성명 홍길동' ③ 주민번호 줄 바로 위(또는 같은 줄 앞)의 한글 2~4자 한 낱말(운전면허증)
+    const NOT_NAME = /^(주민등록증|운전면허증|자동차|면허증|대한민국|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|특별시|광역시|시장|구청장|군수|도지사|경찰청장|적성검사|갱신기간|조건|발급|재발급|주소|성명|암호|일련번호|기간|면허|종류|보통|대형|특수|소형|원동기)$/;
+    const okName = s => /^[가-힣]{2,4}$/.test(s) && !NOT_NAME.test(s);
+    let name = '';
     const nm = t.match(/([가-힣]{2,4})\s*\(\s*[^\s)]{1,8}\s*\)/) || t.match(/성\s*명\s*[:：]?\s*([가-힣]{2,4})/);
-    if (nm) { f.corp_ceo = nm[1]; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
-    const rr = t.match(/(\d{2})(\d{2})(\d{2})-\*{7}/);
+    if (nm && okName(nm[1])) name = nm[1];
+    if (!name) {
+      const i = lines.findIndex(l => /\d{6}\s*[-–—]\s*[\d*]/.test(l));
+      const cands = i < 0 ? [] : [lines[i].split(/\d{6}/)[0], lines[i - 1] || '', lines[i - 2] || ''];
+      for (const c of cands) { const w = (c.match(/[가-힣]{2,4}/g) || []).filter(okName); if (w.length === 1 || (w.length && c.trim().length <= 6)) { name = w[w.length - 1]; break; } }
+    }
+    if (name) { f.corp_ceo = name; meta.corp_ceo = { conf: 0.7, note: '사진 글자 인식 — 확인해 주세요' }; }
+    const rr = t.match(/(\d{2})(\d{2})(\d{2})\s*[-–—]\s*\*{7}/) || t.match(/(?:^|[^\d])(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\s*[-–—]\s*[\d*●xX#]/m);
     if (rr) {
       const yy = +rr[1], now = new Date().getFullYear() % 100;
       f.corp_ceo_birth = (yy > now ? '19' : '20') + rr[1] + '-' + rr[2] + '-' + rr[3];
@@ -535,6 +582,7 @@
     else if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'corpreg') r = parseCorpReg(rows);
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
     // 사진 인식은 한 단계 낮은 정확도로
@@ -805,6 +853,7 @@
       if (m) { up = m[1].trim(); jm = m[2].trim(); }
     }
     if (up || jm) { f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' '); meta.corp_biz_type = { conf: 0.75 }; }
+    const reg = corpRegOf(lines.join('\n')); if (reg) { f.corp_reg_no = reg; meta.corp_reg_no = { conf: 0.9 }; }
     return { fields: f, meta, notes: tax0 ? ['사업자등록증', tax0[1]] : ['사업자등록증'] };
   }
 
@@ -889,6 +938,7 @@
     else if (c.kind === 'vat') r = parseVAT(rows);
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'corpreg') r = parseCorpReg(rows);
     else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     else if (c.kind === 'ledger' || c.kind === 'creditor') {
       const parsed = parseDebtDocument(pagesToCells(pages));
@@ -930,6 +980,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
