@@ -720,7 +720,42 @@
         </h3>
         <div>
           <label class="font-bold text-slate-700 block mb-1.5 text-xs">상담 분야 (만들 보고서)</label>
-          <div id="report_key_chips" class="flex flex-wrap gap-1.5 text-xs"></div>
+          <div id="report_key_chips" class="space-y-1.5 text-xs"></div>
+        </div>
+        <!-- 컨설팅 완료 보고서 작성 칸: '완료' 단계를 골랐을 때만 펼침. 비운 칸은 보고서에서 줄째 빠진다 -->
+        <div id="done_box" class="hidden space-y-3 border border-teal-200 bg-teal-50/40 rounded-xl p-3 text-xs">
+          <div class="font-extrabold text-slate-900">컨설팅 완료 보고서 작성</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="done_period" class="font-bold text-slate-700 block mb-1">수행 기간</label>
+              <input type="text" id="done_period" placeholder="예) 2026.09.01 ~ 2026.10.31" oninput="syncCompanyData()" class="form-input-control">
+            </div>
+            <div>
+              <label for="done_sessions" class="font-bold text-slate-700 block mb-1">수행 일정·회차</label>
+              <input type="text" id="done_sessions" placeholder="예) 총 4회 (현장 방문 2회 · 비대면 2회)" oninput="syncCompanyData()" class="form-input-control">
+            </div>
+          </div>
+          <div>
+            <span class="font-bold text-slate-700 block mb-1">수행한 진단 분야</span>
+            <div id="done_area_chips" class="flex flex-wrap gap-1.5"></div>
+            <input type="hidden" id="done_areas" value="">
+          </div>
+          <div>
+            <label for="done_work" class="font-bold text-slate-700 block mb-1">주요 수행 내용</label>
+            <textarea id="done_work" rows="3" placeholder="회차별로 무엇을 진단·자문했는지" oninput="syncCompanyData()" class="form-input-control"></textarea>
+          </div>
+          <div>
+            <label for="done_result" class="font-bold text-slate-700 block mb-1">성과·변화</label>
+            <textarea id="done_result" rows="3" placeholder="예) 고금리 대출 2건 대환 신청, 스마트상점 지원사업 선정, 월 고정비 40만원 절감" oninput="syncCompanyData()" class="form-input-control"></textarea>
+          </div>
+          <div>
+            <label for="done_next" class="font-bold text-slate-700 block mb-1">향후 과제·후속 지원</label>
+            <textarea id="done_next" rows="3" placeholder="남은 과제와 다음에 연계할 지원사업" oninput="syncCompanyData()" class="form-input-control"></textarea>
+          </div>
+          <div>
+            <label for="done_opinion" class="font-bold text-slate-700 block mb-1">기업 의견 <span class="font-normal text-slate-500">(선택)</span></label>
+            <textarea id="done_opinion" rows="2" placeholder="대표자가 말한 만족도·요청 사항" oninput="syncCompanyData()" class="form-input-control"></textarea>
+          </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div>
@@ -2261,7 +2296,7 @@
         scale: 'small',
         title: '소기업 도약성장자금 및 기술보증기금 혁신형 특례보증',
         agency: '중소벤처기업진흥공단 / 기술보증기금',
-        target: '상시근로자 10~50인 미만 초기 제조·SW 혁신 소기업',
+        target: '초기 제조·SW 혁신 소기업',
         max_amount: '운전자금 최대 3억원, 시설자금 최대 10억원 (보증비율 95%)',
         summary: '소기업 스케일업 및 양산 설비 투자를 위한 장기 분할상환 시설·운전자금 융자 지원',
         close_date: '자금 소진시까지',
@@ -2289,7 +2324,7 @@
         scale: 'small',
         title: '소기업 신규채용 고용유지지원금 및 일경험 청년 매칭',
         agency: '고용노동부 / 한국산업인력공단',
-        target: '10~50인 미만 성장형 제조 및 IT 소기업',
+        target: '성장형 제조 및 IT 소기업',
         max_amount: '인당 월 100만원 지원 (최대 6개월)',
         summary: '인력 부족 소기업의 실무 인재 채용 시 인건비 보조 및 OJT 현장 훈련비 국비 지원',
         close_date: '상시 접수',
@@ -2345,7 +2380,7 @@
         scale: 'small',
         title: '소기업 맞춤형 성장경영 바우처 및 벤처·이노비즈 인증 컨설팅',
         agency: '중소벤처기업진흥공단 / 이노비즈협회',
-        target: '10~50인 미만 성장 정체 또는 인증 획득 희망 소기업',
+        target: '성장 정체 또는 인증 획득 희망 소기업',
         max_amount: '기업당 최대 3,000만원 (전문 컨설팅비 80% 지원)',
         summary: '기술평가 대비 사전 실사, 메인비즈/이노비즈 인증 획득 지원 및 세무·원가 혁신 자문',
         close_date: '상시 접수',
@@ -2361,7 +2396,7 @@
         scale: 'sme',
         title: '중소·중견 스케일업 혁신성장 팩토링 및 신용보증기금 P-CBO',
         agency: '신용보증기금 / 산업은행 / 중소벤처기업진흥공단',
-        target: '매출 30억원 이상 중소 제조·유망 기술기업 (50인 이상)',
+        target: '매출 30억원 이상 중소 제조·유망 기술기업',
         max_amount: '기업당 최대 30억원~100억원 한도 채권 담보 유동화',
         summary: '회사채 발행을 통한 대규모 장기 시설자금 및 원자재 일괄구매를 위한 매출채권 팩토링 지원',
         close_date: '분기별 심사',
@@ -2568,7 +2603,7 @@
           tabTitle: '1. 맞춤형 경영개선 실행문',
           title: '경영개선 진단서',
           docNo: 'COSTEP-2026-소상-0101',
-          subject: '소상공인 맞춤 경영개선 자문 결과에 따른 후속 실행 및 협조 안내',
+          subject: '맞춤 경영개선 자문 결과에 따른 후속 실행 및 협조 안내',
           summary: '사업장 수지균형 기준선(일·월 최소 유지 매출액) 도출, 고정 지출 재조정 및 역마진 품목 가격 현실화 실행안',
           sections: [
             {
@@ -2825,15 +2860,15 @@
         strategy: {
           key: 'strategy',
           tabTitle: '1. 소기업 성장전략 및 스케일업 실행서',
-          title: '소기업 사업구조 혁신진단서',
+          title: '사업구조 혁신진단서',
           docNo: 'COSTEP-2026-소기-0101',
-          subject: '소기업(10~50인) 스케일업 및 정부 공모사업 연계 안내',
+          subject: '스케일업 및 정부 공모사업 연계 안내',
           summary: '생산라인 확충, 벤처·이노비즈 인증 획득 및 소기업 전용 R&D·시설자금 연계 계획',
           sections: [
             {
-              title: 'Ⅰ. 진단 배경 및 소기업 현황',
+              title: 'Ⅰ. 진단 배경 및 기업 현황',
               items: [
-                '진단 대상: 상시근로자 10~50인 미만 초기 제조·SW 혁신 소기업',
+                '진단 대상: 초기 제조·SW 혁신 소기업',
                 '현황 분석: 매출 성장세 대비 제조·연구 시설자금 부족 및 인증 인프라 확충 시급'
               ]
             },
@@ -2865,9 +2900,9 @@
         finance: {
           key: 'finance',
           tabTitle: '2. 소기업 여신구조 개선 및 금리인하 실행서',
-          title: '소기업 금융여신구조 진단서',
+          title: '금융여신구조 진단서',
           docNo: 'COSTEP-2026-소기-0102',
-          subject: '소기업 고금리 차입금 저리 대환 및 정책금융 연계 안내',
+          subject: '고금리 차입금 저리 대환 및 정책금융 연계 안내',
           summary: '운전자금 및 고금리 시설대출을 정책금융 및 이차보전으로 전환하여 이자비용 30% 절감',
           sections: [
             {
@@ -2903,9 +2938,9 @@
         labor: {
           key: 'labor',
           tabTitle: '3. 청년일자리 및 고용유지지원 실행서',
-          title: '소기업 고용지원 및 일자리진단서',
+          title: '고용지원 및 일자리진단서',
           docNo: 'COSTEP-2026-소기-0103',
-          subject: '소기업 신규인력 채용 및 인건비 국비보조금 수급 안내',
+          subject: '신규인력 채용 및 인건비 국비보조금 수급 안내',
           summary: '청년일자리도약장려금(인당 최대 1,200만원) 및 일경험 매칭 국비 지원 연계',
           sections: [
             {
@@ -2933,9 +2968,9 @@
         safety: {
           key: 'safety',
           tabTitle: '4. 제조공정 자동화 및 스마트설비 구축서',
-          title: '소기업 스마트공정 구축진단서',
+          title: '스마트공정 구축진단서',
           docNo: 'COSTEP-2026-소기-0104',
-          subject: '소기업 제조현장 자동화 및 스마트공장 보급사업 신청 안내',
+          subject: '제조현장 자동화 및 스마트공장 보급사업 신청 안내',
           summary: '기초단계 스마트공장(정부지원 최대 5천만원) 도입을 통한 생산성 25% 향상',
           sections: [
             {
@@ -2962,9 +2997,9 @@
         procure: {
           key: 'procure',
           tabTitle: '5. 공공구매 및 우수조달제품 등록서',
-          title: '소기업 공공조달 판로진단서',
+          title: '공공조달 판로진단서',
           docNo: 'COSTEP-2026-소기-0105',
-          subject: '소기업 직접생산확인 및 나라장터 다수공급자계약 안내',
+          subject: '직접생산확인 및 나라장터 다수공급자계약 안내',
           summary: '중기간 경쟁제품 지정, 직접생산확인 및 조달청 종합쇼핑몰 상품 등록',
           sections: [
             {
@@ -2991,7 +3026,7 @@
         esg: {
           key: 'esg',
           tabTitle: '6. 기업인증 및 기술금융 연계서',
-          title: '소기업 기술인증 종합진단서',
+          title: '기술인증 종합진단서',
           docNo: 'COSTEP-2026-소기-0106',
           subject: '벤처기업 인증 및 메인비즈 획득을 통한 조세감면 안내',
           summary: '법인세 50% 감면 및 정책금융 신용등급 가점 획득 실행 가이드',
@@ -3319,7 +3354,8 @@
 
       const dbTarget = COSTEP_REPORTS_DB[track] ? track : (track === 'smb' ? 'smb' : 'sme');
       const keys = Object.keys(COSTEP_REPORTS_DB[dbTarget]);
-      window.appState.activeReportKey = keys[0];
+      // 완료 보고서는 규모 공통이라 규모가 바뀌어도 그대로 둔다
+      if (window.appState.activeReportKey !== 'done') window.appState.activeReportKey = keys[0];
 
       calcSmbMetrics();
       calcDebtTotals();
@@ -3762,27 +3798,55 @@
           : 'px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-[#0369a1] border border-cyan-200';
       }
 
-      bar.innerHTML = Object.keys(db).map((key, idx) => {
-        const item = db[key];
+      let idx = 0;
+      bar.innerHTML = reportStageGroups(db).map(g => `<span class="subrep-stage">${g.name}</span>` + g.items.map(([key, item]) => {
+        idx++;
         const isActive = (key === activeKey);
         return `
           <button type="button" onclick="selectSubReport('${key}')" class="subrep-btn ${isActive ? 'active bg-[#169aa8] text-white shadow-xs font-bold' : 'bg-white border border-slate-200 text-slate-700 hover:bg-teal-50 hover:border-teal-200'} w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2">
-            <span class="w-5 h-5 rounded-full ${isActive ? 'bg-white text-[#169aa8]' : 'bg-slate-100 text-slate-600'} text-[10px] font-black flex items-center justify-center shrink-0">${idx + 1}</span>
+            <span class="w-5 h-5 rounded-full ${isActive ? 'bg-white text-[#169aa8]' : 'bg-slate-100 text-slate-600'} text-[10px] font-black flex items-center justify-center shrink-0">${key === 'done' ? String.fromCharCode(10003) : idx}</span>
             <span class="truncate">${item.tabTitle.replace(/^[0-9]+\.\s*/, '')}</span>
           </button>
         `;
-      }).join('');
+      }).join('')).join('');
     }
     window.renderReportButtons = renderReportButtons;
-    // 입력부 '상담 분야' 칩 — 고르면 그 분야 보고서로 바뀐다 (규모에 따라 6종)
+    // 보고서 단계: 규모별 6종을 순번으로 착수(1·2)·진단(3·4)·보완(5·6), 마지막에 규모 공통 '컨설팅 완료 보고서'
+    const REPORT_STAGES = [['착수', [0, 1]], ['진단', [2, 3]], ['보완', [4, 5]], ['완료', ['done']]];
+    const DONE_REPORT = { key: 'done', tabTitle: '컨설팅 완료 보고서', title: '경영컨설팅 완료 보고서' };
+    function reportStageGroups(db) {
+      const keys = Object.keys(db);
+      return REPORT_STAGES.map(([name, idx]) => ({ name, items: idx.map(i => i === 'done' ? ['done', DONE_REPORT] : (keys[i] ? [keys[i], db[keys[i]]] : null)).filter(Boolean) }));
+    }
+    window.reportStageGroups = reportStageGroups;
+    // 입력부 '상담 분야' 칩 — 단계별 줄로 묶어 보여 주고, 고르면 그 분야 보고서로 바뀐다
     function renderReportKeyChips() {
       const box = document.getElementById('report_key_chips');
       if (!box) return;
       const track = window.appState.bizTrack || 'smb';
       const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
       const keys = Object.keys(db);
-      const active = keys.includes(window.appState.activeReportKey) ? window.appState.activeReportKey : keys[0];
-      box.innerHTML = keys.map(k => `<button type="button" onclick="selectSubReport('${k}')" class="px-3 py-1.5 rounded-full border font-bold cursor-pointer transition-all ${k === active ? 'bg-[#169aa8] border-[#169aa8] text-white' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}">${escapeHtml(db[k].tabTitle.replace(/^[0-9]+\.\s*/, ''))}</button>`).join('');
+      const cur = window.appState.activeReportKey;
+      const active = cur === 'done' || keys.includes(cur) ? cur : keys[0];
+      box.innerHTML = reportStageGroups(db).map(g => `<div class="flex items-start gap-2"><span class="shrink-0 w-9 pt-1.5 text-[11px] font-extrabold text-slate-500">${g.name}</span><div class="flex flex-wrap gap-1.5">${
+        g.items.map(([k, r]) => `<button type="button" onclick="selectSubReport('${k}')" class="px-3 py-1.5 rounded-full border font-bold cursor-pointer transition-all ${k === active ? 'bg-[#169aa8] border-[#169aa8] text-white' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'}">${escapeHtml(r.tabTitle.replace(/^[0-9]+\.\s*/, ''))}</button>`).join('')
+      }</div></div>`).join('');
+      renderDoneBox(db, active === 'done');
+    }
+    // 완료 보고서 작성 칸: '완료'를 고르면 펼치고, 수행 분야 체크(이 규모 6종)를 숨은 칸 done_areas(쉼표로 이은 key)와 맞춘다
+    function renderDoneBox(db, open) {
+      const box = document.getElementById('done_box'); if (!box) return;
+      if (open) box.classList.remove('hidden'); else box.classList.add('hidden');
+      const hid = document.getElementById('done_areas'), chips = document.getElementById('done_area_chips');
+      if (!hid || !chips) return;
+      const on = new Set(String(hid.value || '').split(',').filter(Boolean));
+      chips.innerHTML = Object.entries(db).map(([k, r]) => `<label class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border cursor-pointer ${on.has(k) ? 'bg-white border-[#169aa8] text-[#0f766e]' : 'bg-white border-slate-300 text-slate-600'}"><input type="checkbox" class="accent-[#169aa8]" data-done-area="${k}"${on.has(k) ? ' checked' : ''}><span class="font-bold">${escapeHtml(r.tabTitle.replace(/^[0-9]+\.\s*/, ''))}</span></label>`).join('');
+      chips.onchange = () => {
+        hid.value = [...chips.querySelectorAll('input[data-done-area]:checked')].map(x => x.dataset.doneArea).join(',');
+        hid.dispatchEvent(new Event('input', { bubbles: true }));
+        renderDoneBox(db, true);
+        renderActiveReport();
+      };
     }
     window.renderReportKeyChips = renderReportKeyChips;
 
@@ -4167,7 +4231,7 @@
     window.downloadAsDoc = downloadAsDoc;
 
     const DOCX_SHEETS = { official: ['print_target_official', '서식1 행정시행문'], report: ['print_target_report', '서식2 결과보고서'], guide: ['print_target_guide', '서식3 실행안내서'], bplan: ['print_target_bplan', '서식4 사업계획 개요서'] };
-    const repLabel = () => { try { const track = window.appState.bizTrack || 'smb'; const db = COSTEP_REPORTS_DB[track] || COSTEP_REPORTS_DB.sme; const r = db[window.appState.activeReportKey] || Object.values(db)[0]; return r.title || r.name || ''; } catch (e) { return ''; } };
+    const repLabel = () => { try { if (window.appState.activeReportKey === 'done') return DONE_REPORT.title; const track = window.appState.bizTrack || 'smb'; const db = COSTEP_REPORTS_DB[track] || COSTEP_REPORTS_DB.sme; const r = db[window.appState.activeReportKey] || Object.values(db)[0]; return r.title || r.name || ''; } catch (e) { return ''; } };
     function downloadSingleSheetDoc(sheetKey) {
       const s = DOCX_SHEETS[sheetKey];
       if (!s) { downloadAllSheetsDoc(); return; }
@@ -5262,6 +5326,83 @@
       return { ...info, budget, outcome };
     }
 
+    // 컨설팅 완료 보고서(규모 공통 A4 1장): 기업 개요·수행 개요는 입력값으로, 수행 내용·성과·향후 과제는 컨설턴트가 쓴 칸으로. 빈 칸은 줄째 뺀다
+    function doneReportHtml() {
+      const v = id => (document.getElementById(id)?.value || '').trim();
+      const e = id => escapeHtml(v(id));
+      const track = window.appState.bizTrack || 'smb';
+      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const brand = getBrand(), brandName = escapeHtml(brand.name);
+      const consultantName = e('consultant_name') || '담당 컨설턴트';
+      const consultantLabel = /컨설턴트$/.test(consultantName) ? consultantName : consultantName + ' 경영컨설턴트';
+      const dd = v('doc_date');
+      const dateStr = (dd ? new Date(dd + 'T00:00:00') : new Date()).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const ind = (typeof INDUSTRY_NAMES !== 'undefined' && INDUSTRY_NAMES[window.appState.industryTrack]) || '';
+      const areas = v('done_areas').split(',').filter(k => db[k]).map(k => escapeHtml(db[k].tabTitle.replace(/^[0-9]+\.\s*/, '')));
+      const td = 'p-1 border border-slate-300', th = td + ' bg-slate-100 font-bold text-center';
+      const row = (a, av, b, bv) => `<tr><td class="${th} w-1/6">${a}</td><td class="${td} w-2/6">${av || '-'}</td><td class="${th} w-1/6">${b}</td><td class="${td} w-2/6">${bv || '-'}</td></tr>`;
+      const wide = (a, av) => av ? `<tr><td class="${th}">${a}</td><td class="${td}" colspan="3">${av}</td></tr>` : '';
+      let fa = '';
+      try {
+        if (track !== 'smb' && typeof faDiagnose === 'function') { const fd = faData(); if (fd.Y.some(y => y.S !== null || y.A !== null)) fa = faDiagHtml(faDiagnose(fd)); }
+      } catch (err) { fa = ''; }
+      const block = (n, t, id) => v(id) ? `<div class="space-y-0.5"><div class="font-black text-slate-950 text-[11.5px] border-b border-slate-300 pb-0.5">${n}. ${t}</div><p class="text-[10.5px] text-slate-800 whitespace-pre-line leading-relaxed pl-1">${e(id)}</p></div>` : '';
+      const blocks = [['주요 수행 내용', 'done_work'], ['성과 및 변화', 'done_result'], ['향후 과제 및 후속 지원', 'done_next'], ['기업 의견', 'done_opinion']].filter(([, id]) => v(id));
+      const empty = !blocks.length ? `<p class="w-full text-[11px] text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded p-2">입력 화면 '진단 건 정보'의 <b>컨설팅 완료 보고서 작성</b> 칸(수행 내용·성과·향후 과제)을 채우면 여기에 들어갑니다.</p>` : '';
+      return `
+        <div id="print_target_done" class="a4-page-card">
+          <div class="no-print flex flex-wrap justify-between items-center pb-2.5 mb-3 border-b border-slate-200 gap-2">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
+              <span class="px-2.5 py-0.5 rounded bg-teal-50 text-[#0f766e] border border-teal-200 font-extrabold text-xs">컨설팅 완료 보고서 (A4 단일 규격)</span>
+            </div>
+            ${empty}
+          </div>
+          <div class="flex-1 flex flex-col">
+          <div class="space-y-3 text-xs text-slate-900 font-sans leading-relaxed">
+            <div class="text-center py-2.5 border-b-2 border-slate-900">
+              <h2 class="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">경영컨설팅 완료 보고서</h2>
+            </div>
+            <div class="space-y-1">
+              <div class="font-black text-slate-950 text-[11.5px]">Ⅰ. 수진기업 개요</div>
+              <table class="w-full text-[10.5px] border-collapse border border-slate-400">
+                ${row('수진기업', '<b>' + (e('corp_name') || '-') + '</b>', '대 표 자', e('corp_ceo'))}
+                ${row('사업자번호', '<span class="font-mono">' + (e('corp_biz_no') || '-') + '</span>', '사업자구분', e('corp_form'))}
+                ${row('주 업 종', escapeHtml(ind) + (v('corp_biz_type') ? (ind ? ' · ' : '') + e('corp_biz_type') : ''), '설립일자', e('corp_est_date'))}
+                ${wide('소 재 지', e('corp_address'))}
+              </table>
+            </div>
+            <div class="space-y-1">
+              <div class="font-black text-slate-950 text-[11.5px]">Ⅱ. 수행 개요</div>
+              <table class="w-full text-[10.5px] border-collapse border border-slate-400">
+                ${wide('관련 협약', e('doc_agreement') || '중소기업진흥법 제46조 및 2026년도 기업 맞춤형 경영컨설팅 자문 협약')}
+                ${row('수행 기간', e('done_period'), '일정·회차', e('done_sessions'))}
+                ${wide('수행 분야', areas.join(' · '))}
+                ${row('담당 컨설턴트', consultantLabel, '보 고 일', dateStr)}
+              </table>
+            </div>
+            ${fa ? `<div class="fa-dg-rep border border-slate-300 rounded-lg p-2 space-y-1"><div class="font-extrabold text-slate-900 text-[10px] border-b border-slate-200 pb-1">【 재무진단 — 5개 영역 판정 】</div>${fa}</div>` : ''}
+            ${blocks.map(([t, id], i) => block(['Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ'][i], t, id)).join('')}
+          </div>
+          <div class="border-t-2 border-slate-900 pt-2 mt-auto flex justify-between items-center gap-3 text-xs">
+            <div class="flex-1 min-w-0 pr-3">
+              <span class="font-black text-slate-900 text-xs">자문 수행기관 : ${brandName}</span>
+              <p class="text-[10px] text-slate-500">위와 같이 경영컨설팅을 완료하였음을 보고합니다.</p>
+            </div>
+            <div class="flex items-center space-x-1 shrink-0 whitespace-nowrap">
+              ${brandSignHtml(brand, 'w-12 h-12', '', personSignHtml(consultantLabel, brand))}
+            </div>
+          </div>
+          </div>
+        </div>`;
+    }
+    window.doneReportHtml = doneReportHtml;
+    // 완료 보고서를 고른 동안은 서식1~4 탭이 의미 없으니 숨긴다
+    function syncSheetTabsForDone(done) {
+      const box = document.getElementById('sheet_tab_all')?.parentElement;
+      if (box) box.style.display = done ? 'none' : '';
+    }
+
     function renderActiveReport() {
       // 서식2 재무표 바로 위: 재무진단 5개 영역 판정 + 자동 문장(소·중기업이고 재무 값이 있을 때)
       let faDiagReport = '';
@@ -5273,6 +5414,8 @@
       } catch (e) { faDiagReport = ''; }
       const area = document.getElementById('active_report_render_area');
       if (!area) return;
+      syncSheetTabsForDone(window.appState.activeReportKey === 'done');
+      if (window.appState.activeReportKey === 'done') { area.innerHTML = doneReportHtml(); fitSheetsToA4(area); return; }
 
       const track = window.appState.bizTrack || 'smb';
       const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
@@ -5767,11 +5910,11 @@
 
           <!-- Bottom Signature Box with Seal -->
           <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center text-xs">
-            <div>
+            <div class="flex-1 min-w-0 pr-3">
               <span class="font-black text-slate-900 text-xs">자문 수행기관 : ${brandName}</span>
               <p class="text-[10px] text-slate-500">본 진단은 관계 법령 및 소관 기관 규격에 따라 실시되었습니다.</p>
             </div>
-            <div class="flex items-center space-x-1">
+            <div class="flex items-center space-x-1 shrink-0 whitespace-nowrap">
               ${brandSignHtml(brand, 'w-12 h-12', '', personSignHtml(consultantLabel, brand))}
             </div>
           </div>
@@ -5836,9 +5979,9 @@
           </div>
 
           <!-- Bottom Footer with Seal -->
-          <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center text-xs">
-            <span class="text-[10px] text-slate-500">※ 본 안내서는 수진기업의 적법하고 신속한 행정 절차 이행을 지원합니다.</span>
-            <div class="flex items-center space-x-1">
+          <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center gap-3 text-xs">
+            <span class="flex-1 min-w-0 text-[10px] leading-snug text-slate-500">※ 본 안내서는 수진기업의 적법하고 신속한 행정 절차 이행을 지원합니다.</span>
+            <div class="flex items-center space-x-1 shrink-0 whitespace-nowrap">
               ${brandSignHtml(brand, 'w-11 h-11', '', personSignHtml(consultantLabel, brand))}
             </div>
           </div>
@@ -5934,9 +6077,9 @@
           </div>
 
           <!-- Bottom Footer with Seal -->
-          <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center text-xs">
-            <span class="text-[10px] text-slate-500">※ 본 개요서는 정부 지원사업 공식 사업계획서 작성 시 그대로 인용 가능합니다.</span>
-            <div class="flex items-center space-x-1">
+          <div class="border-t-2 border-slate-900 pt-2 flex justify-between items-center gap-3 text-xs">
+            <span class="flex-1 min-w-0 text-[10px] leading-snug text-slate-500">※ 본 개요서는 정부 지원사업 공식 사업계획서 작성 시 그대로 인용 가능합니다.</span>
+            <div class="flex items-center space-x-1 shrink-0 whitespace-nowrap">
               ${brandSignHtml(brand, 'w-11 h-11', '작성 자문 :', personSignHtml(consultantLabel, brand))}
             </div>
           </div>
@@ -6151,7 +6294,7 @@
       ic.innerHTML = XP_ICON[xpMode]; ic.style.background = pcs.getPropertyValue('--tint'); ic.style.color = pcs.getPropertyValue('--tc');
       m.querySelector('#xp_t2').textContent = md.title;
       const bx = '<span class="bx">' + XP_ICON.check + '</span>';
-      m.querySelector('#xp_f').innerHTML = Object.entries(db).map(([k, r]) => { const t = escapeHtml(r.title || r.tabTitle || k), short = t.replace(/^기업\s+/, ''); return '<label class="xp-chip" title="' + t + '"><input type="checkbox" data-g="f" value="' + k + '"' + (k === cur ? ' checked' : '') + '>' + bx + '<span class="tx">' + short + '</span>' + (k === cur ? '<em>지금</em>' : '') + '</label>'; }).join('');
+      m.querySelector('#xp_f').innerHTML = [...Object.entries(db), ['done', DONE_REPORT]].map(([k, r]) => { const t = escapeHtml(r.title || r.tabTitle || k), short = t.replace(/^기업\s+/, ''); return '<label class="xp-chip" title="' + t + '"><input type="checkbox" data-g="f" value="' + k + '"' + (k === cur ? ' checked' : '') + '>' + bx + '<span class="tx">' + short + '</span>' + (k === cur ? '<em>지금</em>' : '') + '</label>'; }).join('');
       const sheets = Array.isArray(last.sheets) && last.sheets.length ? last.sheets : XP_SHEETS.map(s => s[0]);
       m.querySelector('#xp_s').innerHTML = XP_SHEETS.map(([k, , t]) => '<label class="xp-chip" title="' + t + '"><input type="checkbox" data-g="s" value="' + k + '"' + (sheets.includes(k) ? ' checked' : '') + '>' + bx + '<span class="tx"><b>' + t.slice(0, 3) + '</b>' + t.slice(4) + '</span></label>').join('');
       const ov = (last.opts && last.opts[xpMode]) || {};
@@ -6169,8 +6312,8 @@
       return { f, s, o };
     }
     function xpCount() {
-      const m = xpModal(), { f, s } = xpPicked(), k = f.length * s.length, go = m.querySelector('#xp_go');
-      m.querySelector('#xp_cnt').innerHTML = '<b>' + k + '장</b><small>' + f.length + '개 분야 × ' + s.length + '개 서식</small>';
+      const m = xpModal(), { f, s } = xpPicked(), nd = f.filter(x => x !== 'done').length, hasDone = f.includes('done'), k = nd * s.length + (hasDone ? 1 : 0), go = m.querySelector('#xp_go');
+      m.querySelector('#xp_cnt').innerHTML = '<b>' + k + '장</b><small>' + nd + '개 분야 × ' + s.length + '개 서식' + (hasDone ? ' + 완료 보고서' : '') + '</small>';
       m.querySelector('#xp_fn').textContent = f.length + ' / ' + m.querySelectorAll('input[data-g="f"]').length;
       m.querySelector('#xp_sn').textContent = s.length + ' / 4';
       m.querySelectorAll('[data-all]').forEach(b => { const bs = [...m.querySelectorAll('input[data-g="' + b.dataset.all + '"]')]; b.textContent = bs.every(x => x.checked) ? '모두 해제' : '전체 선택'; });
@@ -6201,13 +6344,15 @@
       const db = xpDb(), savedKey = window.appState.activeReportKey, savedSheet = window.appState.activeSheet;
       const groups = [];
       window.appState.activeSheet = 'all';
-      Object.keys(db).filter(k => f.includes(k)).forEach(k => {
+      [...Object.keys(db), 'done'].filter(k => f.includes(k)).forEach(k => {
         window.appState.activeReportKey = k;
         renderActiveReport();
-        const label = db[k].title || db[k].tabTitle || k;
-        const pages = XP_SHEETS.filter(x => s.includes(x[0])).flatMap(([sk, id, t]) => sheetEls(id).map((src, n) => {
+        const r = k === 'done' ? DONE_REPORT : db[k];
+        const label = r.title || r.tabTitle || k;
+        const sheetsFor = k === 'done' ? [['done', 'print_target_done', '']] : XP_SHEETS.filter(x => s.includes(x[0]));
+        const pages = sheetsFor.flatMap(([sk, id, t]) => sheetEls(id).map((src, n) => {
           const c = src.cloneNode(true);
-          c.id = c.id + '__' + k; c.dataset.xpName = label + '_' + t + (n ? '_별첨' : '');
+          c.id = c.id + '__' + k; c.dataset.xpName = label + (t ? '_' + t : '') + (n ? '_별첨' : '');
           c.removeAttribute('data-attach-of');
           c.querySelectorAll(':scope > .no-print').forEach(x => x.remove());
           if (o.seal === 1) c.querySelectorAll('img[alt$="직인"]').forEach(x => x.remove());
@@ -6230,12 +6375,13 @@
     function xpTail(f, s) {
       const db = xpDb();
       if (f.length !== 1) return '';
+      if (f[0] === 'done') return DONE_REPORT.title;
       const label = db[f[0]].title || db[f[0]].tabTitle || '';
       return s.length === 1 ? label + '_' + XP_SHEETS.find(x => x[0] === s[0])[2] : label;
     }
     function xpRun() {
       const { f, s, o } = xpPicked();
-      if (!f.length || !s.length) return;
+      if (!f.length || (!s.length && !f.includes('done'))) return;
       const last = xpLoad(); last.sheets = s; last.opts = Object.assign(last.opts || {}, { [xpMode]: o }); xpSave(last);
       xpClose();
       const mode = xpMode, tail = xpTail(f, s);
@@ -7815,7 +7961,11 @@
       if (!window.supabase?.createClient) { document.getElementById('auth_gate').classList.remove('hidden'); document.getElementById('auth_error_text').innerText = '로그인 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'; authShow('error'); return; }
       sb = window.supabase.createClient(MSC_AUTH.url, MSC_AUTH.key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true } });
       authShow('loading');
-      sb.auth.onAuthStateChange((event) => {
+      sb.auth.onAuthStateChange((event, session) => {
+        // 탭으로 돌아오면 로그인 모듈이 세션을 다시 확인하며 SIGNED_IN 을 또 보낸다. 같은 사용자로 이미 화면이 열려 있으면 다시 그리지 않음
+        // (다시 그리면 로딩 가림막이 떴다 걷혀 '메인화면이 떴다 넘어가는' 것처럼 보였음)
+        const ready = document.getElementById('auth_gate')?.classList.contains('hidden');
+        if (event === 'SIGNED_IN' && ready && session && window.appState.auth?.user?.id === session.user.id) return;
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') setTimeout(authRefresh, 0);
         if (event === 'SIGNED_OUT') authShow('signin');
       });
@@ -8103,7 +8253,7 @@
       <div class="hd"><h4 id="docs_modal_t">업로드로 자동채우기</h4><button type="button" data-x aria-label="닫기">×</button></div>
       <div class="bd">
         <div class="lock">파일은 이 기기 안에서만 읽고 저장하지 않아요. 읽은 값은 아래 표에서 고른 칸만 들어갑니다.</div>
-        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.txt,text/plain" multiple hidden><br>PDF · 사진(JPG·PNG·WebP) · 20MB 이하 · 여러 개 한꺼번에 · 스캔 PDF 는 30쪽까지 글자 인식</div>
+        <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.txt,text/plain" multiple hidden><br>PDF · 사진(JPG·PNG·WebP) · 50MB 이하 · 여러 개 한꺼번에 · 스캔 PDF 는 30쪽까지 글자 인식</div>
         <div class="sup" id="docs_sup">
           <b>읽을 수 있는 서류</b><br>
           <b>사업자등록증명</b> <span>— 상호 · 사업자등록번호 · 사업자구분·과세유형 · 대표자 · 소재지 · 개업일 · 업태/종목</span><br>
@@ -9702,7 +9852,7 @@
                                    : { status: 'skip', notes: ['출원번호·등록번호 열이 있는 지식재산권 목록 표를 찾지 못했어요'] };
               continue;
             }
-            if (file.size > 20 * 1024 * 1024) { f.res = { status: 'skip', notes: ['20MB 넘는 파일'] }; continue; }
+            if (file.size > 50 * 1024 * 1024) { f.res = { status: 'skip', notes: ['50MB 넘는 파일'] }; continue; }
             if (isPdf) {
               f.pages = await readPdf(file, (p, n) => progress(file.name, p, n));
               f.res = P().parseDocument(f.pages, file.name);
@@ -10117,6 +10267,8 @@
     @media (prefers-reduced-motion: reduce) { #l3_head, #l3_head *, #l3_head *::before { transition-duration: .01ms !important; transition-delay: 0s !important; } }
     #l3_head .row > * { flex: none; }
     #l3_head #subrep_btn_bar, #l3_head .l3-sheets { display: flex; flex-direction: row !important; gap: 4px; }
+    #subrep_btn_bar .subrep-stage { font-size: 10.5px; font-weight: 800; color: #64748b; padding: 6px 2px 0; }
+    #l3_head #subrep_btn_bar > .subrep-stage { padding: 6px 2px 0 8px !important; align-self: center; background: none; border: 0; }
     #l3_head #subrep_btn_bar > *, #l3_head .l3-sheets > * { margin: 0 !important; width: auto !important; white-space: nowrap; padding: 5px 10px !important; font-size: 11px; }
     #l3_head .l3-print { margin-left: auto; padding: 6px 12px; border-radius: 9px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); font-size: 11px; font-weight: 800; white-space: nowrap; cursor: pointer; }
     #l3_stage { flex: 1; overflow: auto; padding: 16px 0; }
@@ -10598,7 +10750,6 @@
         box.addEventListener('scroll', () => requestAnimationFrame(markStep));
 
         // (현재 스텝은 24px 여유로 판단 — 부드러운 이동 뒤 소수점 오차 흡수)
-        // 휠 한 번 = 스텝 하나. 스텝이 화면보다 길면 그 안에서는 평소처럼 굴리다가 끝에 닿으면 다음 스텝
         let paging = false;
         const curIdx = () => { const y = box.scrollTop + 24; let c = 0; secs.forEach((s, i) => { if (s.offsetTop <= y) c = i; }); return c; };
         function goStep(i) {
@@ -10607,17 +10758,7 @@
           box.scrollTo({ top: secs[i].offsetTop, behavior: 'smooth' });
           setTimeout(() => { paging = false; }, 650);
         }
-        box.addEventListener('wheel', e => {
-          if (e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-          if (e.target.closest('select, textarea, .more, #client_bar details[open]')) return;
-          const dir = e.deltaY > 0 ? 1 : -1, i = curIdx(), s = secs[i];
-          const top = s.offsetTop, bottom = top + s.offsetHeight, viewTop = box.scrollTop, viewBottom = viewTop + box.clientHeight;
-          if (dir > 0 && bottom - viewBottom > 4) return;     // 긴 스텝: 아직 아래가 남음
-          if (dir < 0 && viewTop - top > 4) return;           // 긴 스텝: 아직 위가 남음
-          e.preventDefault();
-          if (i + dir < 0 || i + dir >= secs.length) return;   // 처음·마지막 스텝에서는 더 가지 않음(제자리로 튀지 않게)
-          if (!paging) goStep(i + dir);
-        }, { passive: false });
+        // 휠은 평소처럼 부드럽게 굴린다(예전: 휠 한 칸 = 다음 스텝으로 점프 → 짧은 스텝 아래 칸을 쓰려면 스크롤바를 다시 잡아야 했음). 스텝 이동은 ▲▼ 버튼·스텝 목록으로
         const nav = document.createElement('div');
         nav.id = 'l3_nav'; nav.className = 'no-print';
         nav.innerHTML = '<button type="button" data-d="-1" aria-label="이전 스텝" title="이전 스텝"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>' +
