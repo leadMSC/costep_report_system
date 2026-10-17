@@ -242,6 +242,18 @@ ok('사업자등록증 제목이 깨진 글자 인식: 본문 칸 이름으로 �
   // 칸 이름이 하나뿐이면 판별하지 않음
   assert.strictEqual(P.parseTextDocument(['( 법인사업자 )', '등록번호 : 123-81-12345', '아무 내용'].join('\n'), 'x.png').kind, 'unknown');
 });
+ok('부가세 과세표준증명 스캔(글자 인식): 기간·금액·합계 검산', () => {
+  const t = ['부가가치세과세표준증명', '성 명(대표자) 홍길동', '사 업 자 등 록 번 호 123-81-00001',
+    '2024/01/01 2024/06/30 183,434,740 0 183,434,740 0', '2024/07/01 2024/12/31 173,653,010 0 173.653,O10 0'].join('\n');
+  const r = P.parseTextDocument(t, 'x.pdf');
+  assert.strictEqual(r.kind, 'vat'); assert.strictEqual(r.status, 'ok');
+  assert.deepStrictEqual(r.vatHalves, { '2024-1': 183434740, '2024-2': 173653010 });
+  assert.strictEqual(r.fields.corp_biz_no, '123-81-00001');
+  assert.ok(r.notes.some(x => /합계 검산 2\/2/.test(x)));
+  // 숫자 하나 오독(합계 안 맞음) → 월평균 정확도 낮춤
+  const r2 = P.parseTextDocument(t.replace('183,434,740 0 183', '188,434,740 0 183'), 'x.pdf');
+  assert.ok(r2.meta.smb_monthly_sales.conf < 0.6);
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

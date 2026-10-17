@@ -8546,7 +8546,7 @@
     ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
     ['fs', '표준재무제표증명', t => /표준재무제표증명|표준재무상태표|표준손익계산서/.test(t)],
     ['fsacct', '결산 재무제표(세무사)', t => /재무상태표|대차대조표/.test(t) && /손익계산서/.test(t)],
-    ['vat', '부가가치세 과세표준증명', t => /과세표준증명/.test(t)],
+    ['vat', '부가가치세 과세표준증명', t => /과세표준[증중]명/.test(t)],   // 글자 인식이 '증'을 '중'으로 자주 읽음
     ['ins', '4대보험 사업장 가입자명부', t => /사업장가입자명부/.test(t)],
     ['share', '주주명부', t => /주주명부/.test(t)],
     ['ledger', '거래처원장(차입금)', t => /거래처원장/.test(t)],
@@ -8808,6 +8808,40 @@
     return { fields: f, meta, yearTotals, halfTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
   }
 
+  // 부가세 과세표준증명 — 스캔본·사진(글자 인식 글). 줄마다 '부터 까지 계 과세분 면세분' → parseVAT 와 같은 꼴의 줄로 바꿔 넘긴다.
+  // 글자 인식이 숫자를 잘못 읽을 수 있어, 계 = 과세분 + 면세분 이 맞는 줄 수를 세어 정확도에 반영한다
+  function parseVATText(text) {
+    const t = String(text || '').replace(/(?<=\d)[Oo]|[Oo](?=\d)/g, '0');
+    const D = '(\\d{4})\\s*[/.\\-]\\s*(\\d{1,2})\\s*[/.\\-]\\s*(\\d{1,2})';
+    const N = '(\\d[\\d,.]*)';
+    const G = '[\\s|:_]+';   // 칸 사이: 띄어쓰기·표 세로줄(|)·잡음
+    const re = new RegExp(D + '[\\s|~\\-]*' + D + G + N + '(?:' + G + N + ')?(?:' + G + N + ')?', 'g');
+    const num = x => x === undefined ? null : Number(String(x).replace(/[.,]/g, ''));
+    const pad = x => String(x).padStart(2, '0');
+    const rows = [];
+    let ok = 0;
+    for (const m of t.matchAll(re)) {
+      const [y1, m1, d1, y2, m2, d2] = m.slice(1, 7).map(Number);
+      if (m1 < 1 || m1 > 12 || m2 < 1 || m2 > 12 || y2 < y1) continue;
+      const total = num(m[7]), a = num(m[8]), b = num(m[9]);
+      if (total === null || !isFinite(total)) continue;
+      if (a !== null && b !== null && a + b === total) ok++;
+      rows.push([`${y1}/${pad(m1)}/${pad(d1)}`, `${y2}/${pad(m2)}/${pad(d2)}`, String(total)]);
+    }
+    const r = parseVAT(rows);
+    const d = despace(t);
+    const no = bizNoOf((d.match(/사업자등록번호[:：]?(\d{3}-?\d{2}-?\d{5})/) || [])[1] || '');
+    if (no) r.fields.corp_biz_no = no;
+    const ceo = (t.match(/성\s*명\s*\(\s*대\s*표\s*자\s*\)\s*[:：|]?\s*([가-힣]{2,5})/) || [])[1];
+    if (ceo) r.fields.corp_ceo = ceo;
+    if (rows.length) {
+      r.notes.push(`글자 인식 · 합계 검산 ${ok}/${rows.length}줄`);
+      if (r.meta.smb_monthly_sales) { r.meta.smb_monthly_sales.conf = ok === rows.length ? 0.75 : 0.5; if (ok < rows.length) r.meta.smb_monthly_sales.note = '글자 인식 금액이 합계와 안 맞는 줄이 있어요 — 원본 확인'; }
+    }
+    r.vatChecked = ok; r.vatRows = rows.length;
+    return r;
+  }
+
   // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
   function parseIns(rows) {
     let total = 0, emp = 0;
@@ -8966,6 +9000,12 @@
     else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
     else if (c.kind === 'corpreg') r = parseCorpReg(rows);
+    else if (c.kind === 'vat') {
+      r = parseVATText(text);
+      if (!r.vatRows) { out.status = 'skip'; out.notes.push('과세기간 줄을 읽지 못했어요 — 더 선명한 스캔으로'); return out; }
+      out.vatYears = r.yearTotals; out.vatHalves = r.halfTotals;
+      out.vatOcrCheck = { ok: r.vatChecked, rows: r.vatRows };
+    }
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
     // 사진 인식은 한 단계 낮은 정확도로
@@ -9396,7 +9436,7 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -9619,12 +9659,27 @@
       }
       const same = (a, b) => String(a).replace(/[,\s]/g, '') === String(b).replace(/[,\s]/g, '');
 
+      // 다른 회사 서류: 서류의 사업자번호가 기준 번호와 다르면 그 서류 값은 하나도 넣지 않는다(파일 줄에 경고)
+      // 기준 = 지금 입력된 사업자번호, 비어 있으면 올린 서류에 가장 많이 나온 번호
+      const bizDigits = v => String(v || '').replace(/\D/g, '');
+      function markOtherCompany() {
+        const cur = bizDigits(document.getElementById('corp_biz_no')?.value);
+        const okNo = n => n.length === 10 && P().bizNoValid(n);   // 검증식이 맞는 번호만(글자 인식 오독으로 같은 회사를 다른 회사로 보지 않게)
+        const nos = files.map(f => f.res && f.res.status === 'ok' ? bizDigits((f.res.fields || {}).corp_biz_no) : '').filter(okNo);
+        const count = {}; nos.forEach(n => { count[n] = (count[n] || 0) + 1; });
+        const target = cur.length === 10 ? cur : Object.keys(count).sort((a, b) => count[b] - count[a])[0] || '';
+        files.forEach(f => {
+          const n = f.res && f.res.status === 'ok' ? bizDigits((f.res.fields || {}).corp_biz_no) : '';
+          f.other = target && okNo(n) && n !== target ? { no: n, byInput: cur.length === 10 } : null;
+        });
+      }
       // 후보 모으기 → 같은 칸끼리 묶기(값이 다르면 충돌)
       function buildRows() {
+        markOtherCompany();
         const cands = [];
         const fsList = [];
         files.forEach(f => {
-          const r = f.res; if (!r || r.status !== 'ok') return;
+          const r = f.res; if (!r || r.status !== 'ok' || f.other) return;
           Object.entries(r.fields || {}).forEach(([id, v]) => {
             if (v === '' || v === null || v === undefined) return;
             const m = (r.meta || {})[id] || {};
@@ -9638,7 +9693,7 @@
         const yNow = new Date().getFullYear();
         const yearField = y => ({ [yNow]: 'smb_sales_cur', [yNow - 1]: 'smb_sales_y1', [yNow - 2]: 'smb_sales_y2', [yNow - 3]: 'smb_sales_y3' })[y];
         files.forEach(f => {
-          const r = f.res; if (!r || r.status !== 'ok') return;
+          const r = f.res; if (!r || r.status !== 'ok' || f.other) return;
           Object.entries(r.vatYears || {}).forEach(([y, won]) => { const id = yearField(+y); if (id && won) cands.push({ id, value: String(Math.round(won / 1e4)), conf: +y === yNow ? 0.7 : 0.8, valid: true, src: won, year: +y, note: '부가세 과세표준 합계' + (+y === yNow ? ' (올해 누적)' : ''), file: f.name }); });
           (r.fsList || (r.fs ? [r.fs] : [])).forEach(fx => { if (fx && fx.year && fx.wonValues && fx.wonValues.sales) { const id = yearField(fx.year); if (id) cands.push({ id, value: String(Math.round(fx.wonValues.sales / 1e4)), conf: 0.9, valid: true, src: fx.wonValues.sales, year: fx.year, note: '재무제표 매출액', file: f.name }); } });
         });
@@ -9662,7 +9717,7 @@
         }
         // 반기 매출(부가세 과세표준증명)
         const halves = {}; let hf = [];
-        files.forEach(f => { const r = f.res; if (r && r.status === 'ok' && r.vatHalves && Object.keys(r.vatHalves).length) { Object.assign(halves, r.vatHalves); hf.push(f.name); } });
+        files.forEach(f => { const r = f.res; if (r && r.status === 'ok' && !f.other && r.vatHalves && Object.keys(r.vatHalves).length) { Object.assign(halves, r.vatHalves); hf.push(f.name); } });
         if (Object.keys(halves).length) {
           const ks = Object.keys(halves).sort(), lab = k => { const [y, h] = k.split('-'); return y + (h === '1' ? ' 상반기' : h === '2' ? ' 하반기' : ' 연간'); };
           cands.push({ id: '_vathalf', value: `${lab(ks[0])} ~ ${lab(ks[ks.length - 1])} (${ks.length}개)`, conf: 0.9, valid: true, file: hf.join(', '), halves });
@@ -9784,13 +9839,20 @@
         document.getElementById('docs_sup').style.display = files.length ? 'none' : '';
         document.getElementById('docs_files').innerHTML = files.map((f, i) => {
           const r = f.res;
-          const st = !r ? '<span class="st">읽는 중…</span>' : r.status === 'ok' ? `<span class="st ok">읽음${r.notes && r.notes.length ? ' · ' + esc(r.notes.join(' · ')) : ''}</span>`
+          const fmtNo = n => n.slice(0, 3) + '-' + n.slice(3, 5) + '-' + n.slice(5);
+          const st = !r ? '<span class="st">읽는 중…</span>' : f.other ? `<span class="st warn">다른 회사 서류(사업자번호 ${fmtNo(f.other.no)}) — ${f.other.byInput ? '지금 입력된 사업자번호와 달라' : '다른 서류들과 달라'} 넣지 않아요</span>`
+            : r.status === 'ok' ? `<span class="st ok">읽음${r.notes && r.notes.length ? ' · ' + esc(r.notes.join(' · ')) : ''}</span>`
             : r.status === 'scan' ? '<span class="st warn">글자층 없는 PDF</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
           const sel = `<select data-i="${i}" aria-label="서류 종류">${kinds.map(([k, t]) => `<option value="${k}" ${r && r.kind === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="unknown" ${!r || r.kind === 'unknown' ? 'selected' : ''}>어떤 서류인지 골라 주세요</option></select>`;
           return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${f.pages || f.text !== undefined ? sel : ''}${st}</div>`;
         }).join('');
         const t = document.getElementById('docs_table');
-        if (!rows.length) { t.innerHTML = files.length && files.every(f => f.res) ? '<div class="sup">채울 수 있는 값을 찾지 못했어요. 서류 종류가 맞는지 확인해 주세요.</div>' : ''; }
+        if (!rows.length) {
+          const allOther = files.some(f => f.other) && files.every(f => f.other || !f.res || f.res.status !== 'ok');
+          t.innerHTML = !files.length || !files.every(f => f.res) ? ''
+            : allOther ? '<div class="sup">올린 서류가 모두 지금 고객과 다른 회사 것이에요. 다른 고객의 서류라면 \'새 고객 작성\'을 누른 뒤 올려 주세요.</div>'
+            : '<div class="sup">채울 수 있는 값을 찾지 못했어요. 서류 종류가 맞는지 확인해 주세요.</div>';
+        }
         else {
           t.innerHTML = `<table><thead><tr><th style="width:26px"></th><th>항목</th><th>지금 값</th><th>읽은 값</th><th>정확도</th></tr></thead><tbody>${rows.map((g, i) => {
             const o = g.opts[g.pick], v = showVal(g, o);
@@ -9897,7 +9959,8 @@
                 // 사업자등록증(또는 종류 못 알아봄)에서 칸을 6개 미만 읽었으면: 보정 없이 그린 그림을 '한 덩어리 글' 방식으로 한 번 더 읽어 합친다
                 // (글자층이 깨진 PDF 는 그림이 깨끗해서 보정이 오히려 글자를 지우기도 함)
                 const r1 = P().parseTextDocument(texts.join('\n<<PAGE>>\n'), file.name);
-                if (['bizreg', 'bizcert', 'unknown'].includes(r1.kind) && Object.keys(r1.fields || {}).length < 6 && info.read <= 3) {
+                // 부가세 과세표준증명은 과세기간 줄을 하나도 못 읽었을 때 다시 읽는다(보정이 표 숫자를 지우는 경우)
+                if (((['bizreg', 'bizcert', 'unknown'].includes(r1.kind) && Object.keys(r1.fields || {}).length < 6) || (r1.kind === 'vat' && r1.status !== 'ok')) && info.read <= 3) {
                   const t2 = [];
                   const w = await getWorker('kor+eng');
                   try {
@@ -9905,7 +9968,9 @@
                     await scanPdfPages(file, async (c, p, n) => { try { ocrProg = x => progress(file.name + ' (다시 읽기)', 0, 0, (p - 1 + x) / n); t2.push(P().redact((await w.recognize(c)).data.text || '')); } finally { ocrProg = null; freeCanvas(c); } }, { raw: true });
                   } finally { await w.setParameters({ tessedit_pageseg_mode: '3' }); }
                   const r2 = P().parseTextDocument(t2.join('\n<<PAGE>>\n'), file.name);
-                  const n1 = Object.keys(r1.fields || {}).length, n2 = Object.keys(r2.fields || {}).length;
+                  // 점수: 읽기 성공(ok)이 먼저, 그다음 칸 수
+                  const score = r => (r.status === 'ok' ? 100 : 0) + Object.keys(r.fields || {}).length;
+                  const n1 = score(r1), n2 = score(r2);
                   if (r2.kind !== 'unknown' && (r1.kind === 'unknown' || n2 > n1 || r1.kind === r2.kind)) {
                     // 칸이 더 많은 쪽을 바탕으로, 같은 종류면 다른 쪽에만 있는 칸을 보탠다
                     const base = (r1.kind === 'unknown' || n2 >= n1) ? r2 : r1, other = base === r2 ? r1 : r2;

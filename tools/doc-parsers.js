@@ -271,7 +271,7 @@
     ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
     ['fs', '표준재무제표증명', t => /표준재무제표증명|표준재무상태표|표준손익계산서/.test(t)],
     ['fsacct', '결산 재무제표(세무사)', t => /재무상태표|대차대조표/.test(t) && /손익계산서/.test(t)],
-    ['vat', '부가가치세 과세표준증명', t => /과세표준증명/.test(t)],
+    ['vat', '부가가치세 과세표준증명', t => /과세표준[증중]명/.test(t)],   // 글자 인식이 '증'을 '중'으로 자주 읽음
     ['ins', '4대보험 사업장 가입자명부', t => /사업장가입자명부/.test(t)],
     ['share', '주주명부', t => /주주명부/.test(t)],
     ['ledger', '거래처원장(차입금)', t => /거래처원장/.test(t)],
@@ -533,6 +533,40 @@
     return { fields: f, meta, yearTotals, halfTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
   }
 
+  // 부가세 과세표준증명 — 스캔본·사진(글자 인식 글). 줄마다 '부터 까지 계 과세분 면세분' → parseVAT 와 같은 꼴의 줄로 바꿔 넘긴다.
+  // 글자 인식이 숫자를 잘못 읽을 수 있어, 계 = 과세분 + 면세분 이 맞는 줄 수를 세어 정확도에 반영한다
+  function parseVATText(text) {
+    const t = String(text || '').replace(/(?<=\d)[Oo]|[Oo](?=\d)/g, '0');
+    const D = '(\\d{4})\\s*[/.\\-]\\s*(\\d{1,2})\\s*[/.\\-]\\s*(\\d{1,2})';
+    const N = '(\\d[\\d,.]*)';
+    const G = '[\\s|:_]+';   // 칸 사이: 띄어쓰기·표 세로줄(|)·잡음
+    const re = new RegExp(D + '[\\s|~\\-]*' + D + G + N + '(?:' + G + N + ')?(?:' + G + N + ')?', 'g');
+    const num = x => x === undefined ? null : Number(String(x).replace(/[.,]/g, ''));
+    const pad = x => String(x).padStart(2, '0');
+    const rows = [];
+    let ok = 0;
+    for (const m of t.matchAll(re)) {
+      const [y1, m1, d1, y2, m2, d2] = m.slice(1, 7).map(Number);
+      if (m1 < 1 || m1 > 12 || m2 < 1 || m2 > 12 || y2 < y1) continue;
+      const total = num(m[7]), a = num(m[8]), b = num(m[9]);
+      if (total === null || !isFinite(total)) continue;
+      if (a !== null && b !== null && a + b === total) ok++;
+      rows.push([`${y1}/${pad(m1)}/${pad(d1)}`, `${y2}/${pad(m2)}/${pad(d2)}`, String(total)]);
+    }
+    const r = parseVAT(rows);
+    const d = despace(t);
+    const no = bizNoOf((d.match(/사업자등록번호[:：]?(\d{3}-?\d{2}-?\d{5})/) || [])[1] || '');
+    if (no) r.fields.corp_biz_no = no;
+    const ceo = (t.match(/성\s*명\s*\(\s*대\s*표\s*자\s*\)\s*[:：|]?\s*([가-힣]{2,5})/) || [])[1];
+    if (ceo) r.fields.corp_ceo = ceo;
+    if (rows.length) {
+      r.notes.push(`글자 인식 · 합계 검산 ${ok}/${rows.length}줄`);
+      if (r.meta.smb_monthly_sales) { r.meta.smb_monthly_sales.conf = ok === rows.length ? 0.75 : 0.5; if (ok < rows.length) r.meta.smb_monthly_sales.note = '글자 인식 금액이 합계와 안 맞는 줄이 있어요 — 원본 확인'; }
+    }
+    r.vatChecked = ok; r.vatRows = rows.length;
+    return r;
+  }
+
   // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
   function parseIns(rows) {
     let total = 0, emp = 0;
@@ -691,6 +725,12 @@
     else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
     else if (c.kind === 'corpreg') r = parseCorpReg(rows);
+    else if (c.kind === 'vat') {
+      r = parseVATText(text);
+      if (!r.vatRows) { out.status = 'skip'; out.notes.push('과세기간 줄을 읽지 못했어요 — 더 선명한 스캔으로'); return out; }
+      out.vatYears = r.yearTotals; out.vatHalves = r.halfTotals;
+      out.vatOcrCheck = { ok: r.vatChecked, rows: r.vatRows };
+    }
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
     // 사진 인식은 한 단계 낮은 정확도로
@@ -1121,6 +1161,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
