@@ -8845,8 +8845,8 @@
   // 같은 줄 '칸 이름 + 값'(쌍점 없이도) — 증명서 표·스캔 글자 인식·다른 발급처 양식 공통. 이미 읽은 칸은 건드리지 않고 빈 칸만 채운다
   const LINE_LABELS = [
     ['corp_name', /^(?:상\s*호\s*\(\s*법\s*인\s*명\s*\)|법\s*인\s*명\s*\(\s*단\s*체\s*명\s*\)|상\s*호|법\s*인\s*명)/],
-    ['corp_biz_no', /^사\s*업\s*자\s*등\s*록\s*번\s*호/],
-    ['corp_ceo', /^(?:성\s*명\s*\(\s*대\s*표\s*자\s*\)|대\s*표\s*자(?:\s*\([^)]*\))?|성\s*명)/],
+    ['corp_biz_no', /^사\s*업\s*자\s*[등둥]\s*록\s*번\s*호/],   // 글자 인식이 '등'을 '둥'으로 읽기도 함
+    ['corp_ceo', /^(?:대\s*표\s*자\s*성\s*명(?:\s*\([^)]*\))?|성\s*명\s*\(\s*대\s*표\s*자\s*\)|대\s*표\s*자(?:\s*\([^)]*\))?|성\s*명)/],
     ['corp_address', /^(?:사\s*업\s*장\s*소\s*재\s*지|사\s*업\s*장|소\s*재\s*지)/],
     ['corp_est_date', /^개\s*업\s*(?:연\s*월\s*)?일/]
   ];
@@ -8859,15 +8859,37 @@
       for (const [id, re] of LINE_LABELS) {
         if (f[id]) continue;
         const m = l.match(re); if (!m) continue;
-        const v = l.slice(m[0].length).replace(/^[\s|¦:：_.\-]+/, '').trim();
+        // 칸 이름과 값 사이 글자 인식 잡음(、 , ' 。 등)은 건너뜀
+        const v = l.slice(m[0].length).replace(/^[\s|¦:：_.,，、。·'"`~\-]+/, '').trim();
         if (!v) continue;
         if (id === 'corp_biz_no') { const n = bizNoOf((v.match(/\d{3}\s*-?\s*\d{2}\s*-?\s*\d{5}/) || [''])[0]); if (n) f[id] = n; }
-        else if (id === 'corp_ceo') { const n = (v.match(/^[가-힣]{2,5}(?=\s|$|[^가-힣])/) || [])[0]; if (n && !/^(주민|법인|등록|사업)/.test(n)) f[id] = n; }
+        else if (id === 'corp_ceo') { const n = (v.match(/^[가-힣]{2,5}(?=\s|$|[^가-힣])/) || [])[0]; if (n && !/^(주민|법인|등록|사업|성명)/.test(n)) f[id] = n; }
         else if (id === 'corp_est_date') { const d = v.match(/(\d{4})\s*\D{0,3}\s*(\d{1,2})\s*\D{0,3}\s*(\d{1,2})/); if (d && +d[2] >= 1 && +d[2] <= 12 && +d[3] >= 1 && +d[3] <= 31) f[id] = `${d[1]}-${d[2].padStart(2, '0')}-${d[3].padStart(2, '0')}`; }
-        else if (id === 'corp_name') { const n = v.split(/\s{2,}|\s+(?:사\s*업\s*자|성\s*명|대\s*표)/)[0].trim(); if (n.length >= 2 && /[가-힣A-Za-z]/.test(n)) f[id] = n; }
+        else if (id === 'corp_name') { const n = v.split(/\s{2,}|\s+(?:사\s*업\s*자|성\s*명|대\s*표)/)[0].trim(); if ((n.length >= 2 && /[가-힣A-Za-z]/.test(n)) || /^[가-힣]$/.test(n)) f[id] = n; }   // 한 글자 상호(예: '녁')도
         else if (id === 'corp_address') { if (/[가-힣]{2,}(시|도|구|군)/.test(v)) f[id] = v.replace(/\s{2,}.*$/, ''); }
       }
     });
+    // 업태·종목: ① '업태 A 종목 B' 한 줄 ② 증명서처럼 '업 태'·'종 목' 칸 이름만 있는 줄 — 값은 바로 위 줄(없으면 아래 줄) ③ '사업의 종류 :' 뒤(업태·종목 글자가 빠진 경우 통째로)
+    const lines = String(text || '').split(/\r?\n/).map(x => x.replace(/^[\s|¦:_=\-]+/, '').trim());
+    const isLabel = s => /^(?:업\s*태|종\s*목|성\s*명|상\s*호|사\s*업|개\s*업|주\s*민|공\s*동|대\s*표|법\s*인)/.test(s);
+    let up = '', jm = '';
+    lines.forEach((l, i) => {
+      const both = l.match(/업\s*태\s*[:：]?\s*(.+?)\s+종\s*목\s*[:：]?\s*(.+)$/);
+      if (both && !up) { up = both[1].trim(); jm = both[2].trim(); return; }
+      const near = () => { const p = lines[i - 1], n = lines[i + 1]; return p && !isLabel(p) && /[가-힣]{2}/.test(p) ? p : n && !isLabel(n) && /[가-힣]{2}/.test(n) ? n : ''; };
+      if (!up && /^업\s*태\s*$/.test(l)) up = near();
+      else if (!up && /^업\s*태\s+\S/.test(l)) up = l.replace(/^업\s*태\s*[:：]?\s*/, '');
+      if (!jm && /^종\s*목\s*$/.test(l)) jm = near();
+      else if (!jm && /^종\s*목\s+\S/.test(l)) jm = l.replace(/^종\s*목\s*[:：]?\s*/, '');
+    });
+    if (up || jm) f.corp_biz_type = [jm, up ? '(' + up + ')' : ''].filter(Boolean).join(' ');
+    else {
+      const i = lines.findIndex(l => /^사\s*업\s*의\s*종\s*류/.test(l));
+      if (i >= 0) { const v = [lines[i].replace(/^사\s*업\s*의\s*종\s*류\s*[:：]?\s*/, ''), lines[i + 1] && !isLabel(lines[i + 1]) && !/발\s*급|세\s*무\s*서|전\s*자\s*세\s*금/.test(lines[i + 1]) ? lines[i + 1] : ''].join(' ').replace(/\s+/g, ' ').trim(); if (/[가-힣]{2}/.test(v)) f.corp_biz_type = v; }
+    }
+    // 법인등록번호 후보: '주민(…)등록번호'·'법인등록번호' 뒤 13자리(법인사업자일 때만 fillByLines 가 씀 — 주민번호 꼴은 이미 가려져 있음)
+    const rg = String(text || '').match(/(?:주\s*민\s*\([^)]{0,6}\)|법\s*인)\s*등\s*록\s*번\s*호[\s|:：_]*(\d{6})\s*-\s*(\d{7})(?!\d)/);
+    if (rg) f._regCand = rg[1] + '-' + rg[2];
     return f;
   }
   // r.fields 의 빈 칸만 lineFields 로 채우고(정확도 낮게), 사업자 구분도 없으면 번호·제목으로
@@ -8879,7 +8901,10 @@
   function fillByLines(r, text) {
     const add = lineFields(text);
     if (!add.corp_biz_no) { const n = soleBizNo(text); if (n) add.corp_biz_no = n; }
+    const regCand = add._regCand; delete add._regCand;
     r.meta = r.meta || {};
+    const bn = r.fields.corp_biz_no || add.corp_biz_no;
+    if (regCand && !r.fields.corp_reg_no && bn && isCorpNo(bn)) { add.corp_reg_no = regCand; if (!corpRegValid(regCand)) r.meta.corp_reg_no = { conf: 0.3, valid: false, note: '번호 검증식이 맞지 않아요 — 원본 확인' }; }
     Object.entries(add).forEach(([k, v]) => { if (!r.fields[k]) { r.fields[k] = v; r.meta[k] = Object.assign({ conf: 0.6 }, r.meta[k] || {}, { conf: 0.6 }); } });
     if (r.fields.corp_biz_no && !r.fields.corp_form) {
       const tax0 = despace(text).match(/\((일반과세자|간이과세자|면세사업자|법인사업자)\)/);
@@ -9605,6 +9630,43 @@
               if (merged && merged !== L.text.trim()) text = text.replace(L.text.trim(), merged);
             }
           } catch (e) { /* 두 번째 읽기는 보조 — 실패해도 첫 결과 사용 */ }
+        }
+        // 사업자등록증·증명·부가세 증명: 흐린 스캔에서 이름·업태가 영문 잡음으로 읽히는 경우가 많아,
+        // 칸 이름 줄(상호·대표자·업태·종목·사업의 종류)과 '업 태'·'종 목' 바로 위·아래 값 줄을 2배로 키워 한글 전용으로 다시 읽고 한글이 더 많이 읽힌 쪽으로 바꾼다
+        if (/사\s*업\s*자\s*등\s*록|과\s*세\s*표\s*준|과\s*세\s*기\s*간/.test(text)) {
+          try {
+            const lines = (data.blocks || []).flatMap(b => b.paragraphs.flatMap(p => p.lines)).filter(l => l.text.trim());
+            const LBL = /(상\s*호|법\s*인\s*명|대\s*표\s*자|성\s*명\s*\(|업\s*태|종\s*목|사\s*업\s*의\s*종\s*류)/;
+            const pick = new Set();
+            lines.forEach((l, i) => {
+              if (!LBL.test(l.text) || /주\s*민|등\s*록\s*번\s*호/.test(l.text)) return;
+              pick.add(l);
+              if (/^\s*[|_]?\s*(업\s*태|종\s*목)\s*$/.test(l.text)) { if (lines[i - 1]) pick.add(lines[i - 1]); if (lines[i + 1]) pick.add(lines[i + 1]); }
+              if (/사\s*업\s*의\s*종\s*류/.test(l.text) && lines[i + 1]) pick.add(lines[i + 1]);
+            });
+            const targets = [...pick].slice(0, 12);
+            if (targets.length) {
+              const k = await korOnly();
+              const han = s => (String(s).match(/[가-힣]/g) || []).length;
+              await k.setParameters({ tessedit_pageseg_mode: '7' });
+              try {
+                for (const L of targets) {
+                  // 칸 이름 줄은 값이 오른쪽에 따로 떨어져 읽히기도 해서 그 줄 높이로 문서 오른쪽 끝까지 자른다
+                  const b = L.bbox, pad = 8, isLbl = LBL.test(L.text);
+                  const x1 = isLbl ? Math.max(b.x1, Math.round(canvas.width * 0.96)) : b.x1;
+                  const wd = Math.min(canvas.width, x1 + pad) - Math.max(0, b.x0 - pad), ht = b.y1 - b.y0 + pad * 2;
+                  const crop = document.createElement('canvas'); crop.width = wd * 2; crop.height = ht * 2;
+                  const cx = crop.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.fillStyle = '#fff'; cx.fillRect(0, 0, crop.width, crop.height);
+                  cx.drawImage(canvas, Math.max(0, b.x0 - pad), Math.max(0, b.y0 - pad), wd, ht, 0, 0, crop.width, crop.height);
+                  const t2 = P().redact(((await k.recognize(crop)).data.text || '').replace(/\s*\n\s*/g, ' ').trim());
+                  freeCanvas(crop);
+                  const t1 = P().redact(L.text.replace(/\s*\n\s*/g, ' ').trim());
+                  if (dbg) dbg.push({ step: 'kor-line', before: han(t1), after: han(t2) });
+                  if (t2 && han(t2) > han(t1)) text =text.includes(t1) ? text.replace(t1, t2) : text + '\n' + t2;
+                }
+              } finally { await k.setParameters({ tessedit_pageseg_mode: '3' }); }
+            }
+          } catch (e) { /* 다시 읽기는 보조 — 실패해도 첫 결과 사용 */ }
         }
         return text;
       }
