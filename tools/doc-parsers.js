@@ -567,6 +567,53 @@
     return r;
   }
 
+  // 같은 줄 '칸 이름 + 값'(쌍점 없이도) — 증명서 표·스캔 글자 인식·다른 발급처 양식 공통. 이미 읽은 칸은 건드리지 않고 빈 칸만 채운다
+  const LINE_LABELS = [
+    ['corp_name', /^(?:상\s*호\s*\(\s*법\s*인\s*명\s*\)|법\s*인\s*명\s*\(\s*단\s*체\s*명\s*\)|상\s*호|법\s*인\s*명)/],
+    ['corp_biz_no', /^사\s*업\s*자\s*등\s*록\s*번\s*호/],
+    ['corp_ceo', /^(?:성\s*명\s*\(\s*대\s*표\s*자\s*\)|대\s*표\s*자(?:\s*\([^)]*\))?|성\s*명)/],
+    ['corp_address', /^(?:사\s*업\s*장\s*소\s*재\s*지|사\s*업\s*장|소\s*재\s*지)/],
+    ['corp_est_date', /^개\s*업\s*(?:연\s*월\s*)?일/]
+  ];
+  function lineFields(text) {
+    const f = {};
+    String(text || '').split(/\r?\n/).forEach(raw => {
+      let l = raw.replace(/^[\s|¦:_=\-]+/, '');
+      // 소재지는 줄 가운데에서도(앞 '사업장'이 깨져 읽히는 경우)
+      if (!f.corp_address) { const k = l.search(/소\s*재\s*지/); if (k > 0 && k <= 12) l = l.slice(k); }
+      for (const [id, re] of LINE_LABELS) {
+        if (f[id]) continue;
+        const m = l.match(re); if (!m) continue;
+        const v = l.slice(m[0].length).replace(/^[\s|¦:：_.\-]+/, '').trim();
+        if (!v) continue;
+        if (id === 'corp_biz_no') { const n = bizNoOf((v.match(/\d{3}\s*-?\s*\d{2}\s*-?\s*\d{5}/) || [''])[0]); if (n) f[id] = n; }
+        else if (id === 'corp_ceo') { const n = (v.match(/^[가-힣]{2,5}(?=\s|$|[^가-힣])/) || [])[0]; if (n && !/^(주민|법인|등록|사업)/.test(n)) f[id] = n; }
+        else if (id === 'corp_est_date') { const d = v.match(/(\d{4})\s*\D{0,3}\s*(\d{1,2})\s*\D{0,3}\s*(\d{1,2})/); if (d && +d[2] >= 1 && +d[2] <= 12 && +d[3] >= 1 && +d[3] <= 31) f[id] = `${d[1]}-${d[2].padStart(2, '0')}-${d[3].padStart(2, '0')}`; }
+        else if (id === 'corp_name') { const n = v.split(/\s{2,}|\s+(?:사\s*업\s*자|성\s*명|대\s*표)/)[0].trim(); if (n.length >= 2 && /[가-힣A-Za-z]/.test(n)) f[id] = n; }
+        else if (id === 'corp_address') { if (/[가-힣]{2,}(시|도|구|군)/.test(v)) f[id] = v.replace(/\s{2,}.*$/, ''); }
+      }
+    });
+    return f;
+  }
+  // r.fields 의 빈 칸만 lineFields 로 채우고(정확도 낮게), 사업자 구분도 없으면 번호·제목으로
+  // 사업자번호: 칸 이름을 못 읽었어도 글 전체에 검증식이 맞는 번호가 하나뿐이면 그것
+  function soleBizNo(text) {
+    const set = new Set([...String(text || '').matchAll(/(?<!\d)(\d{3})\s*-\s*(\d{2})\s*-\s*(\d{5})(?!\d)/g)].map(m => m[1] + m[2] + m[3]).filter(n => bizNoValid(n)));
+    return set.size === 1 ? bizNoOf([...set][0]) : '';
+  }
+  function fillByLines(r, text) {
+    const add = lineFields(text);
+    if (!add.corp_biz_no) { const n = soleBizNo(text); if (n) add.corp_biz_no = n; }
+    r.meta = r.meta || {};
+    Object.entries(add).forEach(([k, v]) => { if (!r.fields[k]) { r.fields[k] = v; r.meta[k] = Object.assign({ conf: 0.6 }, r.meta[k] || {}, { conf: 0.6 }); } });
+    if (r.fields.corp_biz_no && !r.fields.corp_form) {
+      const tax0 = despace(text).match(/\((일반과세자|간이과세자|면세사업자|법인사업자)\)/);
+      r.fields.corp_form = formValue(isCorpNo(r.fields.corp_biz_no) || (tax0 && tax0[1] === '법인사업자'), tax0 && tax0[1]);
+      r.meta.corp_form = { conf: tax0 ? 0.8 : 0.5 };
+    }
+    return r;
+  }
+
   // 4대보험 가입자명부: 인원수만 센다(이름·주민번호는 담지 않음). 고용보험 취득일이 있는 사람 = 상시근로자 기준
   function parseIns(rows) {
     let total = 0, emp = 0;
@@ -710,6 +757,13 @@
       const d = despace(text);
       const labels = [/개업연월일/, /(사업장|본점)소재지/, /사업의종류/, /세무서장/, /(법인명|상호)\(?단체명/].filter(re => re.test(d)).length;
       if ((/(법인|개인|일반과세|간이과세|면세)사업자|과세자\)/.test(d) || /등록번호:?\d{3}-?\d{2}-?\d{5}/.test(d)) && labels >= 2) Object.assign(auto, { kind: 'bizreg', title: '사업자등록증' });
+      // 사업자등록증명(국세청 증명 양식): 제목이 깨져도 '공동사업자'·'개업일'·'성명(대표자)'·'상호(법인명)'·'사업자등록번호' 중 3개 이상
+      else {
+        const cl = [/공동사업자/, /개업일/, /성명\(대표자\)|대표자성명/, /상호\(법인명\)/, /사업자등록번호/, /주민\((법인|사업자)\)등록번호/].filter(re => re.test(d)).length;
+        if (cl >= 3) Object.assign(auto, { kind: 'bizcert', title: '사업자등록증명' });
+        // 부가세 과세표준증명: 제목이 깨져도 '과세기간' + '과세표준'(또는 '납부할세액')
+        else if (/과세기간/.test(d) && /과세표준|납부할세액/.test(d)) Object.assign(auto, { kind: 'vat', title: '부가가치세 과세표준증명' });
+      }
     }
     // 신분증은 제목이 깨지기 쉬워 번호 꼴 + 발급기관으로도 판별
     if (auto.kind === 'unknown' && /\d{6}-\*{7}/.test(text) && (/(시장|구청장|군수|도지사|경찰청장)/.test(despace(text)) || /[가-힣]{2,4}\s*\(/.test(text))) Object.assign(auto, { kind: 'idcard', title: '신분증' });
@@ -725,6 +779,12 @@
     else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
     else if (c.kind === 'corpreg') r = parseCorpReg(rows);
+    else if (c.kind === 'fs' || c.kind === 'fsacct') {
+      r = parseFS(rows);
+      if (!Object.values(r.wonValues || {}).some(x => x !== null && x !== undefined)) { out.status = 'skip'; out.notes.push('재무제표 금액 줄을 읽지 못했어요 — 더 선명한 스캔으로'); return out; }
+      out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced, full: parseFSFull(rows) };
+    }
+    else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'vat') {
       r = parseVATText(text);
       if (!r.vatRows) { out.status = 'skip'; out.notes.push('과세기간 줄을 읽지 못했어요 — 더 선명한 스캔으로'); return out; }
@@ -732,6 +792,8 @@
       out.vatOcrCheck = { ok: r.vatChecked, rows: r.vatRows };
     }
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
+    if (['bizcert', 'bizreg'].includes(c.kind)) fillByLines(r, text);
+    if (c.kind === 'vat') { const lf = lineFields(text); if (!lf.corp_biz_no) lf.corp_biz_no = soleBizNo(text); r.meta = r.meta || {}; ['corp_biz_no', 'corp_ceo', 'corp_name'].forEach(k => { if (lf[k] && !r.fields[k]) { r.fields[k] = lf[k]; r.meta[k] = { conf: 0.6 }; } }); }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
     // 사진 인식은 한 단계 낮은 정확도로
     Object.keys(out.fields).forEach(k => { const m = out.meta[k] = out.meta[k] || {}; m.conf = Math.min(m.conf ?? 0.9, 0.75); });
@@ -1114,7 +1176,10 @@
       out.fs = out.fsList[0];
       r = { fields: {}, notes: a.notes };
     }
-    else if (c.kind === 'vat') r = parseVAT(rows);
+    else if (c.kind === 'vat') {
+      r = parseVAT(rows);
+      if (!Object.keys(r.halfTotals || {}).length) { const rt = parseVATText(rows.map(x => x.join('  ')).join(String.fromCharCode(10))); if (rt.vatRows) r = rt; }
+    }
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
     else if (c.kind === 'corpreg') r = parseCorpReg(rows);
@@ -1127,6 +1192,12 @@
       if (!parsed) { out.status = 'skip'; out.notes.push('표를 읽지 못함'); }
       return out;
     } else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '종류를 알 수 없음' : '아직 읽는 규칙이 없는 서류'); return out; }
+    if (['bizcert', 'bizreg'].includes(c.kind)) fillByLines(r, rows.map(x => x.join('  ')).join(String.fromCharCode(10)));
+    if (c.kind === 'vat') { const lf = lineFields(rows.map(x => x.join('  ')).join(String.fromCharCode(10))); ['corp_biz_no', 'corp_ceo', 'corp_name'].forEach(k => { if (lf[k] && !r.fields[k]) r.fields[k] = lf[k]; }); }
+    if (!Object.keys(r.fields || {}).length && !out.fs && ['bizcert', 'bizreg', 'corpreg', 'share', 'idcard', 'lease'].includes(c.kind)) {
+      const t = parseTextDocument(rows.map(x => x.join('  ')).join(String.fromCharCode(10)), fileName, c.kind);
+      if (t.status === 'ok' && Object.keys(t.fields || {}).length) { t.ocr = false; Object.keys(t.meta || {}).forEach(k => { if (t.meta[k]) t.meta[k].conf = Math.max(t.meta[k].conf || 0, 0.8); }); t.notes = (t.notes || []).concat('줄 글 규칙으로 읽음'); return Object.assign(out, t, { kind: c.kind, title: c.title }); }
+    }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes;
     if (r.yearTotals) out.vatYears = r.yearTotals;
     if (r.halfTotals) out.vatHalves = r.halfTotals;
@@ -1161,6 +1232,6 @@
   }
 
   function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
