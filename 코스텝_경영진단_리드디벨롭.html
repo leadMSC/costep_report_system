@@ -5042,8 +5042,8 @@
     window.faDiagnose = faDiagnose;
     function faDiagHtml(dg, compact) {
       const cls = { good: 'g', mid: 'm', bad: 'b', none: 'n' };
-      return `<div class="fa-dg"><div class="fa-dg-chips">${dg.areas.map(a => `<div class="c ${cls[a.grade]}"><span>${a.name}</span><b>${a.gradeName}</b></div>`).join('')}</div>
-        <div class="fa-dg-basis">비교 기준: ${dg.basis}${dg.basis === '기준선' ? ' (업종평균 자료가 없을 때 쓰는 기본값)' : ''}</div>
+      return `<div class="fa-dg">${compact ? '' : `<div class="fa-dg-chips">${dg.areas.map(a => `<div class="c ${cls[a.grade]}"><span>${a.name}</span><b>${a.gradeName}</b></div>`).join('')}</div>
+        <div class="fa-dg-basis">비교 기준: ${dg.basis}${dg.basis === '기준선' ? ' (업종평균 자료가 없을 때 쓰는 기본값)' : ''}</div>`}
         <table class="fa-dg-t">${dg.areas.map(a => `<tr><th class="${cls[a.grade]}">${a.name} ${a.gradeName}</th><td>${escapeHtml(a.sentence)}</td></tr>`).join('')}</table></div>`;
     }
     window.faDiagHtml = faDiagHtml;
@@ -5405,7 +5405,7 @@
       try {
         if ((window.appState.bizTrack || 'smb') !== 'smb' && typeof faDiagnose === 'function') {
           const fd = faData();
-          if (fd.Y.some(y => y.S !== null || y.A !== null)) faDiagReport = `<div class="fa-dg-rep border border-slate-300 rounded-lg p-2 space-y-1"><div class="font-extrabold text-slate-900 text-[10px] border-b border-slate-200 pb-1">【 재무진단 — 5개 영역 판정 】</div>${faDiagHtml(faDiagnose(fd))}</div>`;
+          if (fd.Y.some(y => y.S !== null || y.A !== null)) faDiagReport = `<div class="fa-dg-rep border border-slate-300 rounded-lg p-2 space-y-1">${(dg => `<div class="flex justify-between items-baseline gap-2 border-b border-slate-200 pb-1"><span class="font-extrabold text-slate-900 text-[10px]">【 재무진단 — 5개 영역 판정 】</span><span class="text-[8px] text-slate-500">비교 기준: ${dg.basis}</span></div>${faDiagHtml(dg, true)}`)(faDiagnose(fd))}</div>`;
         }
       } catch (e) { faDiagReport = ''; }
       const area = document.getElementById('active_report_render_area');
@@ -5477,16 +5477,27 @@
       // 금융기관별 차입금 테이블 행 생성
       let debtRowsHtml = '';
       if (window.appState.debtItems && window.appState.debtItems.length > 0) {
-        debtRowsHtml = window.appState.debtItems.map(d => `
+        const DEBT_MAX = 5;   // A4 1장: 잔액 큰 순서 5건만 줄로, 나머지는 '외 N건' 한 줄(전체는 입력 화면 대출표)
+        const debtSorted = [...window.appState.debtItems].sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
+        const debtRest = debtSorted.slice(DEBT_MAX);
+        debtRowsHtml = (debtSorted.length > DEBT_MAX + 1 ? debtSorted.slice(0, DEBT_MAX) : debtSorted).map(d => `
           <tr class="text-center text-[10px]">
-            <td class="p-1.5 border border-slate-300 font-bold">${escapeHtml(d.institution) || '-'}</td>
-            <td class="p-1.5 border border-slate-300">${escapeHtml(d.type) || '-'}</td>
-            <td class="p-1.5 border border-slate-300 font-mono font-bold">${Number(d.balance || 0).toLocaleString()}만원</td>
-            <td class="p-1.5 border border-slate-300 font-mono text-[#0f766e] font-bold">연 ${Math.round(Number(d.rate || 0) * 100) / 100}%</td>
-            <td class="p-1.5 border border-slate-300 font-mono text-amber-700">${Number(d.monthlyInterest || 0).toLocaleString()}만원</td>
-            <td class="p-1.5 border border-slate-300">${escapeHtml(d.payback) || '-'}</td>
+            <td class="px-1 py-1 border border-slate-300 font-bold"><div class="rp-clamp1" title="${escapeHtml(d.institution)}">${escapeHtml(d.institution) || '-'}</div></td>
+            <td class="px-1 py-1 border border-slate-300"><div class="rp-clamp1">${escapeHtml(d.type) || '-'}</div></td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono font-bold">${Number(d.balance || 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono text-[#0f766e] font-bold">연 ${Math.round(Number(d.rate || 0) * 100) / 100}%</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono text-amber-700">${Number(d.monthlyInterest || 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300"><div class="rp-clamp1">${escapeHtml(d.payback) || '-'}</div></td>
           </tr>
-        `).join('');
+        `).join('') + (debtSorted.length > DEBT_MAX + 1 ? `
+          <tr class="text-center text-[10px] bg-slate-50">
+            <td class="px-1 py-1 border border-slate-300 font-bold">외 ${debtRest.length}건</td>
+            <td class="px-1 py-1 border border-slate-300 text-slate-500"><div class="rp-clamp1">${escapeHtml([...new Set(debtRest.map(d => d.institution).filter(Boolean))].slice(0, 2).join(', '))}${new Set(debtRest.map(d => d.institution)).size > 2 ? ' 등' : ''}</div></td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono font-bold">${debtRest.reduce((a, d) => a + Number(d.balance || 0), 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300 text-slate-500">-</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono text-amber-700">${debtRest.reduce((a, d) => a + Number(d.monthlyInterest || 0), 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300 text-slate-500">입력 화면 대출표 참고</td>
+          </tr>` : '');
       } else {
         debtRowsHtml = `
           <tr>
@@ -5736,23 +5747,23 @@
                 </tr>
                 <tr class="text-center">
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold">주주현황</td>
-                  <td class="p-1 border border-slate-300">${ceoShare}</td>
+                  <td class="p-1 border border-slate-300"><div class="rp-clamp2">${ceoShare}</div></td>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold">설립일자</td>
                   <td class="p-1 border border-slate-300 font-mono">${estDate}</td>
                 </tr>
                 <tr class="text-center">
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold">주거래은행</td>
-                  <td class="p-1 border border-slate-300 font-medium">${mainBank}</td>
+                  <td class="p-1 border border-slate-300 font-medium"><div class="rp-clamp2">${mainBank}</div></td>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold">주요생산품</td>
-                  <td class="p-1 border border-slate-300 font-bold">${bizType}</td>
+                  <td class="p-1 border border-slate-300 font-bold"><div class="rp-clamp2">${bizType}</div></td>
                 </tr>
                 <tr>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold text-center">본점소재지</td>
-                  <td colspan="3" class="p-1 border border-slate-300">${address}</td>
+                  <td colspan="3" class="p-1 border border-slate-300"><div class="rp-clamp2">${address}</div></td>
                 </tr>
                 <tr>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold text-center">공장/사업장</td>
-                  <td colspan="3" class="p-1 border border-slate-300">${factoryAddress}</td>
+                  <td colspan="3" class="p-1 border border-slate-300"><div class="rp-clamp2">${factoryAddress}</div></td>
                 </tr>
               </table>
             </div>
@@ -5764,17 +5775,17 @@
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold w-1/6">판매방식</td>
                   <td class="p-1 border border-slate-300 w-2/6 text-left pl-2">${salesChannel}</td>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold w-1/6">주요매출처</td>
-                  <td class="p-1 border border-slate-300 w-2/6 text-left pl-2">${clients}</td>
+                  <td class="p-1 border border-slate-300 w-2/6 text-left pl-2"><div class="rp-clamp2">${clients}</div></td>
                 </tr>
                 <tr class="text-center">
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold">주요매입처</td>
-                  <td class="p-1 border border-slate-300 text-left pl-2">${vendors}</td>
+                  <td class="p-1 border border-slate-300 text-left pl-2"><div class="rp-clamp2">${vendors}</div></td>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold">특허·지식재산</td>
-                  <td class="p-1 border border-slate-300 font-bold text-[#0f766e] text-left pl-2">${patents}</td>
+                  <td class="p-1 border border-slate-300 font-bold text-[#0f766e] text-left pl-2"><div class="rp-clamp2">${patents}</div></td>
                 </tr>
                 <tr>
                   <td class="p-1 border border-slate-300 bg-slate-100 font-bold text-center">보유인증</td>
-                  <td colspan="3" class="p-1 border border-slate-300 text-left pl-2 font-bold text-slate-900">${certs}</td>
+                  <td colspan="3" class="p-1 border border-slate-300 text-left pl-2 font-bold text-slate-900"><div class="rp-clamp2">${certs}</div></td>
                 </tr>
                 ${ipListHtml}
               </table>
@@ -6111,13 +6122,14 @@
 
       area.innerHTML = finalHtml;
       fitSheetsToA4(area);
+      if (window.mscHeadingLevels) mscHeadingLevels();
     }
 
     // 서식은 PDF 로 저장해 고객에게 보내므로, 1쪽에 들어가는지는 인쇄 쪽 크기(폭 186mm, 높이 277mm)로 잰다.
     // 넘치면 본문을 조금씩 축소하고(최대 88%), 그래도 넘치면 원래 크기로 2쪽에 이어 인쇄한다
     // (작게 줄인 채 2쪽이 되면 2쪽에 서명만 남는 문제가 생김). 화면이 숨겨져 높이를 잴 수 없으면 건너뜀.
     // 입력이 늘어 서식이 길어지면 한 장에 맞출 때까지 단계적으로 줄인다(84% 아래로는 글씨가 작아 2쪽으로 넘김)
-    const A4_FIT_STEPS = [1, 0.96, 0.92, 0.88, 0.84];
+    const A4_FIT_STEPS = [1, 0.96, 0.92, 0.88, 0.84, 0.82, 0.8];   // 0.8 아래는 글자가 너무 작아 2쪽으로
     const A4_PRINT_LIMIT_PX = 277 * 96 / 25.4 - 6;
     function a4PrintHeight(card) {
       card.classList.add('a4-measure');
@@ -6731,7 +6743,7 @@
               </span>
               <span class="text-[11px] font-bold text-slate-500">${it.scale === 'smb' ? '소상공인 맞춤' : (it.scale === 'small' ? '소기업 맞춤' : (it.scale === 'sme' ? '중기업 맞춤' : '공통'))}</span>
             </div>
-            <h4 class="font-extrabold text-sm text-slate-900 leading-snug">${it.title}</h4>
+            <h4 aria-level="3" class="font-extrabold text-sm text-slate-900 leading-snug">${it.title}</h4>
             <p class="text-[11px] text-[#0f766e] font-bold">${it.agency}</p>
             <div class="pt-2.5 border-t border-slate-100 text-[11.5px] leading-relaxed text-slate-700 space-y-1.5">
               <p><strong class="text-slate-900">· 지원대상:</strong> ${it.target}</p>
@@ -8186,6 +8198,8 @@
     .fa-t .fa-dn, .fa-pt .fa-dn { color: #ea580c; }
     .fa-t tr.fa-g td, .fa-pt tr.fa-g td { background: #f6f8fa; color: #24323d; font-weight: 700; text-align: left; font-size: 11px; padding: 6px 8px; border: 1px solid #e3e8ec; border-top: 1px solid #24323d; }
     .rp-empty { color: #8a94a3; font-weight: 400; }
+    .rp-clamp1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .rp-clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
     /* 숫자 칸·표 숫자는 자릿수 폭 고정(화면) */
     .form-input-control, #l3_input .text-right, #docs_modal td, #xp_modal { font-variant-numeric: tabular-nums; }
@@ -11364,6 +11378,21 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
     window.addEventListener('focus', () => check());
     window.mscBuild = mine;
+  })();
+</script>
+<script>
+  // 제목 단계(화면 읽기 프로그램용): 페이지 제목(h1) 아래 입력 카드 제목은 2단계, 카드 안 소제목은 3단계, 팝업 제목은 2단계.
+  // 모양·스타일은 그대로 두고 aria-level 만 맞춘다(h 태그를 바꾸면 기존 스타일·문구 줄임 규칙이 달라짐)
+  (() => {
+    const lv = () => {
+      document.querySelectorAll('#screen_input h3').forEach(h => h.setAttribute('aria-level', '2'));
+      document.querySelectorAll('#screen_input h4, #screen_input h5, #screen_input h6').forEach(h => h.setAttribute('aria-level', '3'));
+      document.querySelectorAll('#docs_modal h4, #xp_modal h3, #screen_radar h3').forEach(h => h.setAttribute('aria-level', '2'));
+      document.querySelectorAll('#screen_radar h4').forEach(h => h.setAttribute('aria-level', '3'));
+      document.querySelectorAll('.a4-page-card').forEach(c => c.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => h.setAttribute('aria-level', /H[12]/.test(h.tagName) ? '2' : '3')));
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lv); else lv();
+    window.mscHeadingLevels = lv;
   })();
 </script>
 </body>
