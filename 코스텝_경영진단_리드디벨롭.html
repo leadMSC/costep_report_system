@@ -1134,7 +1134,7 @@
             <div class="flex items-center space-x-3 text-xs text-white">
               <div>
                 <span>손익분기 매출 기준액:</span>
-                <span>하루 <strong id="smb_disp_daily_req" class="text-amber-300 font-black text-sm">28.8만원</strong> / 한 달 <strong id="smb_disp_monthly_req" class="text-amber-300 font-black text-sm">1,440만원</strong></span>
+                <span>하루 <strong id="smb_disp_daily_req" class="text-amber-300 font-black text-sm whitespace-nowrap">28.8만원</strong> / 한 달 <strong id="smb_disp_monthly_req" class="text-amber-300 font-black text-sm whitespace-nowrap">1,440만원</strong></span>
               </div>
               <div id="smb_disp_sales_stat" class="pl-2 border-l border-blue-400">
                 <!-- Injected via calcSmbMetrics() -->
@@ -1771,7 +1771,7 @@
             <button type="button" id="cat_btn_all" onclick="setRadarCategory('all')" class="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold bg-[#169aa8] text-white shadow-xs transition-all shrink-0 cursor-pointer border border-[#169aa8]">
               <span id="cat_icon_all" class="shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg></span>
               <span>전체분야</span>
-              <span id="cat_pill_all" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/20 text-white">0</span>
+              <span id="cat_pill_all" class="cat-pill-on px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums">0</span>
             </button>
             <button type="button" id="cat_btn_금융" onclick="setRadarCategory('금융')" class="flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 hover:text-[#169aa8] border border-slate-200 transition-all shrink-0 cursor-pointer shadow-2xs">
               <span id="cat_icon_금융" class="shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg></span>
@@ -1851,7 +1851,7 @@
         </div>
       </div>
 
-      <div id="radar_announcements_grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div id="radar_announcements_grid" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));">
         <!-- Rendered by renderRadarAnnouncements() -->
       </div>
 
@@ -5420,27 +5420,29 @@
       const activeSheet = window.appState.activeSheet || 'all';
 
       // ================= 1. 수진기업 기초 제원 전수 추출 (기재 데이터 우선 연동) =================
-      const corpName = escapeHtml(document.getElementById('corp_name')?.value.trim()) || '미기재 (상호 미지정)';
-      const corpForm = escapeHtml(document.getElementById('corp_form')?.value) || '-';
+      // 입력 전 빈 값: 옅은 글자로 — 실제 입력값과 섞여 보이지 않게(인쇄에서도 빈칸임을 알아보게)
+      const ph = t => `<span class="rp-empty">${t}</span>`;
+      const corpName = escapeHtml(document.getElementById('corp_name')?.value.trim()) || ph('미기재 (상호 미지정)');
+      const corpForm = escapeHtml(document.getElementById('corp_form')?.value) || ph('-');
       // 시행문 수신 직함: 법인은 대표이사, 개인사업자는 대표
       const recipientTitle = corpForm.includes('법인') ? '대표이사' : '대표';   // 구분을 아직 안 골랐으면 '대표'
-      const bizNo = escapeHtml(document.getElementById('corp_biz_no')?.value.trim()) || '-';
-      const regNo = escapeHtml(document.getElementById('corp_reg_no')?.value.trim()) || '-';
-      const ceoName = escapeHtml(document.getElementById('corp_ceo')?.value.trim()) || '대표자';
+      const bizNo = escapeHtml(document.getElementById('corp_biz_no')?.value.trim()) || ph('-');
+      const regNo = escapeHtml(document.getElementById('corp_reg_no')?.value.trim()) || ph('-');
+      const ceoName = escapeHtml(document.getElementById('corp_ceo')?.value.trim()) || ph('대표자');
       const ceoBirthRaw = (document.getElementById('corp_ceo_birth')?.value || '').trim();
       const ceoAge = /만\s*\d/.test(ceoBirthRaw) ? null : ageOf(ceoBirthRaw);
-      const ceoBirth = (escapeHtml(ceoBirthRaw) || '-') + (ceoAge !== null ? ` (만 ${ceoAge}세)` : '');
-      const estDate = escapeHtml(document.getElementById('corp_est_date')?.value) || '-';
-      const address = escapeHtml(document.getElementById('corp_address')?.value.trim()) || '소재지 미기재';
-      const factoryAddress = escapeHtml(document.getElementById('corp_factory_address')?.value.trim()) || '-';
-      const bizType = escapeHtml(document.getElementById('corp_biz_type')?.value.trim()) || '업종 미지정';
-      const mainBank = escapeHtml(document.getElementById('corp_main_bank')?.value.trim()) || '-';
-      const ceoShare = escapeHtml(document.getElementById('corp_ceo_share')?.value.trim()) || '-';
-      const houseType = escapeHtml(document.getElementById('corp_house')?.value) || '미확인';
-      const salesChannel = escapeHtml(document.getElementById('corp_sales_channel')?.value) || '미확인';
-      const clients = escapeHtml(document.getElementById('corp_clients')?.value.trim()) || '-';
-      const vendors = escapeHtml(document.getElementById('corp_vendors')?.value.trim()) || '-';
-      const patents = escapeHtml(document.getElementById('corp_patents')?.value.trim()) || '-';
+      const ceoBirth = (escapeHtml(ceoBirthRaw) || ph('-')) + (ceoAge !== null ? ` (만 ${ceoAge}세)` : '');
+      const estDate = escapeHtml(document.getElementById('corp_est_date')?.value) || ph('-');
+      const address = escapeHtml(document.getElementById('corp_address')?.value.trim()) || ph('소재지 미기재');
+      const factoryAddress = escapeHtml(document.getElementById('corp_factory_address')?.value.trim()) || ph('-');
+      const bizType = escapeHtml(document.getElementById('corp_biz_type')?.value.trim()) || ph('업종 미지정');
+      const mainBank = escapeHtml(document.getElementById('corp_main_bank')?.value.trim()) || ph('-');
+      const ceoShare = escapeHtml(document.getElementById('corp_ceo_share')?.value.trim()) || ph('-');
+      const houseType = escapeHtml(document.getElementById('corp_house')?.value) || ph('미확인');
+      const salesChannel = escapeHtml(document.getElementById('corp_sales_channel')?.value) || ph('미확인');
+      const clients = escapeHtml(document.getElementById('corp_clients')?.value.trim()) || ph('-');
+      const vendors = escapeHtml(document.getElementById('corp_vendors')?.value.trim()) || ph('-');
+      const patents = escapeHtml(document.getElementById('corp_patents')?.value.trim()) || ph('-');
       const finIndHtml = (typeof finIndTableHtml === 'function') ? finIndTableHtml(true) : '';
       const finYears = (typeof computeFinIndicators === 'function') ? computeFinIndicators().years : null;
       let ipItems = [];
@@ -5448,11 +5450,11 @@
       const ipListHtml = ipItems.length ? `<tr><td class="p-1 border border-slate-300 bg-slate-100 font-bold text-center">지식재산권 목록</td><td colspan="3" class="p-1 border border-slate-300 text-left pl-2 text-[9.5px] leading-snug">${
         ipItems.slice(0, 3).map(x => `${escapeHtml(x.kind)} <span class="font-mono">${escapeHtml(x.regNo || x.appNo || '')}</span> ${escapeHtml(x.title || '')}`).join(' · ')
       }${ipItems.length > 3 ? ` 외 ${ipItems.length - 3}건` : ''}</td></tr>` : '';
-      const certs = escapeHtml(document.getElementById('corp_certs')?.value.trim()) || '-';
+      const certs = escapeHtml(document.getElementById('corp_certs')?.value.trim()) || ph('-');
       const consultantName = escapeHtml(document.getElementById('consultant_name')?.value.trim()) || '담당 컨설턴트';
       // 담당자 칸에 직함까지 적힌 경우(예: '홍길동 경영컨설턴트') 직함이 두 번 찍히지 않게
       const consultantLabel = /컨설턴트$/.test(consultantName) ? consultantName : consultantName + ' 경영컨설턴트';
-      const employees = escapeHtml(document.getElementById('sme_employees')?.value.trim()) || '-';
+      const employees = escapeHtml(document.getElementById('sme_employees')?.value.trim()) || ph('-');
       // 시행일자: 진단 건 정보에 적은 날, 비우면 오늘
       const docDateVal = document.getElementById('doc_date')?.value || '';
       const todayStr = (docDateVal ? new Date(docDateVal + 'T00:00:00') : new Date()).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -5460,12 +5462,12 @@
       const docAgreement = escapeHtml(document.getElementById('doc_agreement')?.value.trim()) || '중소기업진흥법 제46조 및 2026년도 기업 맞춤형 경영컨설팅 자문 협약';
 
       // ================= 사업계획 개요서 입력값 연동 =================
-      const bpProblem = escapeHtml(document.getElementById('bp_problem')?.value.trim()) || '사업 추진 배경 및 현장 애로사항 미기재 (기초조사서에서 작성 요망)';
-      const bpSolution = escapeHtml(document.getElementById('bp_solution')?.value.trim()) || '차별화된 제품·기술 및 개발 계획 미기재';
-      const bpScaleup = escapeHtml(document.getElementById('bp_market')?.value.trim()) || '시장 진입 및 판로 확보 전략 미기재';
-      const bpBudget = escapeHtml(document.getElementById('bp_budget')?.value.trim()) || '총 소요자금 및 세부 조달계획 미기재';
-      const bpTeam = escapeHtml(document.getElementById('bp_team')?.value.trim()) || '대표자 및 핵심인력 역량 미기재';
-      const bpEffect = escapeHtml(document.getElementById('bp_outcome')?.value.trim()) || '고용 창출 및 매출 성장 목표 미기재';
+      const bpProblem = escapeHtml(document.getElementById('bp_problem')?.value.trim()) || ph('사업 추진 배경 및 현장 애로사항 미기재 (기초조사서에서 작성 요망)');
+      const bpSolution = escapeHtml(document.getElementById('bp_solution')?.value.trim()) || ph('차별화된 제품·기술 및 개발 계획 미기재');
+      const bpScaleup = escapeHtml(document.getElementById('bp_market')?.value.trim()) || ph('시장 진입 및 판로 확보 전략 미기재');
+      const bpBudget = escapeHtml(document.getElementById('bp_budget')?.value.trim()) || ph('총 소요자금 및 세부 조달계획 미기재');
+      const bpTeam = escapeHtml(document.getElementById('bp_team')?.value.trim()) || ph('대표자 및 핵심인력 역량 미기재');
+      const bpEffect = escapeHtml(document.getElementById('bp_outcome')?.value.trim()) || ph('고용 창출 및 매출 성장 목표 미기재');
 
       // ================= 2. 금융기관별 여신·차입금 실시간 집계 =================
       const totalDebt = document.getElementById('debt_total_balance')?.innerText || '0만원';
@@ -6674,8 +6676,8 @@
         }
         if (pillEl) {
           pillEl.className = isAct
-            ? "px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/20 text-white"
-            : "px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600";
+            ? "cat-pill-on px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums"
+            : "px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 tabular-nums";
         }
       });
       renderRadarAnnouncements();
@@ -6731,15 +6733,15 @@
             </div>
             <h4 class="font-extrabold text-sm text-slate-900 leading-snug">${it.title}</h4>
             <p class="text-[11px] text-[#0f766e] font-bold">${it.agency}</p>
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-700 space-y-1.5">
+            <div class="pt-2.5 border-t border-slate-100 text-[11.5px] leading-relaxed text-slate-700 space-y-1.5">
               <p><strong class="text-slate-900">· 지원대상:</strong> ${it.target}</p>
               <p><strong class="text-slate-900">· 지원규모:</strong> <span class="text-amber-700 font-bold">${it.max_amount}</span></p>
-              <p class="text-slate-600 pt-1 border-t border-slate-200/60">${it.summary}</p>
+              <p class="text-slate-600">${it.summary}</p>
             </div>
           </div>
-          <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span class="text-slate-500 font-medium">접수: ${it.close_date}</span>
-            <a href="${it.url}" target="_blank" class="px-3 py-1.5 rounded-lg bg-[#169aa8] hover:bg-[#138491] text-white font-bold text-xs flex items-center space-x-1 transition-all shadow-2xs">
+          <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <span class="text-slate-500 font-medium min-w-0">접수: ${it.close_date}</span>
+            <a href="${it.url}" target="_blank" class="shrink-0 px-3 py-1.5 rounded-lg bg-[#169aa8] hover:bg-[#138491] text-white font-bold text-xs flex items-center space-x-1 transition-colors shadow-2xs">
               <span>세부 지원요강 열람</span>
             </a>
           </div>
@@ -7558,7 +7560,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       // 소상공인 연 매출 칸 이름표: 해당연도·직전 3개년
       const yNow = new Date().getFullYear();
-      [['smb_sales_cur_lb', `${yNow}년 (올해 누적)`], ['smb_sales_y1_lb', `${yNow - 1}년`], ['smb_sales_y2_lb', `${yNow - 2}년`], ['smb_sales_y3_lb', `${yNow - 3}년`]]
+      [['smb_sales_cur_lb', `${yNow}년 누적`], ['smb_sales_y1_lb', `${yNow - 1}년`], ['smb_sales_y2_lb', `${yNow - 2}년`], ['smb_sales_y3_lb', `${yNow - 3}년`]]
         .forEach(([id, t]) => { const el = document.getElementById(id); if (el) el.textContent = t; });
       // 설립일은 오늘 이후를 고를 수 없게
       const estInput = document.getElementById('corp_est_date');
@@ -8177,6 +8179,12 @@
     .fa-t .fa-up, .fa-pt .fa-up { color: #00a693; }
     .fa-t .fa-dn, .fa-pt .fa-dn { color: #ea580c; }
     .fa-t tr.fa-g td, .fa-pt tr.fa-g td { background: #f6f8fa; color: #24323d; font-weight: 700; text-align: left; font-size: 11px; padding: 6px 8px; border: 1px solid #e3e8ec; border-top: 1px solid #24323d; }
+    .rp-empty { color: #8a94a3; font-weight: 400; }
+    .cat-pill-on { background: rgba(255,255,255,.22) !important; color: #fff !important; }
+    #l3_input, #l3_steps, #l3_radar, #docs_modal, #xp_modal, #auth_gate { word-break: keep-all; overflow-wrap: anywhere; }
+    /* 연한 안내 글(slate-400 #94a3b8, 밝은 바탕에서 2.5:1)을 화면에서는 4.5:1 이상으로 — 서식(A4)은 그대로 */
+    :root:not([data-theme="ink"]) .text-slate-400:not(.a4-page-card *):not(.bg-slate-800 *):not(.bg-slate-900 *):not([class*="from-blue-950"] *):not([class*="bg-slate-800"] *):not(#l3_steps *) { color: #687587; }
+    #l3 .l3-sub { border: 0 !important; border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent) !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 16px 0 4px !important; }
     /* 재무진단 5개 영역: 판정 칸 + 영역별 자동 문장 */
     .fa-dg { margin: 0 0 10px; }
     .fa-dg-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
@@ -10245,7 +10253,7 @@
     #l3 .l3-mode { display: inline-flex; background: var(--t-surface-3, #F1EFE9); border-radius: 10px; padding: 3px; gap: 2px; }
     #l3 .l3-mode button { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; color: var(--t-text-3, #66635C); cursor: pointer; white-space: nowrap; }
     #l3 .l3-mode button.on { background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-    #l3_radar { flex: 1; overflow-y: auto; padding: 16px; }
+    #l3_radar { flex: 1; overflow-y: auto; padding: 72px 16px 16px; }   /* 위 72px: 떠 있는 막대 아래에서 시작(제목·버튼이 가려지지 않게) */
     #l3_preview.radar #l3_stage, #l3_preview.radar .l3-view, #l3_preview.radar .l3-print { display: none !important; }
     #l3_preview:not(.radar) #l3_radar { display: none; }
     /* 고객사 정보: 선택 → 새 고객(서류+기본정보) / 기존(불러오기+기본정보) */
@@ -10285,8 +10293,9 @@
     #l3 .l3-step .grid-cols-2:not([class*="sm:"]):not([class*="md:"]):not([class*="lg:"]) { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; }
     #l3 .l3-step .l3-nowrap { white-space: nowrap !important; }
     /* [2] 3. 월 고정비 5칸은 한 줄(칸을 줄이고 '만원'은 붙여서) */
-    #l3 .l3-step .l3-cost5 { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 8px !important; }
-    #l3 .l3-step .l3-cost5 label { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 고정비 5칸: 넓으면 한 줄 5칸, 좁으면 3+2 칸으로 — 칸 이름이 '…'로 잘리지 않게 */
+    #l3 .l3-step .l3-cost5 { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)) !important; gap: 8px !important; }
+    #l3 .l3-step .l3-cost5 label { font-size: 11px !important; white-space: nowrap; }
     #l3 .l3-step .l3-cost5 .form-input-control { padding-left: 6px; padding-right: 6px; min-width: 0; }
     #l3 .l3-step .l3-cost5 span { font-size: 11px; white-space: nowrap; }
     /* [5] 4·5·6 체크 묶음은 세 칸 — 글씨 11px·자간 좁게, 문구는 짧게(원문은 마우스 올리면) */
@@ -10334,7 +10343,7 @@
     #l3 .l3-step .form-input-control { padding-top: 6px; padding-bottom: 6px; }
     #l3 .l3-step label.block { margin-bottom: 2px; }
     /* 사업계획 개요서 질문 꼬리표(현장 문제점 등): 제목 옆 같은 줄에 제목 색 알약으로 */
-    .bp-tag { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; line-height: 1.6; color: inherit; border: 1px solid currentColor; background: color-mix(in srgb, currentColor 16%, transparent); white-space: nowrap; }
+    .bp-tag { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; line-height: 1.6; color: inherit; border: 1px solid currentColor; background: color-mix(in srgb, currentColor 16%, transparent); white-space: nowrap; }
     #l3 .l3-step span.text-\[11px\].font-medium { display: none; }
     /* 고객 불러오기 줄 (고객사 정보 스텝 맨 위) */
     #l3 #client_bar { gap: 8px; }
@@ -10478,7 +10487,7 @@
     #l3_head #subrep_btn_bar > .subrep-stage { padding: 6px 2px 0 8px !important; align-self: center; background: none; border: 0; }
     #l3_head #subrep_btn_bar > *, #l3_head .l3-sheets > * { margin: 0 !important; width: auto !important; white-space: nowrap; padding: 5px 10px !important; font-size: 11px; }
     #l3_head .l3-print { margin-left: auto; padding: 6px 12px; border-radius: 9px; background: var(--t-accent, #0A0B0F); color: var(--t-on-accent, #fff); font-size: 11px; font-weight: 800; white-space: nowrap; cursor: pointer; }
-    #l3_stage { flex: 1; overflow: auto; padding: 16px 0; }
+    #l3_stage { flex: 1; overflow: auto; padding: 72px 0 16px; }   /* 위 72px: 떠 있는 막대 아래에서 서식이 시작 */
     /* [8] 미리보기 배율: − 100% + 맞춤 (Ctrl+휠로도) */
     #l3 .l3-zoom { position: absolute; right: 22px; bottom: 18px; z-index: 6; display: inline-flex; align-items: center; gap: 2px; background: var(--t-surface, #fff); border: 1px solid var(--t-line, #E4E2DB); border-radius: 12px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
     #l3_preview.radar .l3-zoom { display: none; }
@@ -10680,6 +10689,12 @@
         });
         // [2]·[5] 고정비 묶음 / 4·5·6 체크 묶음 표시
         const costGrid = document.getElementById('smb_cost_rent')?.closest('.grid'); if (costGrid) costGrid.classList.add('l3-cost5');
+        // 카드 안 카드(소상공인 실태 1~6, 진단 대상 ①②, 사업계획 ①~⑥): 안쪽 상자는 테두리·바탕 없이 구분선으로 — 위계를 바깥 카드 하나로
+        scr.querySelectorAll('.rounded-2xl .rounded-xl.border').forEach(el => {
+          if (el.matches('input,select,textarea,button,.dz,#done_box,.fin-ind') || /amber|teal-50/.test(el.className) || el.closest('.l3-sub')) return;
+          if (!/(bg-white|bg-slate-800)/.test(el.className) || !/(^|\s)p-(3|3\.5|4)(\s|$)/.test(el.className)) return;
+          el.classList.add('l3-sub');
+        });
         const threeGrid = document.getElementById('smb_chk_tax_ok')?.closest('.grid'); if (threeGrid) threeGrid.classList.add('l3-three');
         const SHORT = {
           '① 사업장 월 임차료': '① 임차료', '② 제세공과금 및 관리비': '② 공과금·관리비', '③ 인건비 (급여·상여 등)': '③ 인건비', '③ 인건비': '③ 인건비',
