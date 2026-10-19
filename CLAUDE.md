@@ -6,3 +6,4 @@
 - 고객에게는 서식을 PDF로 저장해 보낸다. 출력물 판단은 PDF 기준.
 - 커밋 끝에 `CHANGELOG.md` 요약, 계획 변화는 `DEVELOP_PLAN.md`.
 - **진행 상황이 바뀌면(결함 고침·시나리오·로드맵 등) 원본 구글 시트를 먼저 고치고 대시보드를 즉시 갱신한다.** 절차는 `dashboard/갱신방법.md`. 매일 07:30 자동 갱신 예약(`costep-dashboard-refresh`)도 있다.
+- 화면·서식·차트·애니메이션을 고칠 때는 전역 지침 「화면 디자인 스킬 적극 사용」대로 `impeccable`(Operate 모드) → `web-design-guidelines`·`break-ui` 점검을 쓴다. 단 A4 1장·PDF 점검·기존 색/글꼴 체계가 스킬 지시보다 우선.
