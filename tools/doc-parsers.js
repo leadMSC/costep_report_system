@@ -72,89 +72,249 @@
     return out;
   }
 
-  // ───────── 2) 채권자변동정보 조회서 — 한국신용정보원, 개인(대표자) 대출 ─────────
-  function parseCreditorChange(lines) {
-    const raw = lines.map(norm);
-    const text = raw.join('\n');
-    if (!/채권자변동정보\s*조회서/.test(text)) return null;
-    const um = text.match(/\(단위\s*:\s*(천원|원|만원|백만원|억원)\)/);
-    const unit = um ? um[1] : '천원';
-    const q = text.match(/조회일자\s*\n?\s*'?(\d{2})\.(\d{2})\.(\d{2})/);
-    const out = { kind: 'creditor_change', title: '채권자변동정보 조회서', unit, asOf: q ? `20${q[1]}-${q[2]}-${q[3]}` : '', loans: [], delinquencies: [] };
+  // ───────── 2) 채권자변동정보 조회서 — 대표자 개인(사업자) 대출 · 연체 이력 ─────────
+  // 발급처마다 칸 순서·이름·줄바꿈이 달라서 '칸 이름(동의어)'으로 표 머리를 찾고, 머리 글자의 가로 위치로 칸을 나눈 뒤
+  // 같은 기록의 여러 줄(기관명 위 줄 · 전화번호 아래 줄 같은)은 순번 줄에 가장 가까운 것끼리 묶는다.
+  // pdf.js 위치가 없을 때(글자 인식·시험 견본)는 줄 글 규칙으로 읽는다. 성명·주민번호는 결과에 담지 않는다.
+  const CR_UNIT_RE = /단위\s*[:：]?\s*(천원|백만원|만원|억원|원)/;
+  const crDate = s => {
+    const t = norm(s).replace(/\s+/g, '');
+    let m = t.match(/(19\d{2}|20\d{2})[.\-/년](\d{1,2})[.\-/월](\d{1,2})/) || t.match(/^\(?(19\d{2}|20\d{2})(\d{2})(\d{2})\.?\)?$/);
+    let y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else if ((m = t.match(/^\(?['‘’]?(\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})\.?\)?$/) || t.match(/^\(?['‘’](\d{2})\.(\d{1,2})\.(\d{1,2})/))) { y = +m[1]; y += y > 70 ? 1900 : 2000; mo = +m[2]; d = +m[3]; }
+    else return '';
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+  // 금액 칸: '12,500' · '12,500천원' · '1,250만원' → { v, unit(붙어 있으면) }
+  const crAmount = s => { const m = norm(s).replace(/[,\s]/g, '').match(/^(-?\d+(?:\.\d+)?)(천원|백만원|만원|억원|원)?$/); return m ? { v: Number(m[1]), unit: m[2] || '' } : null; };
+  const crPhone = s => /^\(?\s*(\d{2,4}-?\d{3,4}-?\d{4}|1\d{3}-?\d{4}|\d{8,11})\s*\)?$/.test(norm(s));
+  // 표 머리 칸 이름(띄어쓰기·괄호 뺀 꼴). 줄바꿈으로 잘린 조각('채권구'+'분')도 머리로 본다
+  const CR_HEAD = /^(순번|번호|연번|no\.?|구분|정보구분|대출구분|대출종류|종류|대출과목|과목|상품명?|채권구분?|채권구|분|기관명|금융기관명?|기관|채권자명?|채권기관|금융회사명?|대출기관|전화번호|등록사유|발생일자?|대출일자?|개설일자?|약정일자?|실행일자?|신규일자?|일자|금액|발생금액|대출금액|약정금액|대출잔액|잔액|한도금?액?|변제예정금액|원금|이자|기한이익|상실여부|상실일자|채권추심|위탁여부|위탁업체|채무조정|유형|양도사유|양도일자|양수기관|양도금액|해제사유|해제일자?|해제여부|소멸시효|완성여부|연체금액|연체원금|연체발생일자?|연체일자?|연체기관|등록일자?|상태|발생|대출|금융|사유|여부)(\((천원|백만원|만원|원)\))?$/i;
+  const isCrHead = c => { const d = despace(c); return CR_HEAD.test(d) || CR_HEAD.test(d.replace(/[()]/g, '')); };
+  // 칸 이름 → 뜻 (앞에서부터 먼저 맞는 것. '양수기관(양도금액)'이 기관·금액으로 잘못 가지 않게 순서가 중요)
+  const CR_COLS = [
+    ['seq', /^(순번|번호|연번|no\.?)$/i],
+    ['release', /해제사유|해제여부|해제$/], ['releaseDate', /해제일/],['prescription', /소멸시효/], ['assignee', /양수/], ['transfer', /양도/], ['adjust', /채무조정/],
+    ['collect', /추심|위탁/], ['accel', /기한이익|상실/], ['principal', /원금/], ['interest', /^이자|[^변]이자/],
+    ['inst', /기관|채권자|금융회사|회사명|대출처/], ['type', /종류|채권구분?|상품|과목|계정/],
+    ['category', /^구분|정보구분|대출구분/],
+    ['date', /발생일|대출일|개설일|약정일|실행일|신규일|등록일|일자/], ['amount', /금액|잔액|한도/]
+  ];
+  const crKey = label => { for (const [k, re] of CR_COLS) if (re.test(label)) return k; return ''; };
+  const crJoin = parts => parts.reduce((a, p) => !a ? p : a + ((/[가-힣)]$/.test(a) && (/^\(/.test(p) || (/^[가-힣]/.test(p) && p.length <= 3))) ? '' : ' ') + p, '');
+  const crStop = t => /^\d\.\s*\S|^[□■◆▶]|연체채권의|채무\s*현황|대출\s*현황|^종합신용정보집중기관|^※|^(발급일시|발급번호|페이지)\s*:|조회서$/.test(t);
 
-    // 쪽 머리(조회서 제목 ~ 표 머리 끝)·꼬리·안내문을 걷어내고 데이터 줄만 남긴다. 성명·주민번호는 여기서 버린다.
-    const data = [];
-    let section = 0, inHead = false;
+  // 한 기록(칸 이름 → 글 조각들)을 대출 행 / 연체 행으로
+  function crLoan(c, unit, basis) {
+    const inst0 = (c.inst || []).filter(x => !crPhone(x));
+    const typeRaw = crJoin(c.type || []);
+    const km = typeRaw.match(/^(.+?)\s*\((\d{2,5})\)$/);
+    const amt = (c.amount || []).map(crAmount).find(Boolean);
+    const openedAt = (c.date || []).map(crDate).find(Boolean) || '';
+    const institution = crJoin(inst0).replace(/\s*[[(][^\])]*[\])]$/, '').trim();
+    if (!(institution || typeRaw) || !(amt || openedAt)) return null;
+    const type = km ? km[1] : typeRaw;
+    const u = (amt && amt.unit) || unit;
+    return {
+      category: crJoin(c.category || []), institution, type, typeCode: km ? km[2] : '', openedAt,
+      amountMan: amt ? toMan(amt.v, u) : null, amountBasis: basis,
+      isGuarantee: (/보증/.test(type) && !/보증서?(담보)?대출/.test(type)) || /지보$/.test(type),   // 보증기관의 보증 기록 — 같은 대출의 보증이라 대출표에는 안 넣음
+      rate: null, needs: basis === '잔액' ? ['금리'] : ['잔액', '금리']
+    };
+  }
+  function crDelinq(c, unit) {
+    const institution = crJoin((c.inst || []).filter(x => !crPhone(x))).replace(/\s*\[[^\]]*\]$/, '').trim();
+    const nums = k => (c[k] || []).map(crAmount).filter(Boolean);
+    const p = nums('principal')[0] || nums('amount')[0] || null, it = nums('interest')[0] || null;
+    const occurredAt = (c.date || []).map(crDate).find(Boolean) || '';
+    if (!institution || !(occurredAt || p)) return null;
+    const words = k => (c[k] || []).filter(x => !crDate(x) && !/^[-–—]$/.test(x));
+    const dateOf = k => (c[k] || []).map(crDate).find(Boolean) || '';
+    c.release = (c.release || []).concat(c.releaseDate || []);   // 해제사유·해제일자가 따로 칸인 서류
+    const flat = k => { const w = crJoin(words(k)); return w === '-' ? '' : w; };
+    const accel = flat('accel'), release = flat('release');
+    return {
+      institution, type: crJoin(c.type || []), occurredAt,
+      principalMan: p ? toMan(p.v, p.unit || unit) : null, interestMan: it ? toMan(it.v, it.unit || unit) : null,
+      accelerated: !!accel && !/^(미상실|아니|N|무)/i.test(accel), acceleratedAt: dateOf('accel'),
+      collection: flat('collect'), adjustment: flat('adjust'),
+      transferred: !!flat('transfer') && !/미양도/.test(flat('transfer')), assignee: flat('assignee'),
+      released: !!release || !!dateOf('release'), releaseReason: release, releasedAt: dateOf('release'),
+      prescription: flat('prescription')
+    };
+  }
+
+  // 위치로 읽기: pages = [[{s,x,y,w,h}...]...]
+  function crFromPages(pages, docUnit) {
+    const loans = [], delinquencies = [];
+    let skipped = 0, tables = 0, lastSection = '';
+    pages.forEach(items => {
+      const lines = itemsToLines(items);
+      const text = l => l.items.map(i => i.s).join(' ');
+      let pageUnit = '';
+      for (let li = 0; li < lines.length; li++) {
+        const t = norm(text(lines[li]));
+        const um = t.match(CR_UNIT_RE); if (um) pageUnit = um[1];
+        // 절 제목(짧은 줄)으로 표 성격을 기억: '2. 연체채권의 채권자 변동 현황' / '1. 채무현황'
+        if (t.length <= 30 && lines[li].cells.length <= 2) {
+          if (/연체/.test(t) && /현황|정보|내역/.test(t)) lastSection = 'delinq';
+          else if (/(채무|대출)\s*(현황|정보|내역)/.test(t)) lastSection = 'loans';
+        }
+        // 표 머리: 칸 이름 3개 이상(서로 다른 뜻)
+        const keys = new Set(lines[li].cells.map(c => crKey(despace(c.t).replace(/[()]/g, ''))).filter(Boolean));
+        const headShare = lines[li].cells.filter(c => isCrHead(c.t)).length / lines[li].cells.length;
+        if (keys.size < 3 || headShare < 0.6) continue;
+        // 머리 줄 위아래로 이어진 머리 조각 줄(간격이 글자 높이 이하, 모두 칸 이름)까지 한 묶음
+        const gapOk = (a, b) => Math.abs(a.y - b.y) <= Math.max(a.h, b.h) * 1.05;
+        const allHead = l => l.cells.length && l.cells.every(c => isCrHead(c.t));
+        let top = li, bot = li;
+        while (top > 0 && gapOk(lines[top - 1], lines[top]) && allHead(lines[top - 1])) top--;
+        while (bot + 1 < lines.length && gapOk(lines[bot], lines[bot + 1]) && allHead(lines[bot + 1])) bot++;
+        const hc = [];
+        for (let k = top; k <= bot; k++) lines[k].cells.forEach(c => hc.push({ ...c, y: lines[k].y }));
+        const ov = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 0.5;
+        // 여러 칸을 덮는 묶음 머리('변제예정금액' 아래 '원금'·'이자')는 버린다
+        const leaf = hc.filter(a => { const under = hc.filter(b => b.y < a.y - 0.5 && ov(a, b)); return !under.some(b => under.some(c => c !== b && !ov(b, c) && Math.abs(b.y - c.y) < 1)); });
+        const cols = [];
+        leaf.forEach(c => { const hit = cols.filter(k => k.cells.some(d => ov(c, d))); if (!hit.length) cols.push({ cells: [c] }); else { hit[0].cells.push(c); hit.slice(1).forEach(k => { hit[0].cells.push(...k.cells); cols.splice(cols.indexOf(k), 1); }); } });
+        cols.forEach(k => { k.cells.sort((a, b) => b.y - a.y || a.x0 - b.x0); k.x0 = Math.min(...k.cells.map(c => c.x0)); k.x1 = Math.max(...k.cells.map(c => c.x1)); k.cx = (k.x0 + k.x1) / 2; k.label = despace(k.cells.map(c => c.t).join('')); });
+        cols.sort((a, b) => a.cx - b.cx);
+        const used = new Set();
+        cols.forEach(k => { const key = crKey(k.label.replace(/\((천원|백만원|만원|원)\)/, '').replace(/[()]/g, '')); if (key && !used.has(key)) { k.key = key; used.add(key); } const u = k.label.match(/\((천원|백만원|만원|원)\)/); if (u) { k.unit = u[1]; if (docUnit.guessed) { docUnit.unit = u[1]; docUnit.guessed = false; } } });
+        const isDelinq = ['principal', 'release', 'transfer', 'accel', 'prescription'].some(k => used.has(k)) || cols.some(k => /연체/.test(k.label)) || (lastSection === 'delinq' && !used.has('category'));
+        if (!used.has('inst') || !(used.has('amount') || used.has('principal') || used.has('date'))) { li = bot; continue; }
+        tables++;
+        const xMin = cols[0].x0 - 40, xMax = cols[cols.length - 1].x1 + 40;
+        const colOf = cx => { for (let k = 0; k < cols.length - 1; k++) if (cx < (cols[k].cx + cols[k + 1].cx) / 2) return cols[k]; return cols[cols.length - 1]; };
+        // 자료 줄: 머리 아래 ~ 다음 머리·절 제목·꼬리 전까지
+        const data = [];
+        let k = bot + 1;
+        for (; k < lines.length; k++) {
+          const l = lines[k], tt = norm(text(l));
+          if (crStop(tt) || CR_UNIT_RE.test(tt)) break;
+          const kk = new Set(l.cells.map(c => crKey(despace(c.t).replace(/[()]/g, ''))).filter(Boolean));
+          if (kk.size >= 3 && l.cells.filter(c => isCrHead(c.t)).length / l.cells.length >= 0.6) break;
+          // 칸별로 글 조각 모으기(같은 칸 안에서 가까운 조각만 잇기 — 글자 한 자씩 오는 PDF 도 같은 칸으로)
+          const byCol = new Map();
+          let prev = null;
+          l.items.forEach(it => {
+            const cx = it.x + (it.w || it.s.length * it.h * 0.9) / 2; if (cx < xMin || cx > xMax) return;
+            const col = colOf(cx), end = it.x + (it.w || it.s.length * it.h * 0.9);
+            if (prev && prev.col === col && it.x - prev.end <= it.h * 1.1) { prev.t += (it.x - prev.end > it.h * 0.25 ? ' ' : '') + it.s; prev.end = end; }
+            else { prev = { col, t: it.s, end }; if (!byCol.has(col)) byCol.set(col, []); byCol.get(col).push(prev); }
+          });
+          if (byCol.size) data.push({ y: l.y, h: l.h, byCol });
+        }
+        li = k - 1;
+        const seqCol = cols.find(c => c.key === 'seq'), dateCol = cols.find(c => c.key === 'date'), amtCol = cols.find(c => c.key === 'amount' || c.key === 'principal');
+        const val = (d, col) => col && d.byCol.get(col) ? d.byCol.get(col).map(p => norm(p.t)).join(' ') : '';
+        const isAnchor = d => seqCol ? /^\d{1,4}$/.test(val(d, seqCol)) : dateCol ? !!crDate(val(d, dateCol).split(' ')[0]) : !!(amtCol && crAmount(val(d, amtCol)));
+        const anchors = data.filter(isAnchor);
+        const pitch = anchors.length > 1 ? Math.min(...anchors.slice(1).map((a, i) => anchors[i].y - a.y)) : 0;
+        const thr = pitch ? pitch * 0.55 : (data[0] ? data[0].h * 3 : 30);
+        const recs = anchors.map(a => ({ a, parts: [a] }));
+        data.forEach(d => {
+          if (isAnchor(d)) return;
+          let best = null; recs.forEach(r => { const dist = Math.abs(r.a.y - d.y); if (dist <= thr && (!best || dist < best.dist)) best = { r, dist }; });
+          if (best) best.r.parts.push(d); else skipped++;
+        });
+        recs.forEach(r => {
+          r.parts.sort((a, b) => b.y - a.y);
+          const c = {};
+          r.parts.forEach(p => p.byCol.forEach((arr, col) => { if (!col.key) return; (c[col.key] = c[col.key] || []).push(...arr.map(x => norm(x.t)).filter(Boolean)); }));
+          const unitHere = cols.find(x => x.unit && (x.key === 'amount' || x.key === 'principal'));
+          const unit = (unitHere && unitHere.unit) || pageUnit || docUnit.unit;
+          const row = isDelinq ? crDelinq(c, unit) : crLoan(c, unit, /잔액/.test((amtCol || {}).label || '') ? '잔액' : '발생금액');
+          if (row) (isDelinq ? delinquencies : loans).push(row); else skipped++;
+        });
+      }
+    });
+    return { loans, delinquencies, skipped, tables };
+  }
+
+  // 줄 글로 읽기(글자 인식·칸 한 줄씩): 순번 → (구분·종류·기관) → 날짜 → 금액
+  function crFromLines(raw, unit) {
+    const loans = [], delinquencies = [];
+    let section = 1, skipped = 0;
+    const s1 = [], s2 = [];
     for (let i = 0; i < raw.length; i++) {
       const l = raw[i];
       if (!l || l === '<<PAGE>>') continue;
-      if (/^채권자변동정보\s*조회서$/.test(l)) { inHead = true; continue; }
-      if (/연체채권의\s*채권자\s*변동\s*현황/.test(l)) { section = 2; inHead = true; continue; }
-      if (/채무현황|^\d\.\s*채무\s*현황/.test(l) && section < 2) { section = 1; }
-      if (inHead) {
-        if ((section < 2 && l === '금액') || (section === 2 && /완성여부$/.test(l))) { inHead = false; if (!section) section = 1; }
-        continue;
-      }
-      if (FOOTER.test(l) || /^\d\.\s/.test(l)) continue;
-      data.push({ section, l });
+      if (/^(주민등록번호|성명|조회일자)$/.test(despace(l))) { i++; continue; }    // 이름표 다음 줄(개인 식별값)은 버림
+      if (/연체/.test(l) && /현황|정보|내역/.test(l) && !isCrHead(l)) { section = 2; continue; }
+      if (/(채무|대출)\s*(현황|정보|내역)$/.test(l) && /^\d\.|^[□■]|^(채무|대출)/.test(l)) { section = 1; continue; }
+      if (crStop(l) || CR_UNIT_RE.test(l) || /^\(단위/.test(l) || isCrHead(l) || /^\d\.\s.{12,}/.test(l)) continue;
+      (section === 2 ? s2 : s1).push(l);
     }
-
-    // 1. 채무 현황: 순번 · 구분 · 대출종류(코드) · 기관명[지점] · 발생일자 · 금액
-    const s1 = data.filter(d => d.section === 1).map(d => d.l);
-    for (let i = 0; i + 5 < s1.length; i++) {
-      if (!/^\d+$/.test(s1[i]) || !/정보$/.test(s1[i + 1] || '')) continue;
-      const kind = s1[i + 2].match(/^(.+?)\s*\((\d{3,4})\)$/);
-      const date = (s1[i + 4] || '').match(/^(\d{4})\.(\d{2})\.(\d{2})\.?$/);
-      if (!kind || !date || !isNum(s1[i + 5])) continue;
-      const inst = s1[i + 3].replace(/\[[^\]]*\]$/, '').trim();
-      out.loans.push({
-        category: s1[i + 1],
-        institution: inst,
-        type: kind[1],
-        typeCode: kind[2],
-        openedAt: `${date[1]}-${date[2]}-${date[3]}`,
-        amountMan: toMan(num(s1[i + 5]), unit),
-        amountBasis: '발생금액',   // 서류의 금액은 대출이 생긴 때의 금액 — 지금 잔액은 따로 확인
-        rate: null,
-        needs: ['잔액', '금리']
+    // 한 줄에 칸이 다 있는 꼴('1 개인대출정보 신용대출(100) 가나은행[본점] 2024.03.15. 12,500')은 칸으로 쪼갬
+    const tok = [];
+    s1.forEach(l => { const m = l.match(/^(\d{1,4})\s+(.+?)\s+(\S*\d{2,4}\s?[.\-/년]\s?\d{1,2}\s?[.\-/월]\s?\d{1,2}[.일]?)\s+([\d,]+(?:천원|만원|원)?)$/); if (m) tok.push(m[1], ...m[2].split(/\s{2,}|\s(?=\S*[[(])|(?<=[)\]])\s/).map(norm).filter(Boolean), m[3], m[4]); else tok.push(l); });
+    const instLike = s => /\[.*\]|은행|카드|캐피탈|보험|금고|신협|저축|재단|공단|기금|조합|증권|금융|생명|화재|농협|수협|공사/.test(s);
+    for (let i = 0; i < tok.length; i++) {
+      if (!/^\d{1,4}$/.test(tok[i])) continue;
+      let k = i + 1; while (k < tok.length && k <= i + 6 && !crDate(tok[k])) k++;
+      if (k >= tok.length || !crDate(tok[k]) || !crAmount(tok[k + 1] || '')) continue;
+      const mid = tok.slice(i + 1, k);
+      if (!mid.length || mid.some(x => /^\d{1,4}$/.test(x))) continue;
+      const c = { amount: [tok[k + 1]], date: [tok[k]] };
+      const typeI = mid.findIndex(x => /\(\d{2,5}\)$/.test(x));
+      const instI = mid.findIndex((x, j) => j !== typeI && instLike(x));
+      mid.forEach((x, j) => {
+        if (j === typeI) c.type = [x]; else if (j === instI) c.inst = [x];
+        else if (!c.category && j < Math.max(typeI, instI, 0) && /(대출|정보|보증)$/.test(x)) c.category = [x];
+        else if (!c.type && typeI < 0) c.type = [x]; else if (!c.inst && instI < 0) c.inst = [x];
       });
-      i += 5;
+      const r = crLoan(c, unit, '발생금액');
+      if (r) { loans.push(r); i = k + 1; } else skipped++;
     }
-
-    // 2. 연체채권의 채권자 변동 현황: 기관 · (전화) · 채권구분 · 발생일자 · 원금 · 이자 · 기한이익상실 · 추심위탁 · 채무조정 · 양도 · 양수(양도금액) · 해제사유(해제일자) · 소멸시효
-    const s2 = data.filter(d => d.section === 2).map(d => d.l);
-    const shortDate = s => { const m = String(s).match(/'?(\d{2})\.(\d{2})\.(\d{2})/); return m ? `20${m[1]}-${m[2]}-${m[3]}` : ''; };
+    // 연체 이력: 순번 · 기관 · (전화) · 채권구분 · 발생일자 · 원금 · 이자 · 기한이익상실 · 추심위탁 · 채무조정 · 양도 · 양수 · 해제사유(해제일자) · 소멸시효
     for (let i = 0; i < s2.length; i++) {
-      if (!/^\d+$/.test(s2[i]) || !s2[i + 1] || isNum(s2[i + 1])) continue;
+      if (!/^\d{1,4}$/.test(s2[i]) || !s2[i + 1] || isNum(s2[i + 1])) continue;
       let j = i + 1;
       const inst = s2[j++];
-      if (/^\(\s*[\d-]+\s*\)$/.test(s2[j] || '')) j++;          // 기관 대표전화
+      if (crPhone(s2[j] || '')) j++;
       const kind = s2[j++];
-      const occurred = shortDate(s2[j++]);
+      const occurred = crDate(s2[j++] || '');
       if (!occurred || !isNum(s2[j]) || !isNum(s2[j + 1])) continue;
-      const principal = num(s2[j++]), interest = num(s2[j++]);
-      const accel = s2[j++], collect = s2[j++], adjust = s2[j++], transfer = s2[j++];
-      let assignee = s2[j++];
-      if (/^\([\d,]+\)$/.test(s2[j] || '')) assignee += ' ' + s2[j++];
-      let release = s2[j++] || '';
-      let releasedAt = '';
-      if (/^\('?\d{2}\.\d{2}\.\d{2}\.?\)$/.test(s2[j] || '')) releasedAt = shortDate(s2[j++]);
-      const prescription = s2[j++] || '';
-      out.delinquencies.push({
-        institution: inst, type: kind, occurredAt: occurred,
-        principalMan: toMan(principal, unit), interestMan: toMan(interest, unit),
-        accelerated: accel !== '-', collection: collect, adjustment: adjust === '-' ? '' : adjust,
-        transferred: !/미양도/.test(transfer), assignee: assignee === '-' ? '' : assignee,
-        released: release !== '-' && release !== '', releaseReason: release === '-' ? '' : release, releasedAt,
-        prescription: prescription === '-' ? '' : prescription
-      });
+      const c = { inst: [inst], type: [kind], date: [occurred.replace(/-/g, '.')], principal: [s2[j++]], interest: [s2[j++]], accel: [s2[j++]], collect: [s2[j++]], adjust: [s2[j++]], transfer: [s2[j++]] };
+      c.assignee = [s2[j++]]; if (/^\([\d,]+\)$/.test(s2[j] || '')) c.assignee.push(s2[j++]);
+      c.release = [s2[j++] || '']; if (/^\(?['‘’]?\d{2}\.\d{2}\.\d{2}\.?\)$/.test(s2[j] || '')) c.release.push(s2[j++]);
+      c.prescription = [s2[j++] || ''];
+      const r = crDelinq(c, unit); if (r) delinquencies.push(r); else skipped++;
       i = j - 1;
     }
+    return { loans, delinquencies, skipped };
+  }
+
+  // lines: 칸 줄 배열('<<PAGE>>' 경계), pages(있으면): pdf.js 글자 조각 — 위치로 먼저 읽고 못 읽으면 줄 글로
+  function parseCreditorChange(lines, pages) {
+    const raw = (lines || []).map(norm);
+    const text = raw.join('\n');
+    if (!/채권자변동/.test(despace(text))) return null;
+    const um = text.match(CR_UNIT_RE);
+    const docUnit = { unit: um ? um[1] : '천원', guessed: !um };
+    const q = text.match(/조회\s*일(?:자|시)?\s*[:：]?\s*\n?\s*([^\n]{6,24})/);
+    const asOf = q ? crDate(q[1]) : '';
+    let r = pages && pages.length ? crFromPages(pages, docUnit) : null;
+    let via = 'layout';
+    if (!r || (!r.loans.length && !r.delinquencies.length)) { r = crFromLines(raw, docUnit.unit); via = 'lines'; }
+    // 단위가 안 적힌 서류: 금액 꼴로 짐작(천원으로 본 가운데값이 10억원 이상이면 원 단위로 다시 셈)
+    if (docUnit.guessed && (r.loans.length || r.delinquencies.length)) {
+      const vs = (r.loans.length ? r.loans.map(l => l.amountMan) : r.delinquencies.map(d => d.principalMan)).filter(v => v !== null).sort((a, b) => a - b);
+      const mid = vs[Math.floor(vs.length / 2)];
+      if (mid >= 100000) { const f = UNIT_TO_MAN['원'] / UNIT_TO_MAN['천원']; r.loans.forEach(l => { if (l.amountMan !== null) l.amountMan = Math.round(l.amountMan * f * 10) / 10; }); r.delinquencies.forEach(d => { ['principalMan', 'interestMan'].forEach(k => { if (d[k] !== null) d[k] = Math.round(d[k] * f * 10) / 10; }); }); docUnit.unit = '원'; }
+    }
+    const out = { kind: 'creditor_change', title: '채권자변동정보 조회서', unit: docUnit.unit, unitGuessed: docUnit.guessed, asOf, via, loans: r.loans, delinquencies: r.delinquencies };
+    const real = out.loans.filter(l => !l.isGuarantee);
     out.summary = {
-      loans: out.loans.length,
-      loansTotalMan: Math.round(out.loans.reduce((a, r) => a + (r.amountMan || 0), 0) * 10) / 10,
+      loans: real.length,
+      guarantees: out.loans.length - real.length,
+      loansTotalMan: Math.round(real.reduce((a, l) => a + (l.amountMan || 0), 0) * 10) / 10,
       delinquencies: out.delinquencies.length,
-      unresolved: out.delinquencies.filter(d => !d.released).length
+      unresolved: out.delinquencies.filter(d => !d.released).length,
+      skipped: r.skipped
     };
     return out;
   }
@@ -166,16 +326,18 @@
       institution: r.institution || r.source, type: [r.type, r.guarantor && `${r.guarantor} 보증`].filter(Boolean).join(' · '),
       balance: r.balanceMan, rate: '', monthlyInterest: '', payback: r.startYm ? `${r.startYm} 실행` : '', _needs: r.needs, _from: '거래처원장'
     }));
-    if (parsed.kind === 'creditor_change') return parsed.loans.map(r => ({
-      institution: r.institution, type: `대표자 개인 · ${r.type}`, balance: r.amountMan, rate: '', monthlyInterest: '',
-      payback: `${r.openedAt} 발생`, _needs: r.needs, _from: '채권자변동정보(발생금액)'
+    // 보증기관의 '지급보증' 기록은 같은 대출을 보증한 것이라 대출표에 또 넣으면 두 번 셈 — 빼고 알림에만 건수 표시
+    if (parsed.kind === 'creditor_change') return parsed.loans.filter(r => !r.isGuarantee).map(r => ({
+      institution: r.institution, type: `대표자 ${/사업자/.test(r.category || '') ? '개인사업자' : '개인'} · ${r.type}`, balance: r.amountMan, rate: '', monthlyInterest: '',
+      payback: r.openedAt ? `${r.openedAt} 발생` : '', _needs: r.needs, _from: r.amountBasis === '잔액' ? '채권자변동정보(잔액)' : '채권자변동정보(발생금액)'
     }));
     return [];
   }
 
   // pdf.js 글자 조각(items: {s,x,y,w,h}) → 행[칸...]. 홈택스 PDF는 글자 한 자씩 조각이 나오므로
   // 같은 줄(높이 차 < 글자 높이의 40%)끼리 모아 x 순으로 잇고, 간격이 글자 높이보다 크면 칸을 나눈다.
-  function itemsToRows(items) {
+  // 같은 줄 묶음(위치 유지): [{ y, h, items(x 순), cells: [{ t, x0, x1 }] }] — 표 칸 위치가 필요한 해석기(채권자변동)용
+  function itemsToLines(items) {
     const its = items.filter(i => i.s && i.s.trim()).map(i => ({ ...i, h: i.h || 10 })).sort((a, b) => b.y - a.y || a.x - b.x);
     const rows = [];
     for (const it of its) {
@@ -189,13 +351,16 @@
       let cur = null, end = 0;
       for (const it of xs) {
         const gap = it.x - end;
-        if (!cur || gap > it.h * 1.1) { cur = { t: it.s, x: it.x }; cells.push(cur); }
-        else cur.t += (gap > it.h * 0.25 ? ' ' : '') + it.s;
-        end = it.x + (it.w || it.s.length * it.h * 0.9);
+        const e = it.x + (it.w || it.s.length * it.h * 0.9);
+        if (!cur || gap > it.h * 1.1) { cur = { t: it.s, x0: it.x, x1: e }; cells.push(cur); }
+        else { cur.t += (gap > it.h * 0.25 ? ' ' : '') + it.s; cur.x1 = Math.max(cur.x1, e); }
+        end = e;
       }
-      return cells.map(c => norm(c.t)).filter(Boolean);
+      cells.forEach(c => { c.t = norm(c.t); });
+      return { y: r.y, h: Math.max(...xs.map(i => i.h)), items: xs, cells: cells.filter(c => c.t) };
     });
   }
+  function itemsToRows(items) { return itemsToLines(items).map(l => l.cells.map(c => c.t)); }
   // 쪽 배열(각 쪽 items) → 칸 줄 배열('<<PAGE>>' 경계) — 부채 해석기 입력 형식
   function pagesToCells(pages) {
     const out = [];
@@ -875,6 +1040,14 @@
       out.fs = { year: r.year, wonValues: r.wonValues, balanced: r.balanced, full: parseFSFull(rows) };
     }
     else if (c.kind === 'ins') r = parseIns(rows);
+    else if (c.kind === 'creditor') {
+      // 사진·스캔 조회서: 글자 인식 줄을 줄 글 규칙으로(한 줄에 칸이 다 있는 꼴 포함)
+      const parsed = parseCreditorChange(text.split(String.fromCharCode(10)));
+      out.debtItems = toDebtItems(parsed);
+      if (parsed) out.notes.push(...creditorNotes(parsed));
+      if (!parsed || (!parsed.loans.length && !parsed.delinquencies.length)) out.status = 'skip';
+      return out;
+    }
     else if (c.kind === 'vat') {
       r = parseVATText(text);
       if (!r.vatRows) { out.status = 'skip'; out.notes.push('과세기간 줄을 읽지 못했어요 — 더 선명한 스캔으로'); return out; }
@@ -1278,9 +1451,10 @@
     else if (c.kind === 'corpreg') r = parseCorpReg(rows);
     else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     else if (c.kind === 'ledger' || c.kind === 'creditor') {
-      const parsed = parseDebtDocument(pagesToCells(pages));
+      const parsed = parseDebtDocument(pagesToCells(pages), pages);
       out.debtItems = toDebtItems(parsed);
-      if (parsed && parsed.kind === 'creditor_change') out.notes.push('대표자 개인 대출 ' + parsed.summary.loans + '건 · 연체 이력 ' + parsed.summary.delinquencies + '건(미해제 ' + parsed.summary.unresolved + ')');
+      if (parsed && parsed.kind === 'creditor_change') out.notes.push(...creditorNotes(parsed));
+      if (parsed && parsed.kind === 'creditor_change' && !parsed.loans.length && !parsed.delinquencies.length) out.status = 'skip';
       if (parsed && parsed.kind === 'debt_ledger') out.notes.push('차입금 ' + parsed.rows.length + '건 · 기준일 ' + parsed.asOf);
       if (!parsed) { out.status = 'skip'; out.notes.push('표를 읽지 못함'); }
       return out;
@@ -1324,7 +1498,15 @@
     return f;
   }
 
-  function parseDebtDocument(lines) { return parseLedger(lines) || parseCreditorChange(lines); }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic };
+  function parseDebtDocument(lines, pages) { return parseLedger(lines) || parseCreditorChange(lines, pages); }
+  function creditorNotes(p) {
+    const s = p.summary, n = ['대표자 개인 대출 ' + s.loans + '건 · 연체 이력 ' + s.delinquencies + '건(미해제 ' + s.unresolved + ')'];
+    if (s.guarantees) n.push('보증기관 보증 기록 ' + s.guarantees + '건은 같은 대출의 보증이라 대출표에서 뺐어요');
+    if (p.unitGuessed) n.push('금액 단위가 서류에 없어 ' + p.unit + ' 로 짐작했어요 — 원본 확인');
+    if (s.skipped) n.push('읽지 못한 줄 ' + s.skipped + '개 — 원본과 대조해 주세요');
+    if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
+    return n;
+  }
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
