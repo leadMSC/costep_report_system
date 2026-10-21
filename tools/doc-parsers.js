@@ -927,6 +927,22 @@
     return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
   }
 
+  // 대표자 신분증의 주민등록번호 13자리(사용자 결정 L-137 — 신분증에 한해 뒷자리까지). 가리기 전 원문에서 찾는다
+  // 날짜 꼴 앞 6자리 + 성별 자리 1~8 + 6자리. 검증식이 맞는 후보를 먼저(2020.10 이후 발급분은 검증식이 안 맞을 수 있어 없으면 첫 후보)
+  function rrnFrom(text) {
+    const t = String(text || '').replace(/[|lI]/g, '1').replace(/[oO]/g, '0');
+    const out = [];
+    const re = /(^|[^\d])(\d{6})\s*[-–—~_.]?\s*([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g;
+    let m;
+    while ((m = re.exec(t))) {
+      const front = m[2], back = m[3] + m[4] + m[5], mo = +front.slice(2, 4), d = +front.slice(4, 6);
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
+      const all = front + back, w = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
+      const sum = w.reduce((a, x, i) => a + x * +all[i], 0);
+      out.push({ v: front + '-' + back, ok: (11 - sum % 11) % 10 === +all[12] });
+    }
+    return (out.find(x => x.ok) || out[0] || {}).v || '';
+  }
   // ───────── 사진·스캔(글자 인식) 서류 ─────────
   // 개인정보 가리기: 주민·외국인등록번호 뒷자리는 읽자마자 지운다(앞 6자리가 날짜 꼴일 때만 — 금액 오인 방지)
   function redact(text) {
@@ -1037,7 +1053,7 @@
       f.corp_ceo_birth = (yy > now ? '19' : '20') + rr[1] + '-' + rr[2] + '-' + rr[3];
       meta.corp_ceo_birth = { conf: 0.6, note: '태어난 세기는 추정 — 확인해 주세요' };
     }
-    return { fields: f, meta, notes: ['주소·번호 뒷자리는 저장하지 않아요'] };
+    return { fields: f, meta, notes: ['주소는 저장하지 않아요'] };
   }
 
   // 제목이 깨진 서류를 본문 칸 이름으로 판별(제목 판별 classify 가 못 알아봤을 때만). withId: 신분증 꼴까지 볼지
@@ -1611,6 +1627,6 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

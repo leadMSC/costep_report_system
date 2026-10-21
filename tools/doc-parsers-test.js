@@ -377,6 +377,13 @@ ok('법정 규모 기준(표준산업분류)', () => {
   assert.strictEqual(P.sizeTier(g, 8, null), null);
   assert.strictEqual(P.sizeRule('', D), null);
 });
+ok('신분증 주민등록번호 13자리(가짜 번호)', () => {
+  assert.strictEqual(P.rrnFrom('주민등록증 홍길동 900101-1234568 서울특별시'), '900101-1234568');
+  assert.strictEqual(P.rrnFrom('900101 - l234568'), '900101-1234568');           // 글자 인식 잡음
+  assert.strictEqual(P.rrnFrom('금액 123,456 원 / 991399-1234567'), '');            // 날짜 꼴 아님
+  assert.strictEqual(P.rrnFrom('900101-1234560 그리고 900101-1234568'), '900101-1234568'); // 검증식 맞는 쪽 우선
+  assert.ok(!/1234568/.test(P.redact('900101-1234568')));                          // 서류 글에서는 여전히 가림
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

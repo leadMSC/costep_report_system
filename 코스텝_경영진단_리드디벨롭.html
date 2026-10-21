@@ -9755,6 +9755,22 @@
     return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
   }
 
+  // 대표자 신분증의 주민등록번호 13자리(사용자 결정 L-137 — 신분증에 한해 뒷자리까지). 가리기 전 원문에서 찾는다
+  // 날짜 꼴 앞 6자리 + 성별 자리 1~8 + 6자리. 검증식이 맞는 후보를 먼저(2020.10 이후 발급분은 검증식이 안 맞을 수 있어 없으면 첫 후보)
+  function rrnFrom(text) {
+    const t = String(text || '').replace(/[|lI]/g, '1').replace(/[oO]/g, '0');
+    const out = [];
+    const re = /(^|[^\d])(\d{6})\s*[-–—~_.]?\s*([1-8])\s?(\d{3})\s?(\d{3})(?!\d)/g;
+    let m;
+    while ((m = re.exec(t))) {
+      const front = m[2], back = m[3] + m[4] + m[5], mo = +front.slice(2, 4), d = +front.slice(4, 6);
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) continue;
+      const all = front + back, w = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
+      const sum = w.reduce((a, x, i) => a + x * +all[i], 0);
+      out.push({ v: front + '-' + back, ok: (11 - sum % 11) % 10 === +all[12] });
+    }
+    return (out.find(x => x.ok) || out[0] || {}).v || '';
+  }
   // ───────── 사진·스캔(글자 인식) 서류 ─────────
   // 개인정보 가리기: 주민·외국인등록번호 뒷자리는 읽자마자 지운다(앞 6자리가 날짜 꼴일 때만 — 금액 오인 방지)
   function redact(text) {
@@ -9865,7 +9881,7 @@
       f.corp_ceo_birth = (yy > now ? '19' : '20') + rr[1] + '-' + rr[2] + '-' + rr[3];
       meta.corp_ceo_birth = { conf: 0.6, note: '태어난 세기는 추정 — 확인해 주세요' };
     }
-    return { fields: f, meta, notes: ['주소·번호 뒷자리는 저장하지 않아요'] };
+    return { fields: f, meta, notes: ['주소는 저장하지 않아요'] };
   }
 
   // 제목이 깨진 서류를 본문 칸 이름으로 판별(제목 판별 classify 가 못 알아봤을 때만). withId: 신분증 꼴까지 볼지
@@ -10439,7 +10455,7 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -10517,6 +10533,7 @@
         ocrProg = onProg;
         let data;
         try { data = (await w.recognize(canvas, {}, { text: true, blocks: true })).data; } finally { ocrProg = null; }
+        const rr = P().rrnFrom(data.text || ''); if (rr) rawRrn.push(rr);   // 신분증 주민번호(가리기 전) — 신분증 결과에만 씀
         if (window.__DOCS_DEBUG) (window.__docsPages = window.__docsPages || []).push({ step: 'raw', len: (data.text || '').length });
         let text = P().redact(data.text || '');
         const dbg = window.__DOCS_DEBUG ? (window.__docsPages = window.__docsPages || []) : null;
@@ -10966,11 +10983,24 @@
         if (other.kind === base.kind) Object.entries(other.fields || {}).forEach(([k, v]) => { if (!(k in base.fields)) { base.fields[k] = v; base.meta[k] = (other.meta || {})[k]; } });
         return { merged: base, t2: t2.join('\n') };
       }
+      // 대표자 신분증: 가리기 전 원문에서 잡은 주민등록번호 13자리를 신분증 결과에만 넣음(사용자 결정 L-137)
+      let rawRrn = [];
+      function attachRrn(f) {
+        const pick = rawRrn.slice().sort((a, b) => rawRrn.filter(x => x === b).length - rawRrn.filter(x => x === a).length)[0];
+        if (!pick) return;
+        [f, ...files.filter(e => e !== f && e.src === f.name)].forEach(e => {
+          const r = e.res; if (!r || r.kind !== 'idcard') return;
+          r.fields = r.fields || {}; r.meta = r.meta || {};
+          r.fields.corp_ceo_rrn = pick;
+          r.meta.corp_ceo_rrn = { conf: 0.6, note: '신분증에서 읽음 — 숫자 한 자씩 확인' };
+        });
+      }
       async function addFiles(list) {
         const todo = [...list].slice(0, 30);
         queued += todo.length;
         for (const file of todo) {
           const f = { name: file.name, pages: null, res: null };
+          rawRrn = [];
           files.push(f); render(); progress(file.name, 0, 0);
           try {
             const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
@@ -11000,6 +11030,7 @@
             if (isPdf) {
               f.pages = await readPdf(file, (p, n) => progress(file.name, p, n));
               f.res = P().parseDocument(f.pages, file.name);
+              { const rr = P().rrnFrom(f.pages.map(pg => (pg || []).map(it => it.s || '').join(' ')).join(' / ')); if (rr) rawRrn.push(rr); }
               // 합본(서류 여러 개를 한 PDF로): 쪽마다 제목으로 나눠 서류별로 따로 읽는다
               const segs = f.res.status !== 'scan' && f.pages.length > 1 ? P().splitBundle(f.pages, { fileName: file.name }) : [];
               if (segs.length > 1) {
@@ -11030,7 +11061,7 @@
                       const settled = () => { if (Object.keys(got.fields).length < 2) return false; const n = got.fields.corp_ceo; return !n || got.texts.filter(tx => tx.replace(/[^가-힣]/g, '').includes(n)).length >= 2; };
                       for (let t = 0; t < tries.length && !settled(); t++) {
                         const [mk, psm] = tries[t]; const e = mk();
-                        try { await w.setParameters({ tessedit_pageseg_mode: psm }); ocrProg = x => progress(file.name + ` (다시 읽기 ${t + 1}/${tries.length})`, 0, 0, x); const tx = P().redact((await w.recognize(e)).data.text || ''); got.texts.push(tx);
+                        try { await w.setParameters({ tessedit_pageseg_mode: psm }); ocrProg = x => progress(file.name + ` (다시 읽기 ${t + 1}/${tries.length})`, 0, 0, x); const rawTx = (await w.recognize(e)).data.text || ''; { const rr = P().rrnFrom(rawTx); if (rr) rawRrn.push(rr); } const tx = P().redact(rawTx); got.texts.push(tx);
                           const r = P().parseTextDocument(tx, file.name, 'idcard');
                           Object.entries(r.fields || {}).forEach(([k, v]) => { if (!(k in got.fields)) { got.fields[k] = v; got.meta[k] = (r.meta || {})[k]; } });
                         } finally { ocrProg = null; if (e !== c) freeCanvas(e); }
@@ -11092,7 +11123,7 @@
             }
           } catch (e) { if (window.__DOCS_DEBUG) (window.__docsDebug = window.__docsDebug || []).push({ name: file.name, text: '', error: String(e && (e.stack || e.message) || e).slice(0, 300) });
             f.res = { status: 'skip', notes: [/시간 초과/.test(e && e.message) ? '시간이 너무 오래 걸려 멈췄어요' : /도구/.test(e && e.message) ? e.message : '이 파일은 읽지 못했어요'] }; }
-          finally { finished++; buildRows(); render(); progress(file.name, 0, 0); }
+          finally { try { attachRrn(f); } catch (e) { /* 없음 */ } rawRrn = []; finished++; buildRows(); render(); progress(file.name, 0, 0); }
         }
         if (finished >= queued && ocrWorker) { const w = ocrWorker; ocrWorker = null; ocrLangs = ''; w.terminate(); }
         if (finished >= queued && korWorker) { const w = korWorker; korWorker = null; w.terminate(); }
