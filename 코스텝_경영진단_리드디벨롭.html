@@ -1051,6 +1051,7 @@
               <option value="온라인 전자상거래">온라인 전자상거래</option>
               <option value="해외 직수출 및 로컬수출">해외 직수출 및 로컬수출</option>
             </select>
+            <input type="text" id="corp_sales_detail" value="" placeholder="세부 채널 (예: 스마트스토어·쿠팡, 유튜브·OTT)" oninput="syncCompanyData()" class="form-input-control mt-1.5">
           </div>
           <div>
             <label class="font-bold text-slate-700 block mb-1">주요 매출처 및 비중 (%)</label>
@@ -1408,6 +1409,8 @@
         <h4 class="text-xs font-black text-indigo-950 flex items-center space-x-2" id="ind_spec_header_text">
           <span> 제조업 특화 진단 항목 (공장·설비·안전)</span>
         </h4>
+        <div id="ksic_qa_box" class="ksic-qa text-xs" aria-live="polite"></div>
+        <input type="text" id="corp_ksic_qa" value="" class="hidden" aria-hidden="true" tabindex="-1">
 
         <!-- 1. Mfg specific -->
         <div id="box_ind_mfg" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -5542,6 +5545,24 @@
         ipItems.slice(0, 3).map(x => `${escapeHtml(x.kind)} <span class="font-mono">${escapeHtml(x.regNo || x.appNo || '')}</span> ${escapeHtml(x.title || '')}`).join(' · ')
       }${ipItems.length > 3 ? ` 외 ${ipItems.length - 3}건` : ''}</td></tr>` : '';
       const certs = escapeHtml(document.getElementById('corp_certs')?.value.trim()) || ph('-');
+      // 고객사 정보 새 칸(설비·수출·투자·정부지원·기타) — 적은 것만, 줄마다 2줄 제한
+      const custRowsHtml = (() => {
+        const v = id => (document.getElementById(id)?.value || '').trim();
+        const js = id => { try { return (JSON.parse(v(id) || '[]') || []).filter(r => Array.isArray(r) && r.some(x => String(x || '').trim())); } catch (e) { return []; } };
+        const row = (label, html) => html ? `<tr><td class="p-1 border border-slate-300 bg-slate-100 font-bold text-center">${label}</td><td colspan="3" class="p-1 border border-slate-300 text-left pl-2"><div class="rp-clamp2">${html}</div></td></tr>` : '';
+        const mk = [];
+        if (v('corp_equip') === 'yes') mk.push('생산설비: ' + (escapeHtml(v('corp_equip_detail')) || '도입'));
+        else if (v('corp_equip') === 'none') mk.push('생산설비: 미도입');
+        if (v('corp_export') === 'yes') mk.push('수출 기업' + (v('corp_export_amt') ? `(직전년도 ${escapeHtml(v('corp_export_amt'))}백만원)` : ''));
+        else if (v('corp_export') === 'no') mk.push('내수 기업');
+        if (v('corp_invest') === 'yes') mk.push('민간투자: ' + (escapeHtml(v('corp_invest_detail')) || '3년 내 유치'));
+        const sup = js('corp_support_json'), ext = js('corp_extra_json');
+        const supHtml = sup.slice(0, 2).map(r => escapeHtml([r[0], r[1], r[2] ? `(${r[2]})` : '', r[3] ? `${r[3]}만원` : ''].filter(Boolean).join(' '))).join(' · ') + (sup.length > 2 ? ` 외 ${sup.length - 2}건` : '');
+        const extHtml = ext.slice(0, 3).map(r => `<b>${escapeHtml(r[0] || '')}</b> ${escapeHtml(r[1] || '')}`).join(' · ') + (ext.length > 3 ? ` 외 ${ext.length - 3}건` : '');
+        // A4 1장을 지키려고 한 줄(2줄 제한)로 모음
+        const parts = [mk.join(' · '), sup.length ? '<b>정부지원</b> ' + supHtml : '', ext.length ? '<b>기타</b> ' + extHtml : ''].filter(Boolean);
+        return row('추가 현황', parts.join(' <span class="text-slate-400">|</span> '));
+      })();
       const consultantName = escapeHtml(document.getElementById('consultant_name')?.value.trim()) || '담당 컨설턴트';
       // 담당자 칸에 직함까지 적힌 경우(예: '홍길동 경영컨설턴트') 직함이 두 번 찍히지 않게
       const consultantLabel = /컨설턴트$/.test(consultantName) ? consultantName : consultantName + ' 경영컨설턴트';
@@ -5879,6 +5900,7 @@
                   <td colspan="3" class="p-1 border border-slate-300 text-left pl-2 font-bold text-slate-900"><div class="rp-clamp2">${certs}</div></td>
                 </tr>
                 ${ipListHtml}
+                ${custRowsHtml}
               </table>
             </div>
 
@@ -5987,7 +6009,7 @@
               ${finIndHtml}
               <div class="bg-white p-1 rounded border border-slate-200 text-[9px] text-slate-700">
                 <span class="font-bold text-[#0f766e]">· 주업종 특화 실태 진단 결과:</span>
-                <span class="ml-1">${indDetailsHtml}</span>
+                <span class="ml-1">${indDetailsHtml}${window.ksicQaText && ksicQaText() ? ' | ' + ksicQaText() : ''}</span>
               </div>
             </div>
             `}
@@ -7031,6 +7053,7 @@
       [/\bNEP\b|신제품\s*인증/i, 'NEP 신제품인증'], [/\bNET\b|신기술\s*인증/i, 'NET 신기술인증'], [/\bGS\b/i, 'GS 인증'], [/소부장|소재.?부품.?장비/, '소재·부품·장비 전문기업'],
       [/뿌리/, '뿌리기업'], [/녹색/, '녹색인증'], [/여성기업/, '여성기업'], [/장애인기업/, '장애인기업'], [/사회적기업/, '사회적기업'], [/가족친화/, '가족친화인증'],
       [/강소기업/, '강소기업'], [/수출유망/, '수출유망중소기업'], [/성능인증/, '성능인증'], [/우수조달/, '우수조달제품'], [/혁신제품/, '혁신제품'], [/직접생산/, '직접생산확인']];
+    window.CERT_ALIAS_LIST = CERT_ALIAS;
     function certRender() {
       const box = document.getElementById('cert_checks'); if (!box || box.childElementCount) return;
       box.innerHTML = CERT_LIST.map(([n, org], i) => `<label class="cert-item" title="${n} — ${org}"><input type="checkbox" data-cert="${i}"><span>${n}</span></label>`).join('');
@@ -7231,7 +7254,174 @@
         + (c.tier ? `<br>지금 값(${now})이면 <b>${name[c.tier]}</b>` + (c.tier !== 'over' && c.tier !== cur ? `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}로 바꾸기</button>` : c.tier === cur ? ' <span class="ok">· 지금 선택과 같아요</span>' : '') : `<br>${now ? '지금 값(' + now + ')으로는 판정이 부족해요 — 연매출을 넣어 주세요' : '근로자 수·연매출을 넣으면 판정해요'}`);
     }
     window.renderSizeRule = renderSizeRule;
-    function syncCustExtras() { try { syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); } catch (e) { /* 화면 없음 */ } }
+
+    // ===== 업종 특화 칸 중 고객사 정보와 같은 사실(인증·지식재산·판매 경로)은 한 번만 적게 — 고객사 정보 값을 읽어 보여 줌 =====
+    // 기존 칸 id 는 그대로 두고(서식·권고 문장·저장 자료 호환) 값만 고객사 정보에서 자동으로 맞춘다
+    const IND_SHARED = [
+      { id: 'it_rd', kind: 'cert', map: [['기업부설연구소', 'lab'], ['연구개발전담부서', 'dept']], want: '설립 희망' },
+      { id: 'it_cert', kind: 'cert', map: [['벤처기업', 'venture'], ['이노비즈', 'inno']], want: '취득 희망' },
+      { id: 'esg_cert', kind: 'cert', map: [['녹색인증', 'green'], ['ISO 14001', 'iso14001']], want: '인증 준비 중' },
+      { id: 'food_haccp', kind: 'cert', map: [['HACCP', 'yes']], want: '컨설팅 희망' },
+      { id: 'service_cert', kind: 'certText', re: /ISO|GS|성능|NEP|NET|품질|우수조달|혁신제품/i },
+      { id: 'bio_patent', kind: 'ip', only: ['특허'] },
+      { id: 'content_ip', kind: 'ip' },
+      { id: 'dist_chan', kind: 'chan' },
+      { id: 'content_platform', kind: 'chan' },
+      { id: 'service_client', kind: 'client' }
+    ];
+    const SHARED_TARGET = { cert: 'cert_box', certText: 'cert_box', ip: 'ip_cell', chan: 'corp_sales_channel', client: 'corp_sales_channel' };
+    function certNames() {
+      const raw = String(document.getElementById('corp_certs')?.value || '');
+      return raw.split(/\s*[,，、;]\s*/).map(t => t.trim()).filter(Boolean).flatMap(t => {
+        const parts = /ISO/i.test(t) && t.includes('/') ? t.split(/\s*\/\s*/).map((x, i) => i ? 'ISO ' + x.replace(/ISO\s*/i, '') : x) : [t];
+        return parts.map(x => { const hit = (window.CERT_ALIAS_LIST || []).find(([re]) => re.test(x)); return hit ? hit[1] : x.replace(/\s*\([^()]*\)$/, ''); });
+      });
+    }
+    function ipItemsShared() { try { return JSON.parse(document.getElementById('corp_ip_json')?.value || '[]') || []; } catch (e) { return []; } }
+    // 예전 저장 자료: 업종 특화 칸에만 적힌 사실을 고객사 정보로 옮김(잃지 않게) — 불러오기 때 한 번
+    function migrateIndShared() {
+      const certs = new Set(certNames()), add = [];
+      IND_SHARED.filter(f => f.kind === 'cert').forEach(f => {
+        const v = document.getElementById(f.id)?.value || '';
+        const hit = f.map.find(([, val]) => val === v);
+        if (hit && !certs.has(hit[0])) { add.push(hit[0]); certs.add(hit[0]); }
+      });
+      const sc = document.getElementById('service_cert');
+      if (sc && sc.value.trim() && sc.value !== sc.defaultValue && !certNames().some(n => sc.value.includes(n))) add.push(sc.value.trim());
+      const cc = document.getElementById('corp_certs');
+      if (add.length && cc) cc.value = [cc.value.trim(), ...add].filter(Boolean).join(', ');
+      const det = document.getElementById('corp_sales_detail');
+      if (det && !det.value.trim()) {
+        const old = ['dist_chan', 'content_platform'].map(id => document.getElementById(id)).find(e => e && e.value.trim() && e.value !== e.defaultValue);
+        if (old) det.value = old.value.trim();
+      }
+      const pat = document.getElementById('corp_patents');
+      if (pat && !pat.value.trim() && !ipItemsShared().length) {
+        const old = ['bio_patent', 'content_ip'].map(id => document.getElementById(id)).find(e => e && e.value.trim() && e.value !== e.defaultValue);
+        if (old) pat.value = old.value.trim();
+      }
+    }
+    window.migrateIndShared = migrateIndShared;
+    function syncIndShared() {
+      const certs = certNames(), ips = ipItemsShared();
+      const ch = document.getElementById('corp_sales_channel')?.value || '', det = (document.getElementById('corp_sales_detail')?.value || '').trim();
+      IND_SHARED.forEach(f => {
+        const el = document.getElementById(f.id); if (!el) return;
+        let box = document.querySelector(`.ind-shared[data-for="${f.id}"]`);
+        if (!box) {
+          el.classList.add('hidden'); el.tabIndex = -1; el.setAttribute('aria-hidden', 'true');
+          box = document.createElement('div'); box.className = 'ind-shared'; box.dataset.for = f.id;
+          el.insertAdjacentElement('afterend', box);
+          box.addEventListener('click', ev => {
+            const go = ev.target.closest('.go');
+            if (go) { const t = document.getElementById(SHARED_TARGET[f.kind]); if (t) { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); (t.querySelector ? (t.querySelector('input,select') || t) : t).focus?.({ preventScroll: true }); } }
+          });
+          box.addEventListener('change', ev => {
+            if (!ev.target.matches('input[data-want]')) return;
+            el.value = ev.target.checked ? 'need' : ''; el.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        }
+        let txt = '', none = false, want = '';
+        if (f.kind === 'cert') {
+          const has = f.map.filter(([n]) => certs.includes(n));
+          if (has.length) { el.value = has[0][1]; txt = has.map(([n]) => n).join(' · ') + ' 보유'; }
+          else {
+            if (el.value !== 'need') el.value = '';
+            none = true; txt = f.map.map(([n]) => n).join('·') + ' 없음';
+            want = `<label><input type="checkbox" data-want ${el.value === 'need' ? 'checked' : ''}> ${f.want}</label>`;
+          }
+        } else if (f.kind === 'certText') {
+          const q = certs.filter(n => f.re.test(n));
+          el.value = q.join(', '); none = !q.length; txt = q.length ? q.join(' · ') : '품질·경영 인증 없음';
+        } else if (f.kind === 'ip') {
+          const list = f.only ? ips.filter(x => f.only.includes(x.kind)) : ips;
+          if (list.length) {
+            const cnt = {}; list.forEach(x => { cnt[x.kind || '기타'] = (cnt[x.kind || '기타'] || 0) + 1; });
+            txt = Object.entries(cnt).map(([k, n]) => `${k} ${n}건`).join(' · ');
+          } else {
+            const pat = (document.getElementById('corp_patents')?.value || '').trim();
+            txt = pat && (!f.only || /특허/.test(pat)) ? pat : (f.only ? '특허 없음' : '지식재산권 없음'); none = !(pat && (!f.only || /특허/.test(pat)));
+          }
+          el.value = none ? '' : txt;
+        } else if (f.kind === 'chan') {
+          const v = [det, ch].filter(Boolean)[0] || '';
+          el.value = det ? (ch ? `${det} (${ch})` : det) : ch; none = !v; txt = el.value || '판매 방식 미입력';
+        } else if (f.kind === 'client') {
+          el.value = /B2B|공공|조달|납품/.test(ch) ? 'b2b_b2g' : /B2C|매장|소비자|온라인|전자상거래/.test(ch) ? 'b2c' : '';
+          none = !el.value; txt = el.value ? (el.selectedOptions[0]?.text || ch) : '판매 방식 미입력';
+        }
+        box.innerHTML = `<span class="v${none ? ' none' : ''}">${escapeHtml(txt)}</span>${want}<button type="button" class="go">고객사 정보에서 수정</button>`;
+      });
+    }
+    window.syncIndShared = syncIndShared;
+    // 스마트 주문 기기: 업종 특화(food_order)와 실태 확인(smb_chk_smartorder)을 서로 맞춤
+    document.addEventListener('change', ev => {
+      const id = ev.target && ev.target.id;
+      if (id === 'food_order') { const v = ev.target.value; if (window.setTri) setTri('smb_chk_smartorder', v === 'need' ? 'yes' : v === 'yes' ? 'no' : '', true); }
+      else if (id === 'smb_chk_smartorder' && window.triOf) { const fo = document.getElementById('food_order'); const t = triOf('smb_chk_smartorder'); if (fo) { if (t === 'yes') fo.value = 'need'; else if (fo.value === 'need') fo.value = ''; } }
+      else if (id === 'corp_sales_channel' || id === 'corp_sales_detail') syncIndShared();
+    });
+    document.addEventListener('input', ev => { if (ev.target && (ev.target.id === 'corp_sales_detail' || ev.target.id === 'corp_certs' || ev.target.id === 'corp_patents')) syncIndShared(); });
+
+    // ===== 표준산업분류 대분류(21개)별 업종 질문 — 주업종 코드의 대분류로 고름. 답은 corp_ksic_qa(JSON: {대분류.키: 값}) =====
+    const KSIC_QA = {
+      A: ['농업·임업·어업', [['reg', '농업경영체·어업인 등록', '예: 농업경영체 등록(2019)'], ['scale', '품목·재배(사육) 규모', '예: 시설 화훼 3,300㎡'], ['cert', '친환경·GAP·이력 인증', '예: GAP 인증']]],
+      B: ['광업', [['lic', '광업권·채굴 인가', '예: 채굴계획 인가(2030 만료)'], ['out', '광종·연간 생산량', '예: 석회석 12만t'], ['env', '복구비 예치·환경 점검', '예: 산림복구비 예치 완료']]],
+      C: ['제조업', [['plant', '공장등록·소재지', '예: 공장등록(김해 2공장)'], ['equip', '주요 설비·가동률', '예: CNC 6대, 가동률 70%'], ['qc', '제품·품질 인증(KC 등)', '예: KC 안전인증 3품목']]],
+      D: ['전기·가스·증기·공기조절 공급업', [['lic', '사업 허가·설비 용량', '예: 태양광 발전사업 허가 998kW'], ['sale', '판매 방식', '예: 고정가격계약(SMP+REC)'], ['safe', '안전관리자 선임', '예: 대행 위탁']]],
+      E: ['수도·하수·폐기물 처리·원료 재생업', [['lic', '처리·재활용 허가', '예: 폐기물 중간재활용업'], ['cap', '처리 용량', '예: 일 50t'], ['env', '환경 점검·행정처분 이력', '예: 최근 3년 없음']]],
+      F: ['건설업', [['lic', '등록 업종(면허)', '예: 실내건축공사업'], ['cap', '시공능력평가액', '예: 32억'], ['fund', '실질자본금·공제조합', '예: 자본금 충족, 조합 출자 120좌']]],
+      G: ['도매 및 소매업', [['mix', '온라인·오프라인 매출 비중', '예: 온라인 60 / 매장 40'], ['item', '주력 품목·공급처', '예: 생화 — 양재 화훼공판장'], ['stock', '재고 관리·회전일수', '예: 주 2회 입고, 7일']]],
+      H: ['운수 및 창고업', [['lic', '운송·창고업 허가', '예: 일반화물 운송사업'], ['asset', '보유 차량·창고 면적', '예: 5t 4대, 창고 300평'], ['client', '주요 화주·계약 형태', '예: 식품사 연간 계약']]],
+      I: ['숙박 및 음식점업', [['lic', '영업신고·위생등급', '예: 일반음식점, 위생등급 우수'], ['seat', '좌석·객실 수', '예: 40석'], ['plat', '배달·예약 플랫폼 비중', '예: 배달 35%']]],
+      J: ['정보통신업', [['prod', '주력 서비스·제품', '예: 예약관리 SaaS'], ['rd', '연구조직·개발 인력', '예: 전담부서, 개발자 4명'], ['pub', 'GS 인증·조달 등록', '예: GS 1등급, 디지털서비스몰']]],
+      K: ['금융 및 보험업', [['lic', '인허가·등록 기관', '예: 금융감독원 등록 대출중개'], ['prod', '주요 상품', '예: 법인 보험 대리'], ['audit', '감독기관 점검 이력', '예: 최근 3년 없음']]],
+      L: ['부동산업', [['lic', '중개사무소·임대사업자 등록', '예: 개업공인중개사'], ['units', '관리·보유 물건 수', '예: 관리 120세대'], ['rev', '주요 수익 구조', '예: 중개 70 / 관리 30']]],
+      M: ['전문, 과학 및 기술 서비스업', [['pro', '보유 자격·전문 인력', '예: 기술사 2명'], ['client', '주요 발주처(공공·민간)', '예: 공공 60%'], ['reg', '엔지니어링·연구 등록', '예: 엔지니어링사업자 신고']]],
+      N: ['사업시설 관리·사업 지원·임대 서비스업', [['lic', '허가·등록(경비·파견·렌탈 등)', '예: 근로자파견사업 허가'], ['client', '주요 계약처·계약 기간', '예: 관공서 2년 계약'], ['staff', '인력 운용(정규·도급)', '예: 정규 12, 도급 30']]],
+      O: ['공공 행정, 국방 및 사회보장 행정', [['basis', '위탁·대행 근거', '예: 시 위탁 협약'], ['term', '계약 기간', '예: 2025~2027'], ['staff', '수행 인력', '예: 6명']]],
+      P: ['교육 서비스업', [['lic', '학원·교습소 등록', '예: 학원 등록(보습)'], ['scale', '수강생·강의실 규모', '예: 수강생 80명, 강의실 4'], ['online', '온라인 강의 비중', '예: 20%']]],
+      Q: ['보건업 및 사회복지 서비스업', [['lic', '의료기관·시설 신고', '예: 의원 개설 신고'], ['cap', '병상·정원', '예: 정원 29명'], ['pay', '건강보험·바우처 매출 비중', '예: 80%']]],
+      R: ['예술, 스포츠 및 여가관련 서비스업', [['lic', '체육시설·공연장 신고', '예: 체력단련장업 신고'], ['scale', '회원·관객 규모', '예: 월 회원 300명'], ['safe', '시설 안전 점검·보험', '예: 배상책임보험 가입']]],
+      S: ['협회 및 단체, 수리 및 기타 개인 서비스업', [['lic', '영업신고(미용·세탁·수리 등)', '예: 일반미용업 신고'], ['repeat', '재방문·예약 방식', '예: 예약제, 재방문 70%'], ['equip', '주요 장비', '예: 시술 의자 6대']]],
+      T: ['가구 내 고용활동 및 자가소비 생산활동', [['form', '고용·활동 형태', '예: 가사 서비스 제공'], ['scale', '규모', '예: 월 20건'], ['note', '참고 사항', '']]],
+      U: ['국제 및 외국기관', [['basis', '설립 근거', '예: 외국기관 국내 사무소'], ['scope', '국내 활동 범위', '예: 연락 업무'], ['note', '참고 사항', '']]]
+    };
+    window.KSIC_QA = KSIC_QA;
+    function ksicQaSection() {
+      let code = ''; try { code = ((JSON.parse(document.getElementById('corp_ksic')?.value || '[]') || [])[0] || {}).code || ''; } catch (e) { code = ''; }
+      const it = code && window.ksicData ? (ksicData().items || []).find(x => x[0] === code) : null;
+      return it ? it[2] : '';
+    }
+    function ksicQaRead() { try { return JSON.parse(document.getElementById('corp_ksic_qa')?.value || '{}') || {}; } catch (e) { return {}; } }
+    function renderKsicQa() {
+      const box = document.getElementById('ksic_qa_box'); if (!box) return;
+      const sec = ksicQaSection(), q = KSIC_QA[sec];
+      if (!q) { box.innerHTML = '<div class="hd"><b>표준산업분류 업종 질문</b><span>고객사 정보에서 종목의 표준산업분류를 고르면 그 대분류에 맞는 질문이 나와요.</span></div>'; return; }
+      const ans = ksicQaRead();
+      if (box.dataset.sec === sec && box.contains(document.activeElement)) return; // 입력 중 다시 그리지 않음
+      box.dataset.sec = sec;
+      box.innerHTML = `<div class="hd"><b>${sec} ${escapeHtml(q[0])} 질문</b><span>주업종 표준산업분류의 대분류 기준 · 서식2 업종 특화 줄에 함께 나가요</span></div><div class="grid3">`
+        + q[1].map(([k, label, ph]) => `<div><label>${escapeHtml(label)}<input type="text" data-kqa="${sec}.${k}" class="form-input-control" placeholder="${escapeHtml(ph)}" value="${escapeHtml(ans[sec + '.' + k] || '')}"></label></div>`).join('') + '</div>';
+    }
+    window.renderKsicQa = renderKsicQa;
+    document.addEventListener('input', ev => {
+      const k = ev.target && ev.target.dataset && ev.target.dataset.kqa; if (!k) return;
+      ev.stopPropagation();
+      const ans = ksicQaRead(), v = ev.target.value.trim();
+      if (v) ans[k] = v; else delete ans[k];
+      const h = document.getElementById('corp_ksic_qa'); if (!h) return;
+      h.value = Object.keys(ans).length ? JSON.stringify(ans) : '';
+      h.dispatchEvent(new Event('input', { bubbles: true }));
+    }, true);
+    // 서식2 업종 특화 줄에 붙일 글(채운 답만)
+    function ksicQaText() {
+      const sec = ksicQaSection(), q = KSIC_QA[sec]; if (!q) return '';
+      const ans = ksicQaRead();
+      return q[1].filter(([k]) => ans[sec + '.' + k]).map(([k, label]) => `${escapeHtml(label)}: ${escapeHtml(ans[sec + '.' + k])}`).join(' | ');
+    }
+    window.ksicQaText = ksicQaText;
+    function syncCustExtras() { try { syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); syncIndShared(); renderKsicQa(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
       const ext = elv('cust_ext'), kb = elv('ksic_box');
@@ -7449,6 +7639,7 @@
       });
       if (!data.fields.corp_biz_item && !data.fields.corp_biz_up && data.fields.corp_biz_type) { const it = document.getElementById('corp_biz_item'); if (it) it.value = data.fields.corp_biz_type; }
       window.appState.debtItems = Array.isArray(data.debtItems) ? data.debtItems : [];
+      if (window.migrateIndShared) migrateIndShared();
       renderDebtTable();
       calcSmbMetrics();
       syncCompanyData();
@@ -8475,6 +8666,19 @@
     .rp-empty { color: #8a94a3; font-weight: 400; }
     /* 고객사 정보: 표준산업분류 추천 · 구획 · 칩 토글 · 행 추가 */
     .ksic-box { margin-top: 8px; display: grid; gap: 6px; }
+    .ksic-qa:empty { display: none; }
+    .ksic-qa { padding: 10px 12px; border: 1px solid #c7d2fe; border-radius: 12px; background: #fff; }
+    .ksic-qa .hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 8px; }
+    .ksic-qa .hd b { font-size: 12px; color: #1e1b4b; }
+    .ksic-qa .hd span { font-size: 11px; color: #64748b; }
+    .ksic-qa .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
+    .ksic-qa label { display: block; font-weight: 700; color: #334155; }
+    .ksic-qa label input { margin-top: 4px; font-weight: 400; }
+    .ind-shared { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 34px; padding: 6px 10px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; color: #334155; font-size: 11.5px; line-height: 1.45; }
+    .ind-shared .v { font-weight: 800; color: #0f172a; }
+    .ind-shared .v.none { font-weight: 600; color: #64748b; }
+    .ind-shared .go { margin-left: auto; padding: 1px 0; border: 0; background: none; color: #0e7f8b; font-weight: 800; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .ind-shared label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; }
     .size-rule { margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: #cbd5e1; }
     .size-rule:empty { display: none; }
     .size-rule b { color: #fff; }
