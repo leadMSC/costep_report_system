@@ -372,6 +372,55 @@ ok('사업자등록번호 검증식', () => {
   assert.strictEqual(P.bizNoValid('220-81-62517'), true);
   assert.strictEqual(P.bizNoValid('123-45-67890'), false);
 });
+// 합본 PDF(가짜 값): 서류 여러 개를 한 파일로 → 쪽마다 제목으로 나눔
+const mkPage = rows => rows.flatMap((r, i) => r.map((s, j) => ({ s, x: 50 + j * 160, y: 800 - i * 20, w: s.length * 8, h: 10 })));
+const BIZCERT_P = mkPage([['발급번호 : 1111-2222-3333'], ['사업자등록증명'], ['( 법인사업자 )'], ['상호(법인명)', '가나다주식회사'], ['사업자등록번호', '123-81-00001'], ['성명(대표자)', '홍길동'], ['개업일', '2015년 03월 02일']]);
+const VAT_P = mkPage([['발급번호 : 4444-5555-6666'], ['부가가치세 과세표준증명'], ['사업자등록번호', '123-81-00001'], ['과세기간', '과세표준'],
+  ['2024/01/01', '2024/06/30', '100,000,000'], ['2024/07/01', '2024/12/31', '120,000,000'], ['2023/01/01', '2023/06/30', '90,000,000'], ['2023/07/01', '2023/12/31', '95,000,000']]);
+const fsTitle = (y, sales) => mkPage([['표준재무제표증명'], [y + '년 귀속'], ['표준재무상태표'], ['(단위 : 원)'], ['과목', '코드', '금액'],
+  ['Ⅰ.유동자산', '01', '500,000,000'], ['자산총계', '06', '900,000,000'], ['부채총계', '33', '400,000,000'], ['자본총계', '35', '500,000,000']]);
+const fsIs = sales => mkPage([['표준손익계산서'], ['과목', '코드', '금액'], ['Ⅰ.매출액', '01', sales], ['Ⅱ.매출원가', '02', '600,000,000'], ['Ⅴ.영업이익(손실)', '05', '50,000,000'], ['Ⅹ.당기순이익(손실)', '24', '30,000,000']]);
+const CONT_P = mkPage([['3.기타비용', '25', '1,000,000'], ['4.잡손실', '26', '500,000']]);
+ok('합본 PDF 나누기: 사업자등록증명 + 부가세 + 재무제표 2개년(이어지는 쪽 포함)', () => {
+  const pages = [BIZCERT_P, VAT_P, fsTitle(2024), fsIs('1,200,000,000'), fsTitle(2023), fsIs('1,000,000,000'), CONT_P];
+  const s = P.splitBundle(pages, { fileName: '합본.pdf' });
+  assert.deepStrictEqual(s.map(x => [x.from, x.to, x.kind]), [[1, 1, 'bizcert'], [2, 2, 'vat'], [3, 4, 'fs'], [5, 7, 'fs']]);
+  assert.strictEqual(s[3].pages.length, 3);
+  const r = s.map(x => P.parseDocument(x.pages, '합본.pdf', x.kind));
+  assert.strictEqual(r[0].fields.corp_biz_no, '123-81-00001');
+  assert.deepStrictEqual(r[1].vatYears, { 2024: 220000000, 2023: 185000000 });
+  assert.deepStrictEqual([r[2].fs.year, r[3].fs.year], [2024, 2023]);
+  assert.deepStrictEqual([r[2].fs.wonValues.sales, r[3].fs.wonValues.sales], [1200000000, 1000000000]);
+});
+ok('합본 PDF 나누기: 서류 하나짜리는 그대로 한 묶음', () => {
+  for (const pages of [[fsTitle(2024), fsIs('1,000')], [BIZCERT_P], [VAT_P, CONT_P], CL.layoutKcis(), CL.layoutOther(), CL.layoutChars(), [CONT_P, fsTitle(2024), fsIs('1,000')]]) {
+    const s = P.splitBundle(pages, { fileName: 'x.pdf' });
+    assert.strictEqual(s.length, 1); assert.strictEqual(s[0].pages, pages); assert.deepStrictEqual([s[0].from, s[0].to], [1, pages.length]);
+  }
+  assert.strictEqual(P.splitBundle([], {}).length, 1);
+});
+ok('합본 PDF 나누기: 같은 종류는 발급번호가 다르거나 1쪽 표시일 때만 새 서류', () => {
+  const v2 = mkPage([['발급번호 : 7777-8888-9999'], ['부가가치세 과세표준증명'], ['과세기간', '과세표준'], ['2022/01/01', '2022/12/31', '80,000,000']]);
+  assert.deepStrictEqual(P.splitBundle([VAT_P, v2]).map(x => [x.from, x.to]), [[1, 1], [2, 2]]);
+  const ins = k => mkPage([['사업장가입자명부'], ['- ' + k + ' -']]);
+  assert.deepStrictEqual(P.splitBundle([ins(1), ins(2), ins(1)]).map(x => [x.from, x.to]), [[1, 2], [3, 3]]);
+  assert.strictEqual(P.splitBundle([ins(1), mkPage([['사업장가입자명부']])]).length, 1);   // 제목만 되풀이 → 한 서류
+});
+ok('합본 스캔(글자 인식) 나누기: 제목 깨진 사업자등록증 + 부가세 + 이어지는 쪽', () => {
+  const texts = [
+    '사 엽 자 등 륵 중\n( 법인사업자 )\n등록번호 : 123-81-00001\n법인명(단체명) : 가나주식회사\n개업연월일 : 2015 년 03 월 02 일\n사업장소재지 : 서울특별시 강남구 테헤란로 1',
+    '부가가치세과세표준중명\n성 명(대표자) 홍길동\n사 업 자 등 록 번 호 123-81-00001\n2024/01/01 2024/06/30 183,434,740 0 183,434,740 0',
+    '2024/07/01 2024/12/31 173,653,010 0 173,653,010 0'
+  ];
+  const s = P.splitBundleText(texts);
+  assert.deepStrictEqual(s.map(x => [x.from, x.to, x.kind]), [[1, 1, 'bizreg'], [2, 3, 'vat']]);
+  assert.ok(s[1].text.includes('<<PAGE>>'));
+  const b = P.parseTextDocument(s[0].text, 'x.pdf', s[0].kind), v = P.parseTextDocument(s[1].text, 'x.pdf', s[1].kind);
+  assert.strictEqual(b.fields.corp_biz_no, '123-81-00001');
+  assert.deepStrictEqual(v.vatHalves, { '2024-1': 183434740, '2024-2': 173653010 });
+  assert.strictEqual(P.splitBundleText([texts[1], texts[2]]).length, 1);
+  assert.strictEqual(P.splitBundleText([texts[1], texts[2]])[0].text, texts[1] + '\n<<PAGE>>\n' + texts[2]);
+});
 console.log(`\n${n}개 통과`);
 
 // 앱(HTML) 안에 넣은 해석기가 tools/doc-parsers.js 와 같은지

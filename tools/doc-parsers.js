@@ -492,11 +492,17 @@
     }
     return null;
   }
+  // 표준재무제표 결산 연도(띄어쓰기 지운 글): 'YYYY년귀속' → 기간 끝 해 → 'YYYY년MM월DD일까지'
+  function fsYearOf(all) {
+    const y = (all.match(/(\d{4})년귀속/) || [])[1];
+    if (y) return y;
+    const m = all.match(/\d{4}\.\d{2}\.\d{2}~(\d{4})\.\d{2}\.\d{2}/) || all.match(/(\d{4})년\d{2}월\d{2}일까지/);
+    return m && m[1];
+  }
   function parseFS(rows) {
     const tk = fsTokens(rows);
     const all = despace(rows.flat().join(' '));
-    let year = (all.match(/(\d{4})년귀속/) || [])[1];
-    if (!year) { const m = all.match(/\d{4}\.\d{2}\.\d{2}~(\d{4})\.\d{2}\.\d{2}/) || all.match(/(\d{4})년\d{2}월\d{2}일까지/); year = m && m[1]; }
+    const year = fsYearOf(all);
     let op = fsAmount(tk, /^(?:[IVX]+\.)?영업(?:손익|이익)/);
     if (op === null) { const loss = fsAmount(tk, /^(?:[IVX]+\.)?영업손실/); if (loss !== null) op = -Math.abs(loss); }
     const v = {
@@ -1002,26 +1008,28 @@
     return { fields: f, meta, notes: ['주소·번호 뒷자리는 저장하지 않아요'] };
   }
 
+  // 제목이 깨진 서류를 본문 칸 이름으로 판별(제목 판별 classify 가 못 알아봤을 때만). withId: 신분증 꼴까지 볼지
+  function labelKind(text, withId) {
+    const d = despace(text);
+    // 사업자등록증도 맨 위 제목이 깨지기 쉬워 본문 칸 이름으로도 판별(사업자 구분 또는 등록번호 + 칸 이름 2개 이상)
+    const labels = [/개업연월일/, /(사업장|본점)소재지/, /사업의종류/, /세무서장/, /(법인명|상호)\(?단체명/].filter(re => re.test(d)).length;
+    if ((/(법인|개인|일반과세|간이과세|면세)사업자|과세자\)/.test(d) || /등록번호:?\d{3}-?\d{2}-?\d{5}/.test(d)) && labels >= 2) return { kind: 'bizreg', title: '사업자등록증' };
+    // 사업자등록증명(국세청 증명 양식): 제목이 깨져도 '공동사업자'·'개업일'·'성명(대표자)'·'상호(법인명)'·'사업자등록번호' 중 3개 이상
+    const cl = [/공동사업자/, /개업일/, /성명\(대표자\)|대표자성명/, /상호\(법인명\)/, /사업자등록번호/, /주민\((법인|사업자)\)등록번호/].filter(re => re.test(d)).length;
+    if (cl >= 3) return { kind: 'bizcert', title: '사업자등록증명' };
+    // 부가세 과세표준증명: 제목이 깨져도 '과세기간' + '과세표준'(또는 '납부할세액')
+    if (/과세기간/.test(d) && /과세표준|납부할세액/.test(d)) return { kind: 'vat', title: '부가가치세 과세표준증명' };
+    // 신분증은 제목이 깨지기 쉬워 번호 꼴 + 발급기관으로도 판별
+    if (withId && /\d{6}-\*{7}/.test(text) && (/(시장|구청장|군수|도지사|경찰청장)/.test(d) || /[가-힣]{2,4}\s*\(/.test(text))) return { kind: 'idcard', title: '신분증' };
+    return null;
+  }
+
   // 글자 인식 결과(문자열) 하나 → 서류 결과. 판별 실패하면 사용자가 고른 종류로 다시 읽는다
   function parseTextDocument(rawText, fileName, forceKind) {
     const text = redact(rawText);
     const rows = textRows(text);
     const auto = classify(rows, fileName);
-    // 사업자등록증도 맨 위 제목이 깨지기 쉬워 본문 칸 이름으로도 판별(사업자 구분 또는 등록번호 + 칸 이름 2개 이상)
-    if (auto.kind === 'unknown') {
-      const d = despace(text);
-      const labels = [/개업연월일/, /(사업장|본점)소재지/, /사업의종류/, /세무서장/, /(법인명|상호)\(?단체명/].filter(re => re.test(d)).length;
-      if ((/(법인|개인|일반과세|간이과세|면세)사업자|과세자\)/.test(d) || /등록번호:?\d{3}-?\d{2}-?\d{5}/.test(d)) && labels >= 2) Object.assign(auto, { kind: 'bizreg', title: '사업자등록증' });
-      // 사업자등록증명(국세청 증명 양식): 제목이 깨져도 '공동사업자'·'개업일'·'성명(대표자)'·'상호(법인명)'·'사업자등록번호' 중 3개 이상
-      else {
-        const cl = [/공동사업자/, /개업일/, /성명\(대표자\)|대표자성명/, /상호\(법인명\)/, /사업자등록번호/, /주민\((법인|사업자)\)등록번호/].filter(re => re.test(d)).length;
-        if (cl >= 3) Object.assign(auto, { kind: 'bizcert', title: '사업자등록증명' });
-        // 부가세 과세표준증명: 제목이 깨져도 '과세기간' + '과세표준'(또는 '납부할세액')
-        else if (/과세기간/.test(d) && /과세표준|납부할세액/.test(d)) Object.assign(auto, { kind: 'vat', title: '부가가치세 과세표준증명' });
-      }
-    }
-    // 신분증은 제목이 깨지기 쉬워 번호 꼴 + 발급기관으로도 판별
-    if (auto.kind === 'unknown' && /\d{6}-\*{7}/.test(text) && (/(시장|구청장|군수|도지사|경찰청장)/.test(despace(text)) || /[가-힣]{2,4}\s*\(/.test(text))) Object.assign(auto, { kind: 'idcard', title: '신분증' });
+    if (auto.kind === 'unknown') Object.assign(auto, labelKind(text, true) || {});
     const picked = forceKind && forceKind !== 'unknown' ? DOC_TYPES.find(d => d[0] === forceKind) : null;
     const c = picked ? { kind: picked[0], title: picked[1] } : auto;
     const out = { kind: c.kind, title: c.title, fields: {}, meta: {}, debtItems: [], notes: [], status: 'ok', ocr: true };
@@ -1471,6 +1479,70 @@
     return out;
   }
 
+  // 합본 PDF(서류 여러 개를 한 파일로) → 서류별 묶음. 쪽마다 맨 위 제목(classify)으로 종류를 보고,
+  // 제목이 없는 쪽(표가 이어지는 쪽)은 앞 서류에 붙인다. 같은 종류가 이어지면 '1쪽' 표시 또는 (새 제목 + 발급번호·귀속연도가 다를 때)만 새 서류.
+  // 서류 하나짜리 PDF 는 늘 한 묶음 → 기존 동작 그대로. 결과: [{ from, to, kind, title, pages | text }] (쪽 번호는 1부터)
+  const SPLIT_TOP = 10;                                          // 제목을 찾는 맨 위 줄 수
+  const SPLIT_START = { fs: /표준재무제표증명/, vat: /과세표준[증중]명/, bizcert: /사업자등록증명/, bizreg: /사업자등록증(?!명)/, ins: /사업장가입자명부/, creditor: /채권자변동/, corpreg: /등기사항|법인등기|등기부/, idcard: /주민등록증|운전면허증|신분증/ };
+  const SPLIT_MULTI = new Set(['fs', 'fsacct', 'creditor', 'ledger', 'ins', 'corpreg', 'share', 'ip', 'lease']);   // 여러 쪽짜리가 흔한 서류
+  function pageNoOf(rows) {
+    for (const r of rows) {
+      const t = norm(r.join(' '));
+      const m = t.match(/^-\s*(\d{1,2})\s*-$/) || t.match(/^(?:페이지|쪽)\s*[:：]?\s*(\d{1,2})(?:\s*\/\s*(\d{1,2}))?$/) || t.match(/^\(?\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\)?\s*(?:쪽|페이지)?$/);
+      if (m && (!m[2] || +m[1] <= +m[2])) return { no: +m[1], total: m[2] ? +m[2] : 0 };
+    }
+    return null;
+  }
+  function splitKey(kind, d) {
+    if (kind === 'fs') { const y = fsYearOf(d); if (y) return 'y' + y; }
+    const m = d.match(/발급번호[:：]?([0-9A-Za-z-]{4,})/);
+    return m ? 'n' + m[1] : '';
+  }
+  // 쪽 하나의 판별: 맨 위 줄 제목(강함) → 없으면 본문 칸 이름(약함, 신분증 꼴은 제외: 4대보험 명부의 가린 번호와 헷갈림)
+  function splitPageInfo(rows) {
+    const topRows = rows.slice(0, SPLIT_TOP);
+    const top = classify(topRows);
+    const all = rows.map(r => r.join('  ')).join(String.fromCharCode(10));
+    const d = despace(all), topD = despace(topRows.flat().join(''));
+    let kind = top.kind, title = top.title;
+    const strong = kind !== 'unknown';
+    if (!strong) { const w = labelKind(all, false); if (w) { kind = w.kind; title = w.title; } }
+    const start = kind !== 'unknown' && (SPLIT_START[kind] ? SPLIT_START[kind].test(topD) : strong);
+    const pn = pageNoOf(rows);
+    return { kind, title, strong, start, key: kind === 'unknown' ? '' : splitKey(kind, d), pageNo: pn ? pn.no : 0, total: pn ? pn.total : 0 };
+  }
+  function splitRows(pageRows) {
+    const segs = [];
+    pageRows.map(splitPageInfo).forEach((p, i) => {
+      const cur = segs[segs.length - 1];
+      let fresh = false;
+      if (!cur) fresh = true;
+      else if (p.kind === 'unknown') fresh = false;                                                    // 제목 없는 쪽 = 앞 서류가 이어짐
+      else if (cur.kind === 'unknown') Object.assign(cur, { kind: p.kind, title: p.title, key: p.key }); // 앞의 표지·빈 쪽은 다음 서류에 붙임
+      else if (p.kind !== cur.kind) fresh = p.strong || p.pageNo === 1 || !SPLIT_MULTI.has(cur.kind) || (!!p.key && !!cur.key && p.key !== cur.key);
+      else if (p.pageNo) fresh = p.pageNo === 1 && !(cur.total && i + 1 - cur.from < cur.total);   // '1/3' 인데 아직 3쪽이 안 찼으면 같은 서류
+      else if (p.key && cur.key) fresh = p.key !== cur.key && (p.start || p.strong);
+      else fresh = p.start && !SPLIT_MULTI.has(p.kind) && p.kind !== 'vat';
+      if (fresh) segs.push({ from: i + 1, to: i + 1, kind: p.kind, title: p.title, key: p.key, total: p.pageNo === 1 ? p.total : 0 });
+      else { cur.to = i + 1; if (!cur.key && p.kind === cur.kind) cur.key = p.key; }
+    });
+    return segs;
+  }
+  function splitBundle(pages, opts) {
+    const list = pages || [], pageRows = pagesToRows(list);
+    const segs = pageRows.length > 1 ? splitRows(pageRows) : [];
+    if (segs.length < 2) { const c = classify(pageRows.flat(), (opts || {}).fileName); return [{ from: 1, to: list.length, kind: c.kind, title: c.title, pages: list }]; }
+    return segs.map(s => ({ from: s.from, to: s.to, kind: s.kind, title: s.title, pages: list.slice(s.from - 1, s.to) }));
+  }
+  // 글자 인식(OCR) 결과: 쪽마다 글 하나 → 같은 규칙으로 나눔. text 는 앱과 같은 '<<PAGE>>' 경계로 잇는다
+  function splitBundleText(texts, opts) {
+    const list = texts || [], pageRows = list.map(t => textRows(redact(t)));
+    const segs = list.length > 1 ? splitRows(pageRows) : [];
+    const join = a => a.join(String.fromCharCode(10) + '<<PAGE>>' + String.fromCharCode(10));
+    if (segs.length < 2) { const c = classify(pageRows.flat(), (opts || {}).fileName); return [{ from: 1, to: list.length, kind: c.kind, title: c.title, text: join(list) }]; }
+    return segs.map(s => ({ from: s.from, to: s.to, kind: s.kind, title: s.title, text: join(list.slice(s.from - 1, s.to)) }));
+  }
+
   // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
   function fsToFields(fsList) {
     // 같은 해가 둘이면 세무사 결산(acct)을 먼저 넣어 표준재무제표증명 값이 덮게
@@ -1507,6 +1579,6 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, splitBundle, splitBundleText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
