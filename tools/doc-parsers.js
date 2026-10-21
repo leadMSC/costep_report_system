@@ -861,6 +861,38 @@
     // 점수가 같으면 이름이 짧은(덜 특수한) 분류 먼저 — '소프트웨어 개발'이 게임 소프트웨어보다 응용 소프트웨어로
     return res.sort((a, b) => b.score - a.score || a.name.length - b.name.length || a.code.localeCompare(b.code)).slice(0, n || 3);
   }
+  // 기업 규모 법정 기준(표준산업분류 코드 → 상한). 출처: 「중소기업기본법 시행령」 별표 1(중소기업 평균매출액등 상한)·별표 3(소기업),
+  // 「소상공인기본법 시행령」 제2조(상시근로자: 광업·제조업·건설업·운수업 10명 미만, 그 밖 5명 미만). 금액 단위: 억원
+  const SIZE_SME = [[1500, ['C14', 'C15', 'C17', 'C24', 'C28', 'C32']],
+    [1000, ['A', 'B', 'C10', 'C12', 'C13', 'C16', 'C19', 'C20', 'C22', 'C25', 'C26', 'C29', 'C30', 'C31', 'D', 'E36', 'F', 'G']],
+    [800, ['C11', 'C18', 'C21', 'C23', 'C27', 'C33', 'E', 'H', 'J']],
+    [600, ['C34', 'M', 'N', 'Q', 'R', 'S']],
+    [400, ['I', 'K', 'L', 'N76', 'P']]];
+  const SIZE_SMALL = [[120, ['C10', 'C11', 'C14', 'C15', 'C19', 'C20', 'C21', 'C23', 'C24', 'C25', 'C26', 'C28', 'C29', 'C30', 'C32', 'D', 'E36']],
+    [80, ['A', 'B', 'C12', 'C13', 'C16', 'C17', 'C18', 'C22', 'C27', 'C31', 'C33', 'F', 'H', 'K']],
+    [50, ['G', 'J']],
+    [30, ['E', 'L', 'M', 'N', 'R']],
+    [10, ['C34', 'I', 'P', 'Q', 'S']]];
+  // 가장 구체적인 열쇠(대분류+중분류, 예 'C14'·'N76')가 먼저, 없으면 대분류('E'·'N' 등)
+  function sizeRule(code, data) {
+    const c = String(code || '').replace(/\D/g, '').slice(0, 5); if (c.length < 2) return null;
+    const it = data && data.items ? data.items.find(x => x[0] === c) : null;
+    const sec = it ? it[2] : (data && data.items ? (data.items.find(x => x[0].startsWith(c.slice(0, 2))) || [])[2] : null);
+    if (!sec) return null;
+    const keys = [sec + c.slice(0, 2), sec];
+    const pick = tbl => { for (const k of keys) for (const [v, list] of tbl) if (list.includes(k)) return v; return null; };
+    return { section: sec, mid: c.slice(0, 2), smeEok: pick(SIZE_SME), smallEok: pick(SIZE_SMALL), smbEmp: ['B', 'C', 'F', 'H'].includes(sec) ? 10 : 5 };
+  }
+  // 근로자 수·연매출(억) → 소상공인 / 소기업 / 중기업 / 중소기업 초과. 값이 모자라면 null
+  function sizeTier(rule, emp, salesEok) {
+    if (!rule) return null;
+    if (salesEok != null && rule.smeEok != null && salesEok > rule.smeEok) return 'over';
+    if (salesEok != null && rule.smallEok != null && salesEok <= rule.smallEok) return emp != null && emp < rule.smbEmp ? 'smb' : 'small';
+    if (salesEok != null) return 'sme';
+    if (emp != null) return emp < rule.smbEmp ? 'smb' : null;
+    return null;
+  }
+
   // 코드·이름 직접 검색(코드 앞자리 또는 이름·예시에 들어간 낱말)
   function searchKsic(q, data, n) {
     const s = String(q || '').trim(); if (!s || !data) return [];
@@ -1507,6 +1539,6 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

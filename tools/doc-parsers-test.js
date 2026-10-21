@@ -363,6 +363,20 @@ ok('사업자등록증 업태·종목은 원문 그대로 따로', () => {
   assert.strictEqual(r.fields.corp_biz_up, '음식/제조/도,소매');
   assert.strictEqual(r.fields.corp_biz_item, '한식/떡류/식품');
 });
+ok('법정 규모 기준(표준산업분류)', () => {
+  const D = JSON.parse(fs.readFileSync(path.join(__dirname, 'ksic11.json'), 'utf8'));
+  const g = P.sizeRule('47711', D);
+  assert.deepStrictEqual([g.section, g.smeEok, g.smallEok, g.smbEmp], ['G', 1000, 50, 5]);
+  const c = P.sizeRule('10602', D); // 빵 제조(C10): 소기업 120억, 소상공인 10명 미만
+  assert.deepStrictEqual([c.section, c.smallEok, c.smbEmp], ['C', 120, 10]);
+  assert.strictEqual(P.sizeTier(g, 4, 30), 'smb');
+  assert.strictEqual(P.sizeTier(g, 8, 30), 'small');
+  assert.strictEqual(P.sizeTier(g, 8, 60), 'sme');
+  assert.strictEqual(P.sizeTier(g, 8, 1200), 'over');
+  assert.strictEqual(P.sizeTier(g, 3, null), 'smb');
+  assert.strictEqual(P.sizeTier(g, 8, null), null);
+  assert.strictEqual(P.sizeRule('', D), null);
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

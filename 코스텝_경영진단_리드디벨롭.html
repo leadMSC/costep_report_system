@@ -803,6 +803,7 @@
                 <span class="text-[10px] opacity-80 font-normal">중소기업기본법 제2조 (50인 이상)</span>
               </button>
             </div>
+            <div id="size_rule_box" class="size-rule" aria-live="polite"></div>
           </div>
 
           <!-- 10 Industries Selector (8 cols) -->
@@ -3438,6 +3439,7 @@
 
       const dbTarget = COSTEP_REPORTS_DB[track] ? track : (track === 'smb' ? 'smb' : 'sme');
       const keys = Object.keys(COSTEP_REPORTS_DB[dbTarget]);
+      if (window.renderSizeRule) setTimeout(renderSizeRule, 0);
       // 완료 보고서는 규모 공통이라 규모가 바뀌어도 그대로 둔다
       if (window.appState.activeReportKey !== 'done') window.appState.activeReportKey = keys[0];
 
@@ -7198,7 +7200,38 @@
       if (!up && !it.length) return;   // 둘 다 비면 예전 값을 지우지 않음(불러오기 이전 자료)
       el.value = [it.join(' · '), up ? '(' + up.replace(/\n+/g, ', ') + ')' : ''].filter(Boolean).join(' ');
     }
-    function syncCustExtras() { try { syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); } catch (e) { /* 화면 없음 */ } }
+
+    // 법정 규모 기준(표준산업분류 코드로): 진단 대상 단계에 '이 업종은 소상공인 ○명 미만 · 소기업 ○억 이하 · 중소기업 ○억 이하 → 지금 값이면 ○○' 표시
+    function sizeContext() {
+      const PP = window.MSCDocParsers; if (!PP || !PP.sizeRule) return null;
+      let code = '', basis = '확정';
+      try { code = ((JSON.parse(document.getElementById('corp_ksic')?.value || '[]') || [])[0] || {}).code || ''; } catch (e) { code = ''; }
+      if (!code) {
+        const line = String(document.getElementById('corp_biz_item')?.value || '').split(/\n+/)[0];
+        const sug = line ? PP.suggestKsic(document.getElementById('corp_biz_up')?.value || '', line, ksicData(), 1)[0] : null;
+        if (sug) { code = sug.code; basis = '추천 1순위'; }
+      }
+      const rule = code ? PP.sizeRule(code, ksicData()) : null;
+      const num = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.]/g, '')); return v > 0 ? v : null; };
+      const emp = num('sme_employees');
+      const fsMil = num('sme_sales'), mon = num('smb_monthly_sales');
+      const salesEok = fsMil ? fsMil / 100 : mon ? mon * 12 / 10000 : null;
+      const tier = rule ? PP.sizeTier(rule, emp, salesEok) : null;
+      return { code, basis, rule, emp, salesEok, tier };
+    }
+    window.sizeContext = sizeContext;
+    function renderSizeRule() {
+      const box = document.getElementById('size_rule_box'); if (!box) return;
+      const c = sizeContext();
+      if (!c || !c.rule) { box.innerHTML = '고객사 정보의 종목(표준산업분류)을 정하면 업종별 법정 기준으로 규모를 판정해 줘요.'; return; }
+      const r = c.rule, name = { smb: '소상공인', small: '소기업', sme: '중기업', over: '중소기업 기준 초과' };
+      const now = [c.emp != null ? `근로자 ${c.emp.toLocaleString()}명` : '', c.salesEok != null ? `연매출 약 ${c.salesEok.toFixed(1)}억` : ''].filter(Boolean).join(' · ');
+      const cur = window.appState.bizTrack;
+      box.innerHTML = `${escapeHtml(c.code)}(${c.basis}) 법정 기준 — 소상공인: 근로자 <b>${r.smbEmp}명 미만</b> · 소기업: 매출 <b>${r.smallEok.toLocaleString()}억 이하</b> · 중소기업: <b>${r.smeEok.toLocaleString()}억 이하</b>`
+        + (c.tier ? `<br>지금 값(${now})이면 <b>${name[c.tier]}</b>` + (c.tier !== 'over' && c.tier !== cur ? `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}로 바꾸기</button>` : c.tier === cur ? ' <span class="ok">· 지금 선택과 같아요</span>' : '') : `<br>${now ? '지금 값(' + now + ')으로는 판정이 부족해요 — 연매출을 넣어 주세요' : '근로자 수·연매출을 넣으면 판정해요'}`);
+    }
+    window.renderSizeRule = renderSizeRule;
+    function syncCustExtras() { try { syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
       const ext = elv('cust_ext'), kb = elv('ksic_box');
@@ -8442,6 +8475,11 @@
     .rp-empty { color: #8a94a3; font-weight: 400; }
     /* 고객사 정보: 표준산업분류 추천 · 구획 · 칩 토글 · 행 추가 */
     .ksic-box { margin-top: 8px; display: grid; gap: 6px; }
+    .size-rule { margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: #cbd5e1; }
+    .size-rule:empty { display: none; }
+    .size-rule b { color: #fff; }
+    .size-rule .go { margin-left: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid #5eead4; background: transparent; color: #5eead4; font-weight: 800; cursor: pointer; }
+    .size-rule .ok { color: #5eead4; font-weight: 800; }
     .ksic-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
     .ksic-row .ln { font-weight: 800; color: #0f172a; min-width: 0; max-width: 100%; }
     .ksic-row .arrow { color: #94a3b8; }
@@ -9447,6 +9485,38 @@
     // 점수가 같으면 이름이 짧은(덜 특수한) 분류 먼저 — '소프트웨어 개발'이 게임 소프트웨어보다 응용 소프트웨어로
     return res.sort((a, b) => b.score - a.score || a.name.length - b.name.length || a.code.localeCompare(b.code)).slice(0, n || 3);
   }
+  // 기업 규모 법정 기준(표준산업분류 코드 → 상한). 출처: 「중소기업기본법 시행령」 별표 1(중소기업 평균매출액등 상한)·별표 3(소기업),
+  // 「소상공인기본법 시행령」 제2조(상시근로자: 광업·제조업·건설업·운수업 10명 미만, 그 밖 5명 미만). 금액 단위: 억원
+  const SIZE_SME = [[1500, ['C14', 'C15', 'C17', 'C24', 'C28', 'C32']],
+    [1000, ['A', 'B', 'C10', 'C12', 'C13', 'C16', 'C19', 'C20', 'C22', 'C25', 'C26', 'C29', 'C30', 'C31', 'D', 'E36', 'F', 'G']],
+    [800, ['C11', 'C18', 'C21', 'C23', 'C27', 'C33', 'E', 'H', 'J']],
+    [600, ['C34', 'M', 'N', 'Q', 'R', 'S']],
+    [400, ['I', 'K', 'L', 'N76', 'P']]];
+  const SIZE_SMALL = [[120, ['C10', 'C11', 'C14', 'C15', 'C19', 'C20', 'C21', 'C23', 'C24', 'C25', 'C26', 'C28', 'C29', 'C30', 'C32', 'D', 'E36']],
+    [80, ['A', 'B', 'C12', 'C13', 'C16', 'C17', 'C18', 'C22', 'C27', 'C31', 'C33', 'F', 'H', 'K']],
+    [50, ['G', 'J']],
+    [30, ['E', 'L', 'M', 'N', 'R']],
+    [10, ['C34', 'I', 'P', 'Q', 'S']]];
+  // 가장 구체적인 열쇠(대분류+중분류, 예 'C14'·'N76')가 먼저, 없으면 대분류('E'·'N' 등)
+  function sizeRule(code, data) {
+    const c = String(code || '').replace(/\D/g, '').slice(0, 5); if (c.length < 2) return null;
+    const it = data && data.items ? data.items.find(x => x[0] === c) : null;
+    const sec = it ? it[2] : (data && data.items ? (data.items.find(x => x[0].startsWith(c.slice(0, 2))) || [])[2] : null);
+    if (!sec) return null;
+    const keys = [sec + c.slice(0, 2), sec];
+    const pick = tbl => { for (const k of keys) for (const [v, list] of tbl) if (list.includes(k)) return v; return null; };
+    return { section: sec, mid: c.slice(0, 2), smeEok: pick(SIZE_SME), smallEok: pick(SIZE_SMALL), smbEmp: ['B', 'C', 'F', 'H'].includes(sec) ? 10 : 5 };
+  }
+  // 근로자 수·연매출(억) → 소상공인 / 소기업 / 중기업 / 중소기업 초과. 값이 모자라면 null
+  function sizeTier(rule, emp, salesEok) {
+    if (!rule) return null;
+    if (salesEok != null && rule.smeEok != null && salesEok > rule.smeEok) return 'over';
+    if (salesEok != null && rule.smallEok != null && salesEok <= rule.smallEok) return emp != null && emp < rule.smbEmp ? 'smb' : 'small';
+    if (salesEok != null) return 'sme';
+    if (emp != null) return emp < rule.smbEmp ? 'smb' : null;
+    return null;
+  }
+
   // 코드·이름 직접 검색(코드 앞자리 또는 이름·예시에 들어간 낱말)
   function searchKsic(q, data, n) {
     const s = String(q || '').trim(); if (!s || !data) return [];
@@ -10093,7 +10163,7 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -10471,10 +10541,17 @@
           let tier, why = [];
           if (emp !== null) why.push(`근로자 ${emp}명`);
           if (salesEok !== null) why.push(`연매출 약 ${salesEok.toFixed(1)}억`);
-          if (emp !== null && emp < SMB_EMP[useInd]) tier = 'smb';
+          // 표준산업분류를 알면(확정 또는 업태·종목 추천 1순위) 법정 기준(시행령 별표 1·3, 소상공인기본법)으로
+          const PP = P(), upV = pickVal('corp_biz_up') || (document.getElementById('corp_biz_up')?.value || ''), itV = (pickVal('corp_biz_item') || (document.getElementById('corp_biz_item')?.value || '')).split(/\n+/)[0];
+          let kc = ''; try { kc = ((JSON.parse(document.getElementById('corp_ksic')?.value || '[]') || [])[0] || {}).code || ''; } catch (e) { kc = ''; }
+          if (!kc && itV && window.ksicData) kc = ((PP.suggestKsic(upV, itV, ksicData(), 1) || [])[0] || {}).code || '';
+          const rule = kc && window.ksicData ? PP.sizeRule(kc, ksicData()) : null;
+          const legal = rule ? PP.sizeTier(rule, emp, salesEok) : null;
+          if (legal && legal !== 'over') { tier = legal; why.push(`표준산업분류 ${kc} 법정 기준`); }
+          else if (emp !== null && emp < SMB_EMP[useInd]) tier = 'smb';
           else if (salesEok !== null) tier = salesEok <= SMALL_SALES_EOK[useInd] ? 'small' : 'sme';
           else tier = emp >= 50 ? 'sme' : 'small';
-          out.push({ id: '_track', value: tier, conf: 0.6, valid: true, note: why.join(' · ') + ` · ${IND_NAME[useInd].split(' ')[0]} 기준 단순 판정 — 확인`, file: [fsSales?.file, vat?.file, cands.find(x => x.id === 'sme_employees')?.file].filter(Boolean).join(', ') });
+          out.push({ id: '_track', value: tier, conf: 0.6, valid: true, note: why.join(' · ') + (why.some(w => /법정 기준/.test(w)) ? ' — 확인' : ` · ${IND_NAME[useInd].split(' ')[0]} 기준 단순 판정 — 확인`), file: [fsSales?.file, vat?.file, cands.find(x => x.id === 'sme_employees')?.file].filter(Boolean).join(', ') });
         }
         return out;
       }
