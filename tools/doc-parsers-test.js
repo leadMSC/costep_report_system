@@ -35,6 +35,72 @@ ok('대출표 변환', () => {
   const d = P.toDebtItems(L); assert.strictEqual(d.length, 3); assert.strictEqual(d[0].balance, 20000); assert.strictEqual(d[0].rate, '');
   const c = P.toDebtItems(C); assert.ok(c[0].type.startsWith('대표자 개인'));
 });
+// 채권자변동정보 조회서 — 발급처·칸 배치가 다른 여러 꼴(가짜 값 pdf.js 글자 조각, tests/fixtures/creditor_layouts_fake.js)
+const CL = require('../tests/fixtures/creditor_layouts_fake.js');
+const crDoc = pages => P.parseDocument(pages, 'doc_0.pdf');
+const crParsed = pages => P.parseDebtDocument(P.pagesToCells(pages), pages);
+ok('조회서 꼴1(신용정보원형: 여러 줄 머리·세 줄 기록·여러 쪽): 판별·대출·보증 분리', () => {
+  const pg = CL.layoutKcis(), d = crDoc(pg), c = crParsed(pg);
+  assert.strictEqual(d.kind, 'creditor'); assert.strictEqual(d.status, 'ok');
+  assert.strictEqual(c.via, 'layout'); assert.strictEqual(c.unit, '천원'); assert.strictEqual(c.asOf, '2025-01-02');
+  assert.strictEqual(c.loans.length, 5);
+  assert.deepStrictEqual(c.loans.map(l => l.amountMan), [3000, 5000, 4500, 200, 10000]);
+  assert.deepStrictEqual(c.loans.map(l => l.isGuarantee), [false, false, true, true, false]);
+  assert.strictEqual(c.loans[1].category, '개인사업자대출'); assert.strictEqual(c.loans[1].type, '운전자금(일반)'); assert.strictEqual(c.loans[1].typeCode, '1031');
+  assert.strictEqual(c.loans[1].institution, '다라은행'); assert.strictEqual(c.loans[1].openedAt, '2022-06-07');
+  assert.strictEqual(c.loans[4].type, '신용대출(종합통장대출)'); assert.strictEqual(c.loans[4].institution, '마바(세종)');
+  assert.strictEqual(c.summary.loans, 3); assert.strictEqual(c.summary.guarantees, 2); assert.strictEqual(c.summary.skipped, 0);
+  // 대출표에는 보증 기록을 빼고 3건, 사업자 대출은 '대표자 개인사업자'
+  assert.strictEqual(d.debtItems.length, 3);
+  assert.strictEqual(d.debtItems[1].type, '대표자 개인사업자 · 운전자금(일반)');
+  assert.ok(d.notes.some(n => /보증 기록 2건/.test(n)));
+});
+ok('조회서 꼴1: 연체 이력(기관 위 줄·전화 아래 줄·채권구분 줄바꿈·미해제)', () => {
+  const c = crParsed(CL.layoutKcis());
+  assert.strictEqual(c.delinquencies.length, 2);
+  const [a, b] = c.delinquencies;
+  assert.strictEqual(a.institution, '사아카드'); assert.strictEqual(a.type, '신용카드채권'); assert.strictEqual(a.occurredAt, '2020-03-04');
+  assert.strictEqual(a.principalMan, 120); assert.strictEqual(a.interestMan, 3);
+  assert.strictEqual(a.released, true); assert.strictEqual(a.releaseReason, '채무자 변제'); assert.strictEqual(a.releasedAt, '2020-05-06');
+  assert.strictEqual(b.institution, '자차캐피탈'); assert.strictEqual(b.accelerated, true); assert.strictEqual(b.acceleratedAt, '2021-09-01');
+  assert.strictEqual(b.collection, '위탁(가상신용정보)'); assert.strictEqual(b.released, false); assert.strictEqual(b.transferred, false);
+  assert.strictEqual(c.summary.unresolved, 1);
+  assert.ok(!/홍길동|800101|1500-0000|02-000-0000/.test(JSON.stringify(c)), '이름·주민번호·전화번호 미포함');
+});
+ok('조회서 꼴2(다른 발급처: 칸 순서·이름 다름, 원 단위 잔액, 해제일·사유 따로 칸)', () => {
+  const pg = CL.layoutOther(), d = crDoc(pg), c = crParsed(pg);
+  assert.strictEqual(d.kind, 'creditor'); assert.strictEqual(c.unit, '원'); assert.strictEqual(c.unitGuessed, false); assert.strictEqual(c.asOf, '2025-03-04');
+  assert.deepStrictEqual(c.loans.map(l => [l.institution, l.type, l.openedAt, l.amountMan, l.amountBasis]),
+    [['가상저축은행', '사업자운전자금', '2024-01-31', 3500, '잔액'], ['나다캐피탈', '할부금융', '2024-11-02', 840, '잔액']]);
+  assert.deepStrictEqual(c.loans[0].needs, ['금리']);
+  assert.strictEqual(d.debtItems[0]._from, '채권자변동정보(잔액)'); assert.strictEqual(d.debtItems[0].type, '대표자 개인 · 사업자운전자금');
+  assert.strictEqual(c.delinquencies.length, 2);
+  assert.deepStrictEqual(c.delinquencies.map(x => [x.institution, x.occurredAt, x.principalMan, x.released, x.releaseReason, x.releasedAt]),
+    [['가상카드', '2023-02-03', 150, true, '변제완료', '2023-03-01'], ['나다캐피탈', '2025-01-15', 70, false, '', '']]);
+  assert.ok(!/김가상/.test(JSON.stringify(c)));
+});
+ok('조회서 꼴3(글자 한 자씩 조각·두 줄 머리·순번/단위 없음 → 원 단위 짐작)', () => {
+  const pg = CL.layoutChars(), d = crDoc(pg), c = crParsed(pg);
+  assert.strictEqual(d.kind, 'creditor');
+  assert.strictEqual(c.loans.length, 2);
+  assert.deepStrictEqual(c.loans.map(l => [l.category, l.type, l.typeCode, l.institution, l.openedAt]),
+    [['개인대출정보', '주택담보대출', '0230', '하나둘은행', '2019-10-11'], ['개인대출정보', '카드론', '0041', '셋넷카드', '2024-02-29']]);
+  assert.strictEqual(c.unit, '원'); assert.strictEqual(c.unitGuessed, true);
+  assert.deepStrictEqual(c.loans.map(l => l.amountMan), [12000, 300]);
+  assert.ok(d.notes.some(n => /단위가 서류에 없어/.test(n)));
+});
+ok('조회서 꼴4(사진 글자 인식 줄 글: 한 줄에 칸이 다 있음·만원·년월일)', () => {
+  const t = fs.readFileSync(path.join(__dirname, '..', 'tests', 'fixtures', 'creditor_ocr_fake.txt'), 'utf8');
+  const r = P.parseTextDocument(t, 'scan.jpg');
+  assert.strictEqual(r.kind, 'creditor'); assert.strictEqual(r.status, 'ok');
+  assert.strictEqual(r.debtItems.length, 2);
+  assert.deepStrictEqual(r.debtItems.map(x => [x.institution, x.balance, x.payback]), [['가나은행', 3000, '2023-05-10 발생'], ['다라저축은행', 500, '2024-12-01 발생']]);
+  assert.ok(!/1234567|홍길동/.test(JSON.stringify(r)));
+});
+ok('조회서인데 표가 없으면 건너뜀(빈 결과로 대출표 덮지 않음)', () => {
+  const d = P.parseDocument([[{ s: '채권자변동정보 조회서', x: 100, y: 700, w: 200, h: 20 }, { s: '조회 결과 등록된 정보가 없습니다', x: 100, y: 600, w: 300, h: 10 }]], 'x.pdf');
+  assert.strictEqual(d.kind, 'creditor'); assert.strictEqual(d.status, 'skip'); assert.strictEqual(d.debtItems.length, 0);
+});
 // 사진 글자 인식(합성 글 — 실제 사진·번호 아님)
 ok('주민번호 뒷자리 가리기(잡음 포함)', () => {
   const r = P.redact(['홍길동 (洪吉童)', '800101-1234567', '800101 - 12345)7', '금액 120000 -45000'].join('\n'));
