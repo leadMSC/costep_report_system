@@ -274,6 +274,29 @@ ok('부가세 과세표준증명 스캔(글자 인식): 기간·금액·합계 �
   const r2 = P.parseTextDocument(t.replace('183,434,740 0 183', '188,434,740 0 183'), 'x.pdf');
   assert.ok(r2.meta.smb_monthly_sales.conf < 0.6);
 });
+ok('표준산업분류 추천: 사업자등록증 업태·종목 → KSIC 11차 세세분류', () => {
+  const D = JSON.parse(fs.readFileSync(path.join(__dirname, 'ksic11.json'), 'utf8'));
+  assert.strictEqual(D.items.length, 1205);
+  const top = (u, i) => (P.suggestKsic(u, i, D)[0] || {}).code;
+  assert.strictEqual(top('도매 및 소매업', '주유소'), '47711');
+  assert.ok(/^4620[24]$/.test(top('도매', '화훼')));
+  assert.ok(/^011(22|51)$/.test(top('농업', '화훼')));
+  assert.strictEqual(top('소매업', '꽃집'), '47851');
+  assert.strictEqual(top('서비스', '미용실'), '96112');
+  assert.strictEqual(top('숙박 및 음식점업', '커피전문점'), '56221');
+  assert.ok(/^85/.test(top('서비스업', '학원')) && top('서비스업', '학원') !== '85303');   // 교육 서비스, '대학원'(85303)에 붙지 않음
+  assert.strictEqual(top('제조', '빵'), '10602');
+  assert.strictEqual(top('건설업', '실내건축공사'), '42412');
+  assert.strictEqual(top('서비스업', '경영컨설팅'), '71531');
+  assert.deepStrictEqual(P.suggestKsic('', '', D), []);
+  assert.strictEqual(P.searchKsic('47711', D)[0].name, '운송장비용 주유소 운영업');
+});
+ok('사업자등록증 업태·종목은 원문 그대로 따로', () => {
+  const a = ['사업자등록증명', '( 법인사업자 )', '상호 ( 법 인 명 ) 녁', '사 업 자 둥 록 번 호 123-81-00001', '음식/제조/도,소매', '업             태', '한식/떡류/식품', '종            목'].join('\n');
+  const r = P.parseTextDocument(a, 'x.pdf');
+  assert.strictEqual(r.fields.corp_biz_up, '음식/제조/도,소매');
+  assert.strictEqual(r.fields.corp_biz_item, '한식/떡류/식품');
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);
