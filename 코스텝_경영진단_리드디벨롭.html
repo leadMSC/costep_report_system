@@ -1100,9 +1100,9 @@
               <tr>
                 <th>금융기관</th>
                 <th>과목 · 성격</th>
-                <th class="r">잔액 <small>만원</small></th>
+                <th class="r">잔액 <small>천원</small></th>
                 <th class="r">금리 <small>연%</small></th>
-                <th class="r">월이자 <small>만원</small></th>
+                <th class="r">월이자 <small>천원</small></th>
                 <th>상환방법 · 만기</th>
                 <th></th>
               </tr>
@@ -1115,9 +1115,9 @@
 
         <!-- 합계 (보고서와 같은 값) -->
         <div class="debt-sum">
-          <div><span>잔액 합계</span><strong id="debt_total_balance">0만원</strong><em id="debt_total_balance_kr"></em></div>
+          <div><span>잔액 합계</span><strong id="debt_total_balance">0천원</strong><em id="debt_total_balance_kr"></em></div>
           <div><span>가중평균 금리</span><strong id="debt_avg_rate">연 0.00%</strong></div>
-          <div><span>월 이자 합계</span><strong id="debt_total_monthly_interest">0만원</strong></div>
+          <div><span>월 이자 합계</span><strong id="debt_total_monthly_interest">0천원</strong></div>
         </div>
         <div id="debt_high_rate_alert" class="hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <b>연 7% 이상 고금리 대출 있음</b> · <span id="debt_alert_text"></span>
@@ -3503,6 +3503,10 @@
     // =========================================================================
     // DETAILED DEBT CONSOLE (부채 상세 명세 관리 및 실시간 연산)
     // =========================================================================
+    // 대출표 금액 단위: 저장은 만원, 보이기·입력은 천원
+    const manToChun = v => (v === '' || v === null || v === undefined) ? '' : Math.round(Number(v) * 10);
+    const fmtChun = v => Math.round(Number(v || 0) * 10).toLocaleString() + '천원';
+    window.fmtChun = fmtChun;
     function renderDebtTable() {
       const tbody = document.getElementById('debt_tbody');
       if (!tbody) return;
@@ -3521,13 +3525,13 @@
             <input type="text" value="${escapeHtml(item.type)}" placeholder="과목 · 성격" title="과목 · 성격" oninput="updateDebtItem(${idx}, 'type', this.value)" class="form-input-control text-xs">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="number" min="0" value="${item.balance}" placeholder="잔액(만원)" title="잔액(만원)" oninput="updateDebtItem(${idx}, 'balance', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold">
+            <input type="number" min="0" value="${manToChun(item.balance)}" placeholder="잔액(천원)" title="잔액(천원)" oninput="updateDebtItem(${idx}, 'balance', this.value === '' ? '' : Number(this.value) / 10)" class="form-input-control debt-num text-xs text-right font-bold">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="number" min="0" step="0.1" value="${item.rate}" placeholder="금리(%)" title="금리(연 %)" oninput="updateDebtItem(${idx}, 'rate', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold text-blue-700">
+            <input type="number" min="0" step="0.1" value="${item.rate}" placeholder="금리(%)" title="금리(연 %)" oninput="updateDebtItem(${idx}, 'rate', Number(this.value))" class="form-input-control debt-num text-xs text-right font-bold text-blue-700">
           </td>
           <td class="p-2 border border-slate-200">
-            <input type="number" min="0" value="${item.monthlyInterest}" placeholder="월이자(만원)" title="월이자(만원)" oninput="updateDebtItem(${idx}, 'monthlyInterest', Number(this.value))" class="form-input-control text-xs text-right font-mono font-bold text-amber-700">
+            <input type="number" min="0" value="${manToChun(item.monthlyInterest)}" placeholder="월이자(천원)" title="월이자(천원)" oninput="updateDebtItem(${idx}, 'monthlyInterest', this.value === '' ? '' : Number(this.value) / 10)" class="form-input-control debt-num text-xs text-right font-bold text-amber-700">
           </td>
           <td class="p-2 border border-slate-200">
             <input type="text" value="${escapeHtml(item.payback)}" placeholder="상환방법 · 만기 (예: 원금균등 5년, 2027-06 만기)" oninput="updateDebtItem(${idx}, 'payback', this.value)" class="form-input-control text-xs">
@@ -3563,10 +3567,10 @@
         if (key === 'balance' || key === 'rate') {
           const bal = window.appState.debtItems[index].balance || 0;
           const rt = window.appState.debtItems[index].rate || 0;
-          window.appState.debtItems[index].monthlyInterest = Math.round(bal * rt / 100 / 12);
+          window.appState.debtItems[index].monthlyInterest = Math.round(bal * rt / 100 / 12 * 10) / 10;
           // 화면의 월이자 칸도 바로 바꿈(보고서 계산과 같게)
-          const mi = document.querySelectorAll('#debt_tbody tr')[index]?.querySelector('input[title="월이자(만원)"]');
-          if (mi) mi.value = window.appState.debtItems[index].monthlyInterest;
+          const mi = document.querySelectorAll('#debt_tbody tr')[index]?.querySelector('input[title="월이자(천원)"]');
+          if (mi) mi.value = manToChun(window.appState.debtItems[index].monthlyInterest);
         }
         calcDebtTotals();
       }
@@ -3584,7 +3588,7 @@
       items.forEach(it => {
         const bal = Number(it.balance || 0);
         const rate = Number(it.rate || 0);
-        const mInt = Number(it.monthlyInterest || Math.round(bal * rate / 100 / 12));
+        const mInt = Number(it.monthlyInterest || Math.round(bal * rate / 100 / 12 * 10) / 10);
 
         totalBal += bal;
         totalMonthlyInt += mInt;
@@ -3605,7 +3609,7 @@
       const elAlert = document.getElementById('debt_high_rate_alert');
       const elAlertText = document.getElementById('debt_alert_text');
 
-      if (elTotBal) elTotBal.innerText = totalBal.toLocaleString() + '만원';
+      if (elTotBal) elTotBal.innerText = fmtChun(totalBal);
       // 억 단위 읽기 보조: 1억 이상일 때만 실제 합계로 표시 (예: 58,500만원 → (5억 8,500만원))
       const elTotBalKr = document.getElementById('debt_total_balance_kr');
       if (elTotBalKr) {
@@ -3613,13 +3617,13 @@
         elTotBalKr.innerText = eok > 0 ? `(${eok}억${rest ? ' ' + rest.toLocaleString() + '만원' : '원'})` : '';
       }
       if (elAvgRate) elAvgRate.innerText = `연 ${avgRate}%`;
-      if (elTotInt) elTotInt.innerText = totalMonthlyInt.toLocaleString() + '만원';
+      if (elTotInt) elTotInt.innerText = fmtChun(totalMonthlyInt);
 
       // 차입 내역이 실제로 기재된 경우에만 소상공인 월 차입이자 칸을 대출표 합계로 맞춘다.
       // (부채총계 sme_debt 는 결산서 값이므로 대출표로 덮어쓰지 않는다)
       const smbIntInput = document.getElementById('smb_cost_interest');
       if (smbIntInput && totalBal > 0) {
-        smbIntInput.value = totalMonthlyInt.toLocaleString();
+        smbIntInput.value = Math.round(totalMonthlyInt).toLocaleString();
         window.__smbIntAuto = smbIntInput.value;
       } else if (smbIntInput && !items.length && window.__smbIntAuto !== undefined && smbIntInput.value === window.__smbIntAuto) {
         // 대출을 모두 지웠으면 대출표에서 채운 이자도 비움(직접 쓴 값은 둠)
@@ -5582,9 +5586,9 @@
       const bpEffect = escapeHtml(document.getElementById('bp_outcome')?.value.trim()) || ph('고용 창출 및 매출 성장 목표 미기재');
 
       // ================= 2. 금융기관별 여신·차입금 실시간 집계 =================
-      const totalDebt = document.getElementById('debt_total_balance')?.innerText || '0만원';
+      const totalDebt = document.getElementById('debt_total_balance')?.innerText || '0천원';
       const avgRate = document.getElementById('debt_avg_rate')?.innerText || '연 0.00%';
-      const monthlyInterest = document.getElementById('debt_total_monthly_interest')?.innerText || '0만원';
+      const monthlyInterest = document.getElementById('debt_total_monthly_interest')?.innerText || '0천원';
 
       // 금융기관별 차입금 테이블 행 생성
       let debtRowsHtml = '';
@@ -5596,18 +5600,18 @@
           <tr class="text-center text-[10px]">
             <td class="px-1 py-1 border border-slate-300 font-bold"><div class="rp-clamp1" title="${escapeHtml(d.institution)}">${escapeHtml(d.institution) || '-'}</div></td>
             <td class="px-1 py-1 border border-slate-300"><div class="rp-clamp1">${escapeHtml(d.type) || '-'}</div></td>
-            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono font-bold">${Number(d.balance || 0).toLocaleString()}만원</td>
-            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono text-[#0f766e] font-bold">연 ${Math.round(Number(d.rate || 0) * 100) / 100}%</td>
-            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono text-amber-700">${Number(d.monthlyInterest || 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num font-bold">${fmtChun(d.balance)}</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num text-[#0f766e] font-bold">연 ${Math.round(Number(d.rate || 0) * 100) / 100}%</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num text-amber-700">${fmtChun(d.monthlyInterest)}</td>
             <td class="px-1 py-1 border border-slate-300"><div class="rp-clamp1">${escapeHtml(d.payback) || '-'}</div></td>
           </tr>
         `).join('') + (debtSorted.length > DEBT_MAX + 1 ? `
           <tr class="text-center text-[10px] bg-slate-50">
             <td class="px-1 py-1 border border-slate-300 font-bold">외 ${debtRest.length}건</td>
             <td class="px-1 py-1 border border-slate-300 text-slate-500"><div class="rp-clamp1">${escapeHtml([...new Set(debtRest.map(d => d.institution).filter(Boolean))].slice(0, 2).join(', '))}${new Set(debtRest.map(d => d.institution)).size > 2 ? ' 등' : ''}</div></td>
-            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono font-bold">${debtRest.reduce((a, d) => a + Number(d.balance || 0), 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num font-bold">${fmtChun(debtRest.reduce((a, d) => a + Number(d.balance || 0), 0))}</td>
             <td class="px-1 py-1 border border-slate-300 text-slate-500">-</td>
-            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap font-mono text-amber-700">${debtRest.reduce((a, d) => a + Number(d.monthlyInterest || 0), 0).toLocaleString()}만원</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num text-amber-700">${fmtChun(debtRest.reduce((a, d) => a + Number(d.monthlyInterest || 0), 0))}</td>
             <td class="px-1 py-1 border border-slate-300 text-slate-500">입력 화면 대출표 참고</td>
           </tr>` : '');
       } else {
@@ -5908,7 +5912,7 @@
             <div class="border border-slate-300 rounded-lg p-2 bg-slate-50/40 space-y-1 text-[10px]">
               <div class="flex justify-between items-center border-b border-slate-200 pb-1">
                 <span class="font-extrabold text-slate-900">【 금융기관별 차입금 및 여신 세부 거래 현황 】</span>
-                <span class="text-[9.5px] text-slate-600 font-bold">총 차입잔액: <strong class="text-amber-700 font-mono">${totalDebt}</strong> | 평균금리: <strong class="text-[#0f766e] font-mono">${avgRate}</strong> (월차입이자: ${monthlyInterest})</span>
+                <span class="text-[9.5px] text-slate-600 font-bold">총 차입잔액: <strong class="text-amber-700 debt-num">${totalDebt}</strong> | 평균금리: <strong class="text-[#0f766e] debt-num">${avgRate}</strong> (월차입이자: ${monthlyInterest})</span>
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-[9.5px] border-collapse border border-slate-300 bg-white">
@@ -8500,6 +8504,8 @@
     /* 대출 현황 표 */
     #debt_card .debt-table th { text-align: left; font-weight: 800; color: #64748B; background: #F8FAFC; padding: 8px 8px; border-bottom: 1px solid #E2E8F0; white-space: nowrap; }
     #debt_card .debt-table th.r { text-align: right; }
+    /* 대출표 숫자: 디자인 시스템 글꼴(Noto Sans KR) + 같은 폭 숫자 — 모노 글꼴 대신 */
+    .debt-num, #debt_card .debt-table .form-input-control, #debt_card .debt-sum strong { font-family: 'Noto Sans KR', sans-serif !important; font-variant-numeric: tabular-nums; }
     #debt_card .debt-table th small { font-weight: 600; color: #94A3B8; font-size: 10px; }
     #debt_card .debt-table td { padding: 5px 4px; border-bottom: 1px solid #F1F5F9; }
     #debt_card .debt-table td .form-input-control { padding: 7px 8px; }
@@ -10745,7 +10751,7 @@
           });
           (r.fsList || (r.fs ? [r.fs] : [])).forEach(x => fsList.push(Object.assign({ file: f.name }, x)));
           (r.ipItems || []).forEach((it, i) => cands.push({ id: '_ip:' + f.name + ':' + i, ip: it, value: [it.kind, it.regNo, it.title].filter(Boolean).join(' · '), conf: Object.values(it).filter(Boolean).length >= 7 ? 0.8 : 0.6, valid: true, note: [it.appNo && '출원 ' + it.appNo, it.appDate, it.applicant, it.inventor && '발명 ' + it.inventor, it.regDate && '등록 ' + it.regDate].filter(Boolean).join(' · '), file: f.name }));
-          (r.debtItems || []).forEach((d, i) => cands.push({ id: '_debt:' + f.name + ':' + i, debt: d, value: `${d.institution} · ${d.type} · ${fmt(d.balance)}만원`, conf: 0.8, valid: true, note: d._from === '채권자변동정보(발생금액)' ? '발생 당시 금액 — 지금 잔액 확인 필요' : '금리는 직접 입력', file: f.name }));
+          (r.debtItems || []).forEach((d, i) => cands.push({ id: '_debt:' + f.name + ':' + i, debt: d, value: `${d.institution} · ${d.type} · ${window.fmtChun ? fmtChun(d.balance) : fmt(d.balance) + '만원'}`, conf: 0.8, valid: true, note: d._from === '채권자변동정보(발생금액)' ? '발생 당시 금액 — 지금 잔액 확인 필요' : '금리는 직접 입력', file: f.name }));
         });
         // 소상공인 연 매출 칸(만원): 올해 누적 · 작년 · 2년 전 · 3년 전
         const yNow = new Date().getFullYear();
