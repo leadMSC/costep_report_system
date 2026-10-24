@@ -951,8 +951,8 @@
               <div>
                 <label for="corp_ceo_phone" class="font-bold text-slate-700 block mb-1">대표자 연락처</label>
                 <div class="flex gap-1.5">
-                  <select id="corp_ceo_telecom" class="form-input-control w-[92px] shrink-0" aria-label="통신사"><option value="">통신사</option><option>SKT</option><option>KT</option><option>LG U+</option><option>알뜰폰</option></select>
-                  <input type="tel" id="corp_ceo_phone" value="" placeholder="010-0000-0000" class="form-input-control min-w-0" oninput="this.value = this.value.replace(/[^0-9-]/g, '')">
+                  <select id="corp_ceo_telecom" class="form-input-control w-[84px] shrink-0" aria-label="통신사"><option value="">통신사</option><option>SKT</option><option>KT</option><option>LG U+</option><option>알뜰폰</option></select>
+                  <input type="tel" id="corp_ceo_phone" value="" placeholder="휴대폰 번호" class="form-input-control min-w-0" oninput="this.value = this.value.replace(/[^0-9-]/g, '')">
                 </div>
               </div>
               <div>
@@ -11327,6 +11327,12 @@
     #l3 #debt_card.narrow .debt-table tr { grid-template-columns: 1fr 1fr 1fr 30px; grid-template-areas: "a b b x" "c d e x" "f f f x"; row-gap: 4px; }
     #l3 #screen_input > .l3-step > div[class*="p-5"] { padding: 14px 16px !important; }
     #l3 .l3-step .form-input-control { padding-top: 6px; padding-bottom: 6px; }
+    /* 입력 화면 칸 통일(L-148): 한 줄 칸은 높이 36px · 글꼴 Noto Sans KR 같은 폭 숫자 · 값 500 / 자리표시 400 (좁은 표 안 칸은 제외) */
+    #screen_input :is(input.form-input-control:not([type=checkbox]):not([type=radio]), select.form-input-control):not(.ksic-search):not(.ip-row *):not(.fs-stmt *):not(.fs-tight *):not(table *) { height: 36px; box-sizing: border-box; padding-top: 0 !important; padding-bottom: 0 !important; }
+    #screen_input .form-input-control:not(.ip-mono) { font-family: 'Noto Sans KR', sans-serif !important; font-variant-numeric: tabular-nums; }
+    #screen_input .form-input-control { font-weight: 500; }
+    #screen_input .form-input-control::placeholder { font-weight: 400; }
+    #cust_ext .form-input-control.text-right { text-align: left; }
     #l3 .l3-step label.block { margin-bottom: 2px; }
     /* 사업계획 개요서 질문 꼬리표(현장 문제점 등): 제목 옆 같은 줄에 제목 색 알약으로 */
     .bp-tag { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; line-height: 1.6; color: inherit; border: 1px solid currentColor; background: color-mix(in srgb, currentColor 16%, transparent); white-space: nowrap; }
