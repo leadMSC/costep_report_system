@@ -8173,6 +8173,32 @@
         <tbody>${rows || '<tr><td colspan="5" class="p-3 text-slate-500">구성원이 없습니다.</td></tr>'}</tbody></table></div>`;
     }
 
+    // 관리 화면용 확인·선택 창(화면 안에 그림) — 브라우저 기본 prompt()·confirm() 은 앱 안 브라우저 등에서 막혀
+    // 눌러도 아무 일이 없었음(L-153: 운영자가 소속 없는 대기자를 승인 못 함)
+    function adminAsk({ title, text, options, okLabel, danger }) {
+      return new Promise(resolve => {
+        const wrap = document.createElement('div');
+        wrap.className = 'fixed inset-0 z-[120] bg-slate-900/40 flex items-center justify-center p-4';
+        wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
+        wrap.innerHTML = `<div class="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-200 p-5 space-y-3 text-xs">
+          <h4 class="text-sm font-black text-slate-900">${escapeHtml(title || '')}</h4>
+          ${text ? `<p class="text-slate-600 leading-relaxed">${escapeHtml(text)}</p>` : ''}
+          ${options ? `<select class="form-input-control" data-ask-pick aria-label="${escapeHtml(title || '선택')}">${options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')}</select>` : ''}
+          <div class="flex justify-end gap-2 pt-1"><button type="button" data-ask-no class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold cursor-pointer">취소</button>
+          <button type="button" data-ask-ok class="px-3 py-1.5 rounded-lg font-bold text-white cursor-pointer ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-[#169aa8] hover:bg-[#138491]'}">${escapeHtml(okLabel || '확인')}</button></div></div>`;
+        const done = v => { wrap.remove(); document.removeEventListener('keydown', key, true); resolve(v); };
+        const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+        wrap.addEventListener('click', e => {
+          if (e.target === wrap || e.target.closest('[data-ask-no]')) done(null);
+          else if (e.target.closest('[data-ask-ok]')) { const sel = wrap.querySelector('[data-ask-pick]'); done(sel ? sel.value : true); }
+        });
+        document.addEventListener('keydown', key, true);
+        document.body.appendChild(wrap);
+        (wrap.querySelector('[data-ask-pick]') || wrap.querySelector('[data-ask-ok]')).focus();
+      });
+    }
+    window.adminAsk = adminAsk;
+
     async function adminSetRole(id, role) {
       const m = adminCache.members.find(x => x.id === id);
       if (!m) return;
@@ -8180,19 +8206,18 @@
       // 소속이 없는 대기자를 승인할 때: 펌 관리자는 자기 펌으로, 운영자는 펌을 고른다
       if (!m.org_id && role !== 'blocked') {
         if (isOperator()) {
-          const names = adminCache.orgs.map((o, i) => `${i + 1}. ${o.name}`).join('\n');
-          const pick = prompt(`${m.email} 을(를) 어느 펌으로 승인할까요? 번호를 입력하세요.\n${names}`);
-          const org = adminCache.orgs[Number(pick) - 1];
-          if (!org) return;
-          patch.org_id = org.id;
+          // 기존 펌에 넣거나, 소속 없이 승인해 본인이 '내 정보'에서 상호를 적고 [펌 등록](create_my_org → 그 펌 관리자)
+          const pick = await adminAsk({ title: '어느 펌으로 승인할까요?', text: `${m.name ? m.name + ' · ' : ''}${m.email}`, options: [{ value: '__self__', label: '새 펌 — 본인이 직접 등록' }].concat(adminCache.orgs.map(o => ({ value: o.id, label: o.name }))), okLabel: '승인' });
+          if (!pick) return;
+          if (pick !== '__self__') patch.org_id = pick;
         } else {
           patch.org_id = window.appState.auth.profile.org_id;
         }
       }
-      if (role === 'blocked' && !confirm(`${m.email} 을(를) 차단할까요? 차단하면 로그인해도 이용할 수 없습니다.`)) return;
+      if (role === 'blocked' && !(await adminAsk({ title: '차단할까요?', text: `${m.email} — 차단하면 로그인해도 이용할 수 없습니다.`, okLabel: '차단', danger: true }))) return;
       const { error } = await sb.from('profiles').update(patch).eq('id', id);
       if (error) { adminMsg('변경 실패: ' + error.message, false); return; }
-      adminMsg(`${m.email} → ${ROLE_LABEL[role]}`, true);
+      adminMsg(`${m.email} → ${ROLE_LABEL[role]}` + (role !== 'blocked' && !m.org_id && !patch.org_id ? ' · 본인이 로그인해 「내 정보」에서 상호를 적고 [펌 등록]을 누르면 그 펌 관리자가 됩니다' : ''), true);
       adminLoadMembers();
     }
     window.adminSetRole = adminSetRole;
@@ -8381,7 +8406,7 @@
       }));
       pane.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', async () => {
         const r = fileRows.find(x => x.id === b.dataset.rm); if (!r) return;
-        if (!confirm(`'${r.file_name}' 원본을 서버에서 지울까요? 되돌릴 수 없습니다.`)) return;
+        if (!(await adminAsk({ title: '원본을 지울까요?', text: `'${r.file_name}' — 서버에서 지우면 되돌릴 수 없습니다.`, okLabel: '지우기', danger: true }))) return;
         const st = await sb.storage.from('client-docs').remove([r.path]);
         if (st.error) { adminFileMsg('지우지 못했습니다: ' + st.error.message); return; }
         const { error } = await sb.from('client_files').delete().eq('id', r.id);
