@@ -566,6 +566,7 @@
         <button type="button" id="admin_tab_members" onclick="adminTab('members')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">구성원</button>
         <button type="button" id="admin_tab_invites" onclick="adminTab('invites')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">사전 등록(초대)</button>
         <button type="button" id="admin_tab_logs" onclick="adminTab('logs')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">접속·작업 기록</button>
+        <button type="button" id="admin_tab_files" onclick="adminTab('files')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">담당자 서류</button>
         <button type="button" id="admin_tab_org" onclick="adminTab('org')" class="admin-tab px-3 py-1.5 rounded-lg cursor-pointer">펌 정보·로고·직인</button>
       </div>
       <div class="p-5 text-xs flex-1 min-h-0 overflow-y-auto">
@@ -590,6 +591,7 @@
           <div id="admin_invite_list"></div>
         </div>
         <div id="admin_pane_logs" class="hidden"></div>
+        <div id="admin_pane_files" class="hidden"></div>
         <div id="admin_pane_org" class="hidden space-y-4">
           <div id="org_pick_wrap" class="hidden">
             <label class="font-bold text-slate-700 block mb-1">편집할 펌</label>
@@ -7807,6 +7809,21 @@
     const cloud = { base: null, on: false, aid: null, ver: 0, cid: null, list: [], timer: null, busy: null, again: false, dirty: false, listTimer: null };
     function cloudOn() { return cloud.on && typeof sb !== 'undefined' && !!sb; }
     window.cloudOn = cloudOn;
+    // 서류 창에 올린 원본을 비공개 저장소(client-docs)에 보관 — 펌 관리자·올린 사람만 내려받음(L-152, 신분증 포함·자동 삭제 없음: 사용자 결정)
+    async function cloudKeepFile(file, kindText) {
+      const p = (window.appState.auth || {}).profile || {}, uid = ((window.appState.auth || {}).user || {}).id;
+      if (!cloudOn() || !p.org_id || !uid) throw new Error('로그인한 서버 모드가 아님');
+      const ext = ((file.name.match(/\.([A-Za-z0-9]{1,6})$/) || [])[1] || 'bin').toLowerCase();
+      const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+      const path = `${p.org_id}/${uid}/${id}.${ext}`;
+      const up = await sb.storage.from('client-docs').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (up.error) throw up.error;
+      const row = { org_id: p.org_id, uploader_id: uid, client_id: cloud.cid || null, assessment_id: cloud.aid || null, client_name: String(document.getElementById('corp_name')?.value || '').trim() || null, file_name: file.name, path, size: file.size, mime: file.type || null, kind: kindText || null };
+      const { error } = await sb.from('client_files').insert(row);
+      if (error) { await sb.storage.from('client-docs').remove([path]); throw error; }
+      return path;
+    }
+    window.cloudKeepFile = cloudKeepFile;
     const cloudProfile = () => (window.appState.auth || {}).profile || {};
     const CLIENT_PROFILE_IDS = ['corp_ceo', 'corp_ceo_birth', 'corp_est_date', 'corp_form', 'corp_reg_no', 'corp_address', 'corp_factory_address', 'corp_biz_type', 'corp_main_bank'];
     function cloudSummary(data) {
@@ -8115,12 +8132,12 @@
     window.closeAdmin = closeAdmin;
 
     function adminTab(tab) {
-      ['members', 'invites', 'logs', 'org'].forEach(t => {
+      ['members', 'invites', 'logs', 'files', 'org'].forEach(t => {
         document.getElementById('admin_pane_' + t).classList.toggle('hidden', t !== tab);
         const b = document.getElementById('admin_tab_' + t);
         b.className = 'admin-tab px-3 py-1.5 rounded-lg cursor-pointer ' + (t === tab ? 'bg-[#169aa8] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200');
       });
-      ({ members: adminLoadMembers, invites: adminLoadInvites, logs: adminLoadLogs, org: () => adminLoadOrg() })[tab]();
+      ({ members: adminLoadMembers, invites: adminLoadInvites, logs: adminLoadLogs, files: () => adminLoadFiles(), org: () => adminLoadOrg() })[tab]();
     }
     window.adminTab = adminTab;
 
@@ -8327,6 +8344,55 @@
       pane.querySelector('#log_more')?.addEventListener('click', () => adminLoadLogs(true));
     }
 
+    // 담당자 서류: 서류 창에 올린 원본 목록 — 고객·담당자로 거르고 내려받기(서명된 임시 주소 60초)·지우기(L-152)
+    let fileRows = [], fileFilter = { q: '', who: '' };
+    async function adminLoadFiles() {
+      const pane = document.getElementById('admin_pane_files');
+      pane.innerHTML = '<p class="text-slate-500">불러오는 중…</p>';
+      const { data, error } = await sb.from('client_files').select('id,org_id,uploader_id,client_name,file_name,path,size,kind,created_at').order('created_at', { ascending: false }).limit(500);
+      if (error) { pane.innerHTML = `<p class="text-red-700">${escapeHtml(/client_files|relation|schema cache/.test(error.message) ? '서버에 서류 보관 표가 아직 없습니다(관리자 설정 필요).' : error.message)}</p>`; return; }
+      if (!adminCache.members.length) await adminLoadMembers();
+      fileRows = data || [];
+      adminRenderFiles();
+    }
+    function adminRenderFiles() {
+      const pane = document.getElementById('admin_pane_files');
+      const who = (id) => { const m = adminCache.members.find(x => x.id === id); return m ? (m.name || m.email) : '(알 수 없음)'; };
+      const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round((n || 0) / 1024)) + 'KB';
+      const people = [...new Set(fileRows.map(r => r.uploader_id))];
+      const q = fileFilter.q.trim();
+      const rows = fileRows.filter(r => (!fileFilter.who || r.uploader_id === fileFilter.who) && (!q || (r.client_name || '').includes(q) || (r.file_name || '').includes(q)));
+      pane.innerHTML = `<div class="flex flex-wrap items-center gap-2 mb-2"><input type="search" id="files_q" class="form-input-control max-w-[220px]" placeholder="고객·파일 이름 찾기" aria-label="고객·파일 이름 찾기" value="${escapeHtml(fileFilter.q)}">`
+        + `<select id="files_who" class="form-input-control max-w-[180px]" aria-label="담당자"><option value="">담당자 전체</option>${people.map(id => `<option value="${id}" ${fileFilter.who === id ? 'selected' : ''}>${escapeHtml(who(id))}</option>`).join('')}</select>`
+        + `<span class="text-slate-500 ml-auto">${rows.length}건${fileRows.length >= 500 ? ' (최근 500건)' : ''} · ${isOperator() ? '전체 펌' : '우리 펌'} · 지울 때까지 보관</span></div>`
+        + `<div class="max-h-[55vh] overflow-auto border border-slate-200 rounded-lg"><table class="w-full text-left"><thead class="sticky top-0 bg-slate-50 z-[1]"><tr class="text-slate-600"><th class="p-2">올린 때</th><th class="p-2">담당자</th><th class="p-2">고객</th><th class="p-2">파일 · 서류 종류</th><th class="p-2 text-right">크기</th><th class="p-2"></th></tr></thead><tbody>`
+        + (rows.map(r => `<tr class="border-b border-slate-100"><td class="p-2 whitespace-nowrap text-slate-500">${fmtTime(r.created_at)}</td><td class="p-2 whitespace-nowrap">${escapeHtml(who(r.uploader_id))}</td><td class="p-2">${escapeHtml(r.client_name || '(상호 미입력)')}</td><td class="p-2"><div class="font-bold text-slate-800 break-all">${escapeHtml(r.file_name)}</div>${r.kind ? `<div class="text-slate-500">${escapeHtml(r.kind)}</div>` : ''}</td><td class="p-2 text-right whitespace-nowrap">${kb(r.size)}</td><td class="p-2 whitespace-nowrap text-right"><button type="button" data-dl="${r.id}" class="px-2.5 py-1 rounded-lg bg-[#169aa8] hover:bg-[#138491] text-white font-bold cursor-pointer">내려받기</button> <button type="button" data-rm="${r.id}" class="px-2 py-1 rounded-lg border border-slate-300 bg-white hover:bg-red-50 text-slate-600 font-bold cursor-pointer">지우기</button></td></tr>`).join('')
+          || '<tr><td colspan="6" class="p-3 text-slate-500">보관된 서류가 없습니다. 담당자가 로그인한 상태로 서류 창에 올린 원본이 여기에 쌓입니다.</td></tr>')
+        + '</tbody></table></div>';
+      pane.querySelector('#files_q').addEventListener('input', e => { fileFilter.q = e.target.value; const pos = e.target.selectionStart; adminRenderFiles(); const el = document.getElementById('files_q'); el.focus(); try { el.setSelectionRange(pos, pos); } catch (er) { /* 없음 */ } });
+      pane.querySelector('#files_who').addEventListener('change', e => { fileFilter.who = e.target.value; adminRenderFiles(); });
+      pane.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', async () => {
+        const r = fileRows.find(x => x.id === b.dataset.dl); if (!r) return;
+        b.disabled = true;
+        const { data, error } = await sb.storage.from('client-docs').createSignedUrl(r.path, 60, { download: r.file_name });
+        b.disabled = false;
+        if (error || !data) { adminFileMsg('내려받지 못했습니다: ' + ((error && error.message) || '')); return; }
+        const a = document.createElement('a'); a.href = data.signedUrl; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+      }));
+      pane.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', async () => {
+        const r = fileRows.find(x => x.id === b.dataset.rm); if (!r) return;
+        if (!confirm(`'${r.file_name}' 원본을 서버에서 지울까요? 되돌릴 수 없습니다.`)) return;
+        const st = await sb.storage.from('client-docs').remove([r.path]);
+        if (st.error) { adminFileMsg('지우지 못했습니다: ' + st.error.message); return; }
+        const { error } = await sb.from('client_files').delete().eq('id', r.id);
+        if (error) { adminFileMsg('목록에서 지우지 못했습니다: ' + error.message); return; }
+        fileRows = fileRows.filter(x => x.id !== r.id); adminRenderFiles();
+      }));
+    }
+    function adminFileMsg(t) {
+      const m = document.getElementById('admin_msg'); if (!m) { alert(t); return; }
+      m.textContent = t; m.className = 'mb-3 px-3 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-800 border border-red-200';
+    }
     // 출력·문서 저장·고객 저장을 접속 기록에 남긴다 (기존 함수를 감싸기만 하고 동작은 그대로)
     function authWrapActions() {
       const corp = () => (document.getElementById('corp_name')?.value || '').trim().slice(0, 60);
@@ -10963,7 +11029,9 @@
             : r.status === 'scan' ? '<span class="st warn">글자층 없는 PDF</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
           const sel = `<select data-i="${i}" aria-label="서류 종류">${kinds.map(([k, t]) => `<option value="${k}" ${r && r.kind === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="unknown" ${!r || r.kind === 'unknown' ? 'selected' : ''}>어떤 서류인지 골라 주세요</option></select>`;
           const cut = f.split ? '<span class="st" style="font-weight:400">합본에서 나눔</span>' : '';
-          return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${cut}${f.pages || f.text !== undefined ? sel : ''}${st}</div>`;
+          const src = f.src || f.name, kp = keepState[src], first = files.findIndex(x => (x.src || x.name) === src) === i;
+          const keep = !kp || !first ? '' : kp === 'ok' ? '<span class="st ok" style="font-weight:400">원본 서버 보관</span>' : kp === 'saving' ? '<span class="st" style="font-weight:400">원본 보관 중…</span>' : `<span class="st warn" style="font-weight:400" title="${esc(keepErr[src] || '')}">원본 보관 실패</span>`;
+          return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${cut}${f.pages || f.text !== undefined ? sel : ''}${st}${keep}</div>`;
         }).join('');
         const t = document.getElementById('docs_table');
         if (!rows.length) {
@@ -11027,6 +11095,13 @@
       }
       // 대표자 신분증: 가리기 전 원문에서 잡은 주민등록번호 13자리를 신분증 결과에만 넣음(사용자 결정 L-137)
       let rawRrn = [];
+      // 원본 서버 보관 상태(파일 이름별): saving | ok | fail — 로그인한 서버 모드에서만(L-152)
+      const keepState = {}, keepErr = {};
+      function keepOriginal(file, kindText) {
+        if (!window.cloudKeepFile || !(window.cloudOn && cloudOn())) return;
+        keepState[file.name] = 'saving'; render();
+        cloudKeepFile(file, kindText).then(() => { keepState[file.name] = 'ok'; }).catch(e => { keepState[file.name] = 'fail'; keepErr[file.name] = String((e && e.message) || e); }).finally(render);
+      }
       function attachRrn(f) {
         const pick = rawRrn.slice().sort((a, b) => rawRrn.filter(x => x === b).length - rawRrn.filter(x => x === a).length)[0];
         if (!pick) return;
@@ -11165,7 +11240,9 @@
             }
           } catch (e) { if (window.__DOCS_DEBUG) (window.__docsDebug = window.__docsDebug || []).push({ name: file.name, text: '', error: String(e && (e.stack || e.message) || e).slice(0, 300) });
             f.res = { status: 'skip', notes: [/시간 초과/.test(e && e.message) ? '시간이 너무 오래 걸려 멈췄어요' : /도구/.test(e && e.message) ? e.message : '이 파일은 읽지 못했어요'] }; }
-          finally { try { attachRrn(f); } catch (e) { /* 없음 */ } rawRrn = []; finished++; buildRows(); render(); progress(file.name, 0, 0); }
+          finally { try { attachRrn(f); } catch (e) { /* 없음 */ } rawRrn = [];
+            try { const kinds = [...new Set(files.filter(e => (e.src || e.name) === file.name && e.res && e.res.title).map(e => e.res.title))]; keepOriginal(file, kinds.join(' · ')); } catch (e) { /* 보관 실패는 읽기와 무관 */ }
+            finished++; buildRows(); render(); progress(file.name, 0, 0); }
         }
         if (finished >= queued && ocrWorker) { const w = ocrWorker; ocrWorker = null; ocrLangs = ''; w.terminate(); }
         if (finished >= queued && korWorker) { const w = korWorker; korWorker = null; w.terminate(); }
