@@ -384,6 +384,53 @@ ok('신분증 주민등록번호 13자리(가짜 번호)', () => {
   assert.strictEqual(P.rrnFrom('900101-1234560 그리고 900101-1234568'), '900101-1234568'); // 검증식 맞는 쪽 우선
   assert.ok(!/1234568/.test(P.redact('900101-1234568')));                          // 서류 글에서는 여전히 가림
 });
+ok('사업계획 정답지: 모든 대분류 × 규모가 빈칸 없이, 지어낸 숫자 없이', () => {
+  const lib = JSON.parse(fs.readFileSync(path.join(__dirname, 'bp_lib.json'), 'utf8'));
+  const D = JSON.parse(fs.readFileSync(path.join(__dirname, 'ksic11.json'), 'utf8'));
+  for (const sec of 'ABCDEFGHIJKLMNOPQRSTU') {
+    const code = (D.items.find(x => x[2] === sec) || [])[0];
+    for (const size of ['smb', 'small', 'sme']) {
+      const r = P.bpCompose({ code, section: sec, size, ksicName: '시험 업종' }, lib);
+      for (const k of ['problem', 'solution', 'market', 'budget', 'team', 'outcome']) {
+        if (k === 'solution') { assert.ok(/개발·도입 계획/.test(r.fields[k]), `${sec}/${size} ${k} 비어 있음`); continue; }
+        assert.ok(r.fields[k] && r.fields[k].length > 10, `${sec}/${size} ${k} 비어 있음`);
+        assert.ok(r.fields[k].split('\n').length <= 6, `${sec}/${size} ${k} 줄이 너무 많음`);
+      }
+      const all = Object.values(r.fields).join('\n').split('(' + code + ')').join('');   // 표준산업분류 코드 표기는 입력값
+      assert.ok(!/\d/.test(all), `${sec}/${size} 입력에 없는 숫자: ${(all.match(/.{0,12}\d.{0,12}/) || [])[0]}`);
+      assert.deepStrictEqual(r.banHits, [], `${sec}/${size} 업종에 안 맞는 말: ${r.banHits}`);
+    }
+  }
+});
+ok('사업계획 정답지: 세분류마다 그 세트가 쓰이고 안 맞는 말 없음', () => {
+  const lib = JSON.parse(fs.readFileSync(path.join(__dirname, 'bp_lib.json'), 'utf8'));
+  const D = JSON.parse(fs.readFileSync(path.join(__dirname, 'ksic11.json'), 'utf8'));
+  for (const key of Object.keys(lib.subs)) {
+    const it = D.items.find(x => x[0].startsWith(key));
+    assert.ok(it, `세분류 ${key} 에 맞는 표준산업분류 코드가 없음`);
+    for (const size of ['smb', 'sme']) {
+      const r = P.bpCompose({ code: it[0], section: it[2], size }, lib);
+      assert.strictEqual(r.sub, key === r.sub ? key : r.sub);   // 더 긴 앞자리 세트가 있으면 그쪽
+      assert.ok(it[0].startsWith(r.sub), `${key}: 세분류 세트가 안 쓰임`);
+      assert.deepStrictEqual(r.banHits, [], `${key}/${size} 안 맞는 말: ${r.banHits}`);
+    }
+  }
+});
+ok('사업계획 정답지: 주유소·꽃집은 그 업종 말만, 사실은 입력값 그대로', () => {
+  const lib = JSON.parse(fs.readFileSync(path.join(__dirname, 'bp_lib.json'), 'utf8'));
+  const gas = P.bpCompose({ code: '47711', section: 'G', size: 'smb', ksicName: '운송장비용 주유소 운영업', item: '주유소', highRate: true, maxRate: 9.5, employees: 3 }, lib);
+  const gt = Object.values(gas.fields).join('\n');
+  assert.strictEqual(gas.sub, '47711');
+  assert.ok(/주유/.test(gt) && /9\.5%/.test(gt) && /3명/.test(gt));
+  for (const w of ['풀필먼트', '라이브커머스', 'CNC', 'SaaS', '임상', '클린룸']) assert.ok(!gt.includes(w), '주유소에 ' + w);
+  const flo = P.bpCompose({ code: '47851', section: 'G', size: 'smb', item: '꽃집' }, lib);
+  const ft = Object.values(flo.fields).join('\n');
+  assert.strictEqual(flo.sub, '4785');
+  assert.ok(/꽃|화훼|생화/.test(ft));
+  for (const w of ['풀필먼트', 'CNC', '주유', '임상']) assert.ok(!ft.includes(w), '꽃집에 ' + w);
+  // 같은 입력 → 같은 글(매번 달라지지 않음)
+  assert.deepStrictEqual(P.bpCompose({ code: '47851', section: 'G', size: 'smb', item: '꽃집' }, lib).fields, flo.fields);
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

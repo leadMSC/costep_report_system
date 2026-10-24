@@ -880,6 +880,104 @@
     [30, ['E', 'L', 'M', 'N', 'R']],
     [10, ['C34', 'I', 'P', 'Q', 'S']]];
   // 가장 구체적인 열쇠(대분류+중분류, 예 'C14'·'N76')가 먼저, 없으면 대분류('E'·'N' 등)
+  // ───────── 사업계획 개요서 자동 작성(정답지 세트) ─────────
+  // lib = { sections:{A..U}, subs:{코드 앞자리}, size:{smb,small,sme}, situations:{}, funding:{} } — tools/bp_lib/*.json 을 합친 것
+  // ctx = 화면에서 모은 사실(입력값만). 입력에 없는 금액·비율·인원은 만들지 않고 [○○] 빈칸으로 둔다
+  const BP_FIELDS = ['problem', 'solution', 'market', 'budget', 'team', 'outcome'];
+  function bpLineText(x, size) {
+    if (typeof x === 'string') return x;
+    if (x && typeof x.t === 'string' && (!x.size || x.size.includes(size))) return x.t;
+    return '';
+  }
+  // {토큰} 채우기 — 값이 하나라도 비면 그 줄은 버림
+  function bpFill(s, tok) {
+    let ok = true;
+    const out = String(s || '').replace(/\{([^{}]+)\}/g, (all, k) => { const v = tok[k]; if (v === undefined || v === null || String(v).trim() === '') { ok = false; return ''; } return String(v).trim(); });
+    return ok ? out : '';
+  }
+  function bpSub(code, lib) {
+    const c = String(code || ''); let best = null;
+    Object.keys((lib && lib.subs) || {}).forEach(p => { if (c.startsWith(p) && (!best || p.length > best.length)) best = p; });
+    return best ? Object.assign({ key: best }, lib.subs[best]) : null;
+  }
+  // 사실 → 켜질 상황 목록
+  function bpFlags(ctx) {
+    const f = [], c = ctx || {}, sec = c.section || '';
+    if (c.highRate) f.push('high_rate');
+    if (c.debtTotal && c.annualSales && c.debtTotal > c.annualSales) f.push('debt_heavy');
+    if (c.equip === 'yes' && c.equipDetail) f.push('equip_yes');
+    if (c.equip === 'none' && ['A', 'C'].includes(sec)) f.push('equip_none_mfg');
+    if (c.export === 'yes') f.push(c.exportAmt ? 'export_yes' : 'export_yes_noamt');
+    if (c.invest === 'yes' && c.investDetail) f.push('invest_yes');
+    if (c.supportName) f.push('support_hist');
+    if (c.ipText) f.push('ip_have');
+    if (c.certs) f.push('cert_have'); else if (c.size && c.size !== 'smb') f.push('cert_none_firm');
+    if (c.ceoAge !== null && c.ceoAge !== undefined && c.ceoAge <= 39) f.push('young_ceo');
+    if (c.ceoSex === '여') f.push('female_ceo');
+    if (c.years !== null && c.years !== undefined) { if (c.years < 3) f.push('early_stage'); else if (c.years >= 10) f.push('long_running'); }
+    if (c.salesTrend === 'down') f.push('sales_down');
+    if (c.smartWish) f.push('smart_wish');
+    if (c.employees === 0) f.push('solo'); else if (c.employees > 0) f.push('employer');
+    if (c.report === 'restart') f.push('restart');
+    return f;
+  }
+  function bpCompose(ctx, lib) {
+    const c = Object.assign({ size: 'smb' }, ctx || {}), size = ['smb', 'small', 'sme'].includes(c.size) ? c.size : 'smb';
+    const secLib = ((lib && lib.sections) || {})[c.section] || null, sub = bpSub(c.code, lib), sz = ((lib && lib.size) || {})[size] || {};
+    const flags = bpFlags(c), sits = flags.map(k => ((lib && lib.situations) || {})[k]).filter(Boolean);
+    const tok = { maxRate: c.maxRate, equipDetail: c.equipDetail, exportAmt: c.exportAmt, investDetail: c.investDetail, supportName: c.supportName, ipText: c.ipText, certs: c.certs, employees: c.employees, 종목: c.item };
+    // 비슷한 문장 겹침 막기: 한글 두 글자 조각이 절반 넘게 겹치면 같은 말로 봄('연 매출 ○○% 성장 목표'가 두 번 나오지 않게)
+    const seen = [], grams = t => { const g = new Set(), h = t.replace(/[^가-힣]/g, ''); for (let i = 0; i < h.length - 1; i++) g.add(h.slice(i, i + 2)); return g; };
+    const KEY1 = ['채용'], keyHit = []; const dup = (t, thr) => { if (KEY1.some(k => t.includes(k) && keyHit.includes(k))) return true; const a = grams(t); return seen.some(b => { if (!a.size || !b.size) return false; let n = 0; a.forEach(x => { if (b.has(x)) n++; }); return n / Math.min(a.size, b.size) > thr; }); };
+    const take = (arr, n, thr = 0.4) => { const out = []; (arr || []).forEach(x => { if (out.length >= n) return; const t = bpFill(bpLineText(x, size), tok); if (t && !dup(t, thr)) { seen.push(grams(t)); KEY1.forEach(k => { if (t.includes(k)) keyHit.push(k); }); out.push(t); } }); return out; };
+    // 업종 문장: 세분류 먼저, 모자라면 대분류
+    // 대분류 문장으로 채울 때는 세분류가 금지한 낱말이 든 줄은 뺀다(예: 어업에 스마트팜)
+    const subBan = (sub && sub.ban) || [], okSec = x => { const t = bpLineText(x, size); return !subBan.some(w => w && t.includes(w)); };
+    const ind = (key, n) => { const a = take(sub && sub[key], n); return a.concat(take(((secLib && secLib[key]) || []).filter(okSec), n - a.length)); };
+    const sit = (key, n) => take([].concat(...sits.map(s => s[key] || [])), n);
+    const L = (tag, arr) => arr.filter(Boolean).length ? `[${tag}] ` + arr.filter(Boolean).join(' / ') : '';
+    const lines = arr => arr.filter(Boolean).join('\n');
+    const facts = [c.years !== null && c.years !== undefined ? (c.years < 1 ? '올해 설립' : `업력 ${c.years}년`) : '', c.salesText || '', c.employees > 0 ? `상시 근로자 ${c.employees}명` : ''].filter(Boolean).join(' · ');
+    const what = [c.ksicName ? `${c.ksicName}${c.code ? '(' + c.code + ')' : ''}` : '', c.item && c.item !== c.ksicName ? c.item : ''].filter(Boolean).join(' — ');
+    const out = {};
+    out.problem = lines([
+      L('주요 사업', [what || c.bizType || '', facts]),
+      L('현장 애로', ind('problem', 2).concat(sit('problem', 2))),
+      L('시급성', sit('urgency', 1).length ? sit('urgency', 1) : take(sz.urgency, 1, 0.25))
+    ]);
+    const base = [c.ipText ? `지식재산 ${c.ipText}` : '', c.certs ? `인증 ${c.certs}` : '', c.equip === 'yes' && c.equipDetail ? `설비 ${c.equipDetail}` : ''].concat((c.qa || []).slice(0, 2));
+    out.solution = lines([
+      L('보유 기반', base),
+      L('개발·도입 계획', ind('solution', 2).concat(sit('solution', 2)))
+    ]);
+    const chan = [...new Set([c.salesChannel, c.salesDetail, c.clients ? `주요 거래처 ${c.clients}` : ''].filter(Boolean))];
+    out.market = lines([
+      L('판매 방식', chan),
+      L('판로 확대', ind('market', 3)),   // 규모 일반 문장은 업종(농가·상점)을 가리지 못해 판로에는 쓰지 않음
+      L('확장', sit('market', 2))
+    ]);
+    const fac = ind('facility', 2), wrk = ind('working', 2);
+    out.budget = lines([
+      '총 소요자금 [○○만원]',
+      fac.length ? `- 시설자금 [○○만원]: ${fac.join(' · ')}` : '',
+      wrk.length ? `- 운전자금 [○○만원]: ${wrk.join(' · ')}` : '',
+      ...sit('budget', 2).map(s => /^조달|^시설자금/.test(s) ? s : '- ' + s),
+      ...take(((lib && lib.funding) || {})[size], 1)
+    ]);
+    out.team = lines([
+      L('대표자', [c.ceoCareer || '동종 업계 경력 [○○년] — 확인', c.estFuture ? '설립 예정(설립일 확인 필요)' : c.years === null || c.years === undefined ? '' : c.years < 1 ? '올해 설립' : `설립 ${c.years}년차`]),
+      L('조직 역량', ind('team', 1).concat(take(sz.team, 1, 0.25)).concat(sit('team', 2))),
+      c.factory ? `[사업 인프라] 사업장 ${c.factory}` : ''
+    ]);
+    out.outcome = lines([
+      L('성장 목표', ind('outcome', 2).concat(take(sz.outcome, 1, 0.25))),
+      L('고용·재무', sit('outcome', 2))
+    ]);
+    // 업종에 안 맞는 낱말이 섞였는지(세트 품질 점검용)
+    const ban = [].concat((secLib && secLib.ban) || [], (sub && sub.ban) || []);
+    const text = BP_FIELDS.map(k => out[k]).join('\n');
+    return { fields: out, flags, sub: sub ? sub.key : '', section: c.section || '', banHits: ban.filter(w => w && new RegExp('(^|[^가-힣A-Za-z])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(text)) };
+  }
   function sizeRule(code, data) {
     const c = String(code || '').replace(/\D/g, '').slice(0, 5); if (c.length < 2) return null;
     const it = data && data.items ? data.items.find(x => x[0] === c) : null;
@@ -1627,6 +1725,6 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom, bpCompose, bpFlags, bpSub };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);

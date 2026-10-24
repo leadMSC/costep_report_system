@@ -109,12 +109,12 @@ window.SCENARIOS = [
     async run(api) {
       const ev = []; let verdict = 'PASS';
       const y = new Date().getFullYear();
-      const cases = [['미래(2030-01-01)', '2030-01-01', '설립 예정'], [`올해(${y}-01-02)`, `${y}-01-02`, '올해 설립'], ['비움', '', '현장 실무 경험'], ['5년 전', `${y - 5}-03-01`, '설립 5년차']];
+      const cases = [['미래(2030-01-01)', '2030-01-01', '설립 예정'], [`올해(${y}-01-02)`, `${y}-01-02`, '올해 설립'], ['비움', '', ''], ['5년 전', `${y - 5}-03-01`, '설립 5년차']];
       for (const [label, val, expect] of cases) {
         api.demo(); ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome'].forEach(id => api.set(id, ''));
         api.set('corp_est_date', val); api.call('autoGenerateBusinessPlan');
         const team = api.val('bp_team').split(/\r?\n/)[0];
-        const ok = team.includes(expect) && !team.includes('다년간');
+        const ok = (expect ? team.includes(expect) : !/년차|올해 설립|설립 예정/.test(team)) && !team.includes('다년간');
         if (!ok) verdict = 'FAIL';
         ev.push(`${label} → ${ok ? '맞음' : '틀림'}: ${team.match(/\(([^)]*)\)/)?.[1] || team.slice(0, 60)}`);
       }
