@@ -949,11 +949,11 @@
           <section class="cust-sec">
             <h4 class="cust-h">대표자</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
+              <div class="cust-row-full">
                 <label for="corp_ceo_phone" class="font-bold text-slate-700 block mb-1">대표자 연락처</label>
-                <div class="flex gap-1.5">
-                  <select id="corp_ceo_telecom" class="form-input-control w-[84px] shrink-0" aria-label="통신사"><option value="">통신사</option><option>SKT</option><option>KT</option><option>LG U+</option><option>알뜰폰</option></select>
-                  <input type="tel" id="corp_ceo_phone" value="" placeholder="휴대폰 번호" class="form-input-control min-w-0" oninput="this.value = this.value.replace(/[^0-9-]/g, '')">
+                <div class="flex gap-1.5 cust-phone">
+                  <select id="corp_ceo_telecom" class="form-input-control w-[96px] shrink-0" aria-label="통신사"><option value="">통신사</option><option>SKT</option><option>KT</option><option>LG U+</option><option>알뜰폰</option></select>
+                  <input type="tel" id="corp_ceo_phone" value="" placeholder="010-0000-0000" maxlength="13" inputmode="numeric" autocomplete="off" class="form-input-control min-w-0" oninput="fmtPhoneInput(this)">
                 </div>
               </div>
               <div>
@@ -968,7 +968,7 @@
                 <span class="font-bold text-slate-700 block mb-1">신용 평가 (참고 구간)</span>
                 <div id="credit_grade" class="credit-grade">점수 입력 대기</div>
               </div>
-              <div class="sm:col-span-2 lg:col-span-4">
+              <div class="cust-row-full">
                 <label for="corp_ceo_career" class="font-bold text-slate-700 block mb-1">대표자 경력·주요 역량</label>
                 <input type="text" id="corp_ceo_career" value="" placeholder="예: 동종 업계 12년, 前 OO정밀 생산팀장, 금형 설계 특허 2건" class="form-input-control">
               </div>
@@ -7330,7 +7330,26 @@
       } else if (t.hasAttribute('data-ind-toggle')) { indGridOpen = !indGridOpen; renderIndAuto(); }
       else if (t.dataset.indAuto) { setIndustryTrack(t.dataset.indAuto); }
     });
-    function syncCustExtras() { try { syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); syncIndShared(); renderKsicQa(); renderIndAuto(); } catch (e) { /* 화면 없음 */ } }
+    // 전화번호: 숫자만 받아 하이픈 자동(010-1234-5678 · 02-123-4567 · 031-123-4567 · 1588-1234 · 0505-123-4567)
+    function fmtPhone(v) {
+      const d = String(v || '').replace(/\D/g, '').slice(0, 12);
+      if (/^(15|16|18)\d{2}/.test(d) && d.length <= 8) return d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d;
+      if (d.startsWith('02')) return d.length <= 2 ? d : d.length <= 5 ? d.slice(0, 2) + '-' + d.slice(2) : d.length <= 9 ? d.slice(0, 2) + '-' + d.slice(2, 5) + '-' + d.slice(5) : d.slice(0, 2) + '-' + d.slice(2, 6) + '-' + d.slice(6, 10);
+      const a = d.startsWith('050') ? 4 : 3;
+      if (d.length <= a) return d;
+      if (d.length <= a + 3) return d.slice(0, a) + '-' + d.slice(a);
+      if (d.length <= a + 7) { const mid = d.length - a - 4 >= 4 ? 4 : d.length - a - 4 > 0 ? d.length - a - 4 : 3; return d.slice(0, a) + '-' + d.slice(a, a + mid) + '-' + d.slice(a + mid); }
+      return d.slice(0, a) + '-' + d.slice(a, a + 4) + '-' + d.slice(a + 4, a + 8);
+    }
+    function fmtPhoneInput(el) {
+      const before = el.value, pos = el.selectionStart ?? before.length, digitsBefore = before.slice(0, pos).replace(/\D/g, '').length;
+      el.value = fmtPhone(before);
+      // 커서는 같은 숫자 뒤로(하이픈이 끼어도 입력 위치가 튀지 않게)
+      let i = 0, n = 0; while (i < el.value.length && n < digitsBefore) { if (/\d/.test(el.value[i])) n++; i++; }
+      try { el.setSelectionRange(i, i); } catch (e) { /* 없음 */ }
+    }
+    window.fmtPhone = fmtPhone; window.fmtPhoneInput = fmtPhoneInput;
+    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); syncIndShared(); renderKsicQa(); renderIndAuto(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
       const ext = elv('cust_ext'), kb = elv('ksic_box');
@@ -8592,6 +8611,9 @@
     .ind-shared .v.none { font-weight: 600; color: #64748b; }
     .ind-shared .go { margin-left: auto; padding: 1px 0; border: 0; background: none; color: #0e7f8b; font-weight: 800; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
     .ind-shared label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; }
+    /* 대표자 묶음: 칸 수가 화면 폭 따라 바뀌어도(auto-fill) 연락처·경력은 한 줄 전체 */
+    #cust_ext .cust-row-full { grid-column: 1 / -1; }
+    #cust_ext .cust-phone { max-width: 380px; }
     .ind-auto:empty { display: none; }
     .ind-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid rgba(94,234,212,.35); border-radius: 10px; background: rgba(15,23,42,.45); color: #cbd5e1; font-size: 12px; line-height: 1.5; }
     .ind-auto .code { font-variant-numeric: tabular-nums; font-weight: 800; color: #5eead4; }
