@@ -910,11 +910,11 @@
           </div>
           <div>
             <label class="font-bold text-slate-700 block mb-1">주주현황 (대표자 지분율)</label>
-            <input type="text" id="corp_ceo_share" value="" placeholder="예: 대표이사 100%" oninput="syncCompanyData()" class="form-input-control">
+            <input type="text" id="corp_ceo_share" value="" placeholder="예: 대표이사 100%" oninput="syncCompanyData()" class="form-input-control" data-wide>
           </div>
           <div>
             <label class="font-bold text-slate-700 block mb-1">주거래은행 및 결제계좌</label>
-            <input type="text" id="corp_main_bank" value="" placeholder="예: 기업은행 123-456789" oninput="syncCompanyData()" class="form-input-control">
+            <input type="text" id="corp_main_bank" value="" placeholder="예: 기업은행 123-456789" oninput="syncCompanyData()" class="form-input-control" data-wide>
           </div>
           <div class="sm:col-span-2">
             <label class="font-bold text-slate-700 block mb-1">본점 / 주사업장 소재지</label>
@@ -7403,7 +7403,86 @@
       const el = document.getElementById(b.dataset.go); if (!el) return;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => el.focus({ preventScroll: true }), 350);
     });
-    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); renderSizeNote(); if (typeof calcDebtTotals === 'function') calcDebtTotals(); syncIndShared(); renderKsicQa(); renderIndAuto(); renderBpReady(); } catch (e) { /* 화면 없음 */ } }
+
+    // ===== L-157 화면 정리: 구역 접기(B-1)·바로가기(B-2)·사업계획 요령 접기(B-4)·단계 진행(B-6) =====
+    const fieldsIn = el => [...el.querySelectorAll('input:not([type=hidden]):not([type=file]):not(.tri-src),select,textarea')].filter(x => !x.classList.contains('hidden') && !x.closest('[hidden]'));
+    const filled = x => x.type === 'checkbox' ? x.checked : String(x.value || '').trim() !== '';
+    function setupCustSections() {
+      document.querySelectorAll('#cust_ext .cust-sec').forEach((sec, i) => {
+        const h = sec.querySelector(':scope > .cust-h'); if (!h || h.dataset.fold) return;
+        h.dataset.fold = '1'; h.setAttribute('role', 'button'); h.tabIndex = 0;
+        const sum = document.createElement('span'); sum.className = 'sec-sum'; h.appendChild(sum);
+        const toggle = () => { sec.classList.toggle('closed'); h.setAttribute('aria-expanded', String(!sec.classList.contains('closed'))); };
+        h.addEventListener('click', e => { if (e.target.closest('button,a,input')) return; toggle(); });
+        h.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+        // 처음: 대표자 구역은 펼침, 나머지는 적힌 게 없으면 접음
+        const f = fieldsIn(sec);
+        if (i > 0 && !f.some(filled) && !sec.querySelector('.seg button.on')) sec.classList.add('closed');
+        h.setAttribute('aria-expanded', String(!sec.classList.contains('closed')));
+      });
+      renderCustSecSums();
+    }
+    function renderCustSecSums() {
+      document.querySelectorAll('#cust_ext .cust-sec').forEach(sec => {
+        const sum = sec.querySelector(':scope > .cust-h .sec-sum'); if (!sum) return;
+        const f = [...sec.querySelectorAll('input:not([type=hidden]):not([type=file]),select,textarea')].filter(x => !x.classList.contains('hidden'));
+        const segs = sec.querySelectorAll('.seg').length, segOn = sec.querySelectorAll('.seg button.on').length;
+        const total = f.filter(x => !x.closest('[data-show-when]') && !x.hasAttribute('data-show-when')).length + segs;
+        const done = f.filter(x => !x.closest('[data-show-when]') && !x.hasAttribute('data-show-when') && filled(x)).length + segOn;
+        sum.textContent = sec.classList.contains('closed') ? (done ? `${done}/${total} 입력 · 펼치기` : '비어 있음 · 펼쳐서 입력') : (total ? `${done}/${total}` : '');
+        sum.classList.toggle('full', total > 0 && done >= total);
+      });
+    }
+    window.renderCustSecSums = renderCustSecSums;
+    function setupJumpBars() {
+      ['section_smb_input', 'section_sme_input'].forEach(id => {
+        const sec = document.getElementById(id); if (!sec || sec.querySelector('.jump-bar')) return;
+        const heads = [...sec.querySelectorAll('label, h4, span, div')].filter(e => e.childElementCount === 0 && /^\s*\d+\.\s+\S/.test(e.textContent) && /font-(bold|extrabold|black)/.test(e.className) && e.textContent.trim().length < 40);
+        if (heads.length < 3) return;
+        const bar = document.createElement('div'); bar.className = 'jump-bar no-print'; bar.setAttribute('aria-label', '구역 바로가기');
+        bar.innerHTML = heads.map((h, i) => `<button type="button" data-j="${i}">${escapeHtml(h.textContent.trim().replace(/^(\d+)\.\s*/, '$1 ').slice(0, 14))}</button>`).join('');
+        bar.addEventListener('click', e => { const b = e.target.closest('[data-j]'); if (!b) return; heads[+b.dataset.j].scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+        const anchor = sec.querySelector(':scope > .size-note');
+        sec.insertBefore(bar, anchor ? anchor.nextSibling : sec.firstChild);
+      });
+    }
+    function setupBpGuides() {
+      const btn = document.querySelector('button[onclick^="autoGenerateBusinessPlan"]'); if (!btn) return;
+      const card = btn.closest('.rounded-2xl'); if (!card) return;
+      card.querySelectorAll('label.font-extrabold').forEach(lab => {
+        const p = lab.nextElementSibling; if (!p || p.tagName !== 'P' || lab.querySelector('.bp-guide-btn')) return;
+        p.classList.add('bp-guide-hidden');
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'bp-guide-btn'; b.textContent = '작성 요령'; b.setAttribute('aria-expanded', 'false');
+        b.addEventListener('click', e => { e.preventDefault(); const open = p.classList.toggle('bp-guide-hidden') === false; b.setAttribute('aria-expanded', String(open)); });
+        lab.appendChild(b);
+      });
+    }
+    // 단계별 핵심 입력 진행(n/m) — 왼쪽 단계 목록에 표시
+    const STEP_KEYS = [
+      () => ['corp_name', 'corp_biz_no', 'corp_ceo', 'corp_biz_item', 'corp_address', 'corp_est_date', 'corp_ksic'],
+      () => ['__report', 'doc_agreement'].slice(0, 1),
+      () => ['corp_sales_channel', 'corp_clients', 'corp_vendors'],
+      () => window.appState.bizTrack === 'smb' ? ['smb_monthly_sales', 'smb_cost_rent', 'smb_cost_labor', 'smb_cost_util'] : ['sme_sales', 'sme_profit', 'sme_assets', 'sme_debt', 'sme_equity', 'sme_employees'],
+      () => ['__debt'],
+      () => ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome']
+    ];
+    function renderStepProgress() {
+      const lis = document.querySelectorAll('#l3_steps li[data-i]'); if (!lis.length) return;
+      lis.forEach(li => {
+        const i = +li.dataset.i, keys = (STEP_KEYS[i] || (() => []))(); if (!keys.length) return;
+        const ok = k => k === '__report' ? !!window.appState.activeReportKey : k === '__debt' ? (window.appState.debtItems || []).length > 0
+          : k === 'corp_ksic' ? (() => { try { return !!((JSON.parse(document.getElementById(k)?.value || '[]') || [])[0] || {}).code; } catch (e) { return false; } })()
+          : String(document.getElementById(k)?.value || '').trim() !== '';
+        const done = keys.filter(ok).length;
+        let pg = li.querySelector('.pg'); if (!pg) { pg = document.createElement('span'); pg.className = 'pg'; li.appendChild(pg); }
+        pg.textContent = keys[0] === '__debt' ? ((window.appState.debtItems || []).length ? (window.appState.debtItems.length + '건') : '') : `${done}/${keys.length}`;
+        pg.classList.toggle('full', done >= keys.length);
+        pg.title = keys[0] === '__debt' ? '등록된 대출' : '핵심 입력 칸 중 채운 수';
+      });
+    }
+    window.renderStepProgress = renderStepProgress;
+    if (typeof window.addEventListener === 'function') window.addEventListener('load', () => setTimeout(() => { try { setupCustSections(); setupJumpBars(); setupBpGuides(); renderStepProgress(); } catch (e) { /* 화면 없음 */ } }, 600));
+    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); renderSizeNote(); if (typeof calcDebtTotals === 'function') calcDebtTotals(); syncIndShared(); renderKsicQa(); renderIndAuto(); renderBpReady(); renderCustSecSums(); renderStepProgress(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
       const ext = elv('cust_ext'), kb = elv('ksic_box');
@@ -8765,6 +8844,31 @@
     .bp-ready .ok { padding: 2px 9px; border-radius: 999px; background: rgba(94,234,212,.14); color: #5eead4; font-weight: 700; }
     .bp-ready button { padding: 2px 9px; border-radius: 999px; border: 1px dashed #fcd34d; background: transparent; color: #fcd34d; font-weight: 800; cursor: pointer; }
     .bp-ready button:focus-visible { outline: 2px solid #fcd34d; outline-offset: 2px; }
+    /* L-157 화면 정리 — B-3 긴 값 칸 한 줄 전체 · 칸 이름 옆 안내문은 아래 줄 */
+    #screen_input .grid > div:has(> [data-wide]) { grid-column: 1 / -1; }
+    #screen_input label > span.font-normal.text-slate-500 { display: block; margin-top: 1px; font-size: 11px; line-height: 1.35; }
+    /* B-1 고객사 정보 구역 접기 */
+    #cust_ext .cust-sec > .cust-h { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; }
+    #cust_ext .cust-sec > .cust-h::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; transform: rotate(45deg); transition: transform .15s; }
+    #cust_ext .cust-sec.closed > .cust-h::after { transform: rotate(-45deg); }
+    #cust_ext .cust-sec.closed > :not(.cust-h) { display: none !important; }
+    #cust_ext .cust-sec > .cust-h { flex-wrap: wrap; row-gap: 2px; }
+    #cust_ext .cust-sec.closed > .cust-h > span.font-normal { display: none; }
+    #cust_ext .cust-sec .sec-sum { font-size: 11px; font-weight: 600; color: #64748b; }
+    #cust_ext .cust-sec .sec-sum.full { color: #0f766e; }
+    /* B-2 긴 실태·재무 구역 바로가기 */
+    .jump-bar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 8px; background: inherit; }
+    .jump-bar button { padding: 3px 10px; border-radius: 999px; border: 1px solid #cbd5e1; background: #fff; font-size: 11.5px; font-weight: 700; color: #334155; cursor: pointer; }
+    .jump-bar button:hover { border-color: #169aa8; color: #0f766e; }
+    .jump-bar button:focus-visible { outline: 2px solid #169aa8; outline-offset: 2px; }
+    /* B-4 사업계획 작성 요령은 접기 */
+    .bp-guide-btn { margin-left: auto; padding: 1px 8px; border-radius: 999px; border: 1px solid rgba(148,163,184,.5); background: transparent; color: #94a3b8; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .bp-guide-btn[aria-expanded="true"] { color: #e2e8f0; border-color: #e2e8f0; }
+    .bp-guide-hidden { display: none; }
+    /* B-6 단계 진행 */
+    #l3_steps li .pg { margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.45); }
+    #l3_steps li .pg.full { color: #5eead4; }
+    #l3.folded #l3_steps li .pg { display: none; }
     .ind-auto:empty { display: none; }
     .ind-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid rgba(94,234,212,.35); border-radius: 10px; background: rgba(15,23,42,.45); color: #cbd5e1; font-size: 12px; line-height: 1.5; }
     .ind-auto .code { font-variant-numeric: tabular-nums; font-weight: 800; color: #5eead4; }
