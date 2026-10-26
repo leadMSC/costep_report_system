@@ -533,6 +533,34 @@ ok('합본 스캔(글자 인식) 나누기: 제목 깨진 사업자등록증 + �
   assert.strictEqual(P.splitBundleText([texts[1], texts[2]]).length, 1);
   assert.strictEqual(P.splitBundleText([texts[1], texts[2]])[0].text, texts[1] + '\n<<PAGE>>\n' + texts[2]);
 });
+ok('워드·한글 글: 경력·역량·신용점수·면허·실질자본금·특허·기타 항목(가짜 값)', () => {
+  const T = String.fromCharCode(9), N = String.fromCharCode(10);
+  const t = ['상담 기록', '대표자' + T + '홍길동', '대표자 경력' + T + '건설사 현장소장 12년', '주요 역량' + T + '지반 그라우팅 시공 관리', '자격' + T + '토목기사',
+    '신용 확인: KCB 895점, NICE 885점', '등록업종' + T + '토공사업, 보링그라우팅공사업', '실질자본금' + T + '3억 2천 (충족)',
+    '특허' + T + '지반 보강 장치 (제10-2345678호, 2023.04.12 등록)', '실용신안 제20-0123456호 그라우팅 노즐 2021년 3월 5일 등록',
+    '세무대리인' + T + '가나다 세무회계', '자금 니즈' + T + '운전자금 7~8억', '상시근로자' + T + '12명', '주요 거래처' + T + '가나건설, 다라토건'].join(N);
+  const r = P.parseOfficeText(t, 'memo.docx', '워드 문서');
+  const f = r.fields;
+  assert.strictEqual(r.status, 'ok');
+  assert.ok(/현장소장 12년/.test(f.corp_ceo_career) && /주요역량 지반/.test(f.corp_ceo_career) && /자격 토목기사/.test(f.corp_ceo_career), f.corp_ceo_career);
+  assert.strictEqual(f.sme_kcb, '895'); assert.strictEqual(f.sme_nice, '885');
+  assert.strictEqual(f.const_lic, '토공사업, 보링그라우팅공사업');
+  assert.strictEqual(f.const_cap, 'ok');
+  assert.strictEqual(f.sme_employees, '12');
+  assert.strictEqual(f.corp_clients, '가나건설, 다라토건');
+  assert.strictEqual(r.ipItems.length, 2);
+  assert.deepStrictEqual([r.ipItems[0].kind, r.ipItems[0].regNo, r.ipItems[0].regDate, r.ipItems[0].title], ['특허', '10-2345678', '2023-04-12', '지반 보강 장치']);
+  assert.deepStrictEqual([r.ipItems[1].kind, r.ipItems[1].regNo, r.ipItems[1].regDate, r.ipItems[1].title], ['실용신안', '20-0123456', '2021-03-05', '그라우팅 노즐']);
+  const ex = Object.fromEntries(r.extraRows);
+  assert.strictEqual(ex['실질자본금'], '3억 2천 (충족)'); assert.strictEqual(ex['세무대리인'], '가나다 세무회계'); assert.strictEqual(ex['자금 니즈'], '운전자금 7~8억');
+});
+ok('워드 글이 사업자등록증이면 서류로 읽고 빈 칸만 메모 규칙으로', () => {
+  const N = String.fromCharCode(10);
+  const t = ['사업자등록증', '(법인사업자)', '등록번호 : 220-81-62517', '법인명(단체명) : 가나기초이엔씨 주식회사', '대표자 : 홍길동', '개업연월일 : 2019 년 11 월 01 일', '사업장 소재지 : 서울특별시 중구 세종대로 1', '업태 건설업 종목 보링,그라우팅', '이메일: a@b.co'].join(N);
+  const r = P.parseOfficeText(t, 'reg.hwp');
+  assert.strictEqual(r.kind, 'bizreg');
+  assert.strictEqual(r.fields.corp_biz_no, '220-81-62517');
+});
 console.log(`\n${n}개 통과`);
 
 // 앱(HTML) 안에 넣은 해석기가 tools/doc-parsers.js 와 같은지

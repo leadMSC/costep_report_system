@@ -1446,11 +1446,11 @@
     return a.map((w, i) => (/^[A-Za-z]{2,}[^가-힣]*$/.test(w) && !IP_ACRONYM.test(w.replace(/[^A-Za-z0-9]/g, '')) && /[가-힣]/.test(b[i])) ? b[i] : w).join(' ');
   }
 
-  // .xlsx(엑셀) 읽기 — 라이브러리 없이: zip 안의 sharedStrings·첫 시트만 풀어 행 배열로. 압축 풀기는 브라우저 기본 기능(DecompressionStream)
-  async function readXlsx(buf) {
+  // zip 열기(엑셀·워드·한글 hwpx 공통) — 라이브러리 없이 중앙 목록만 읽고, 꺼낼 때 브라우저 기본 압축 풀기(DecompressionStream)
+  function openZip(buf) {
     const u8 = new Uint8Array(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
     let eocd = -1; for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
-    if (eocd < 0) throw new Error('엑셀(zip) 형식이 아니에요');
+    if (eocd < 0) throw new Error('zip 형식이 아니에요');
     const n = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
     const files = {};
     for (let k = 0; k < n; k++) {
@@ -1464,13 +1464,159 @@
       const lnl = dv.getUint16(f.off + 26, true), lel = dv.getUint16(f.off + 28, true);
       const data = u8.subarray(f.off + 30 + lnl + lel, f.off + 30 + lnl + lel + f.csize);
       if (f.method === 0) return new TextDecoder().decode(data);
-      const ds = new DecompressionStream('deflate-raw');
-      const out = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+      const out = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
       return new TextDecoder().decode(out);
     };
-    const unx = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    return { names: Object.keys(files), get };
+  }
+  const unXml = s => String(s || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(+d)).replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&amp;/g, '&');
+  const TAB = String.fromCharCode(9), NL = String.fromCharCode(10);
+  // 워드·hwpx 본문 xml → 글줄. 표는 한 행을 '칸<탭>칸' 한 줄로(상담 메모·서류 읽기가 '라벨<탭>값' 꼴을 이미 안다)
+  // ns: 워드 'w'(문단 p·글자 t·탭 tab·표 tbl·행 tr·칸 tc), 한글 'hp'(같은 이름)
+  function xmlBodyToText(xml) {
+    const para = s => unXml(s.replace(/<(?:\w+:)?tab\b[^>]*\/>/g, TAB).replace(/<(?:\w+:)?(?:br|lineBreak)\b[^>]*\/>/g, ' ')
+      .replace(/<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>|<[^>]+>/g, (m, t) => t === undefined ? '' : t));
+    const paras = s => [...s.matchAll(/<((?:\w+:)?p)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(m => para(m[2]).trim());
+    const lines = [];
+    // 표를 먼저 떼어 낸다(안에 든 표는 바깥 칸 글에 섞어 둔다)
+    const parts = String(xml || '').split(/(<(?:\w+:)?tbl\b[\s\S]*?<\/(?:\w+:)?tbl>)/);
+    for (const part of parts) {
+      if (/^<(?:\w+:)?tbl\b/.test(part)) {
+        for (const tr of part.matchAll(/<((?:\w+:)?tr)\b[^>]*>([\s\S]*?)<\/\1>/g)) {
+          const cells = [...tr[2].matchAll(/<((?:\w+:)?tc)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(c => paras(c[2]).filter(Boolean).join(' '));
+          if (cells.some(Boolean)) lines.push(cells.join(TAB));
+        }
+      } else lines.push(...paras(part));
+    }
+    return lines.filter(l => l.trim()).join(NL);
+  }
+  async function readDocx(buf) {
+    const z = openZip(buf);
+    if (!z.names.includes('word/document.xml')) throw new Error('워드(docx) 형식이 아니에요');
+    return xmlBodyToText(await z.get('word/document.xml'));
+  }
+  async function readHwpx(buf) {
+    const z = openZip(buf);
+    const secs = z.names.filter(n => /^Contents\/section\d+\.xml$/i.test(n)).sort((a, b) => +a.match(/\d+/)[0] - +b.match(/\d+/)[0]);
+    if (!secs.length) throw new Error('한글(hwpx) 형식이 아니에요');
+    const out = [];
+    for (const s of secs) out.push(xmlBodyToText(await z.get(s)));
+    return out.join(NL);
+  }
+
+  // 한글(.hwp, 5.0) — 복합 문서(CFB) 안의 BodyText/Section* 를 풀어 문단 글자(PARA_TEXT, 태그 67)만 꺼낸다.
+  // 표 칸은 칸 머리(LIST_HEADER, 태그 72)의 행 번호로 같은 행끼리 '칸<탭>칸' 한 줄로 묶는다.
+  function readCfb(buf) {
+    const u8 = new Uint8Array(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    if (dv.getUint32(0, true) !== 0xE011CFD0 || dv.getUint32(4, true) !== 0xE11AB1A1) throw new Error('한글(hwp) 형식이 아니에요');
+    const ss = 1 << dv.getUint16(30, true), mss = 1 << dv.getUint16(32, true);
+    const nDifat = dv.getUint32(72, true), dirStart = dv.getUint32(48, true), cutoff = dv.getUint32(56, true);
+    const miniFatStart = dv.getUint32(60, true);
+    const sec = i => 512 + i * ss;
+    // FAT 섹터 목록: 머리의 109개 + DIFAT 이어짐
+    const fatSecs = [];
+    for (let i = 0; i < 109; i++) { const v = dv.getUint32(76 + i * 4, true); if (v < 0xFFFFFFFA) fatSecs.push(v); }
+    let d = dv.getUint32(68, true), nd = nDifat;
+    for (let guard = 0; d < 0xFFFFFFFA && nd-- > 0 && guard < 10000; guard++) {
+      for (let i = 0; i < ss / 4 - 1; i++) { const v = dv.getUint32(sec(d) + i * 4, true); if (v < 0xFFFFFFFA) fatSecs.push(v); }
+      d = dv.getUint32(sec(d) + ss - 4, true);
+    }
+    const fat = new Uint32Array(fatSecs.length * ss / 4);
+    fatSecs.forEach((s, k) => { for (let i = 0; i < ss / 4; i++) fat[k * ss / 4 + i] = dv.getUint32(sec(s) + i * 4, true); });
+    const chain = (start, table) => { const out = []; for (let s = start, g = 0; s < 0xFFFFFFFA && g < table.length; s = table[s], g++) out.push(s); return out; };
+    const readBig = start => { const c = chain(start, fat); const b = new Uint8Array(c.length * ss); c.forEach((s, i) => b.set(u8.subarray(sec(s), sec(s) + ss), i * ss)); return b; };
+    const dirBuf = readBig(dirStart), ddv = new DataView(dirBuf.buffer);
+    const ents = [];
+    for (let o = 0; o + 128 <= dirBuf.length; o += 128) {
+      const nl = ddv.getUint16(o + 64, true);
+      ents.push({ name: nl > 2 ? new TextDecoder('utf-16le').decode(dirBuf.subarray(o, o + nl - 2)) : '', type: dirBuf[o + 66],
+        left: ddv.getUint32(o + 68, true), right: ddv.getUint32(o + 72, true), child: ddv.getUint32(o + 76, true), start: ddv.getUint32(o + 116, true), size: ddv.getUint32(o + 120, true) });
+    }
+    const root = ents[0];
+    const miniStream = root && root.start < 0xFFFFFFFA ? readBig(root.start) : new Uint8Array(0);
+    const miniFat = miniFatStart < 0xFFFFFFFA ? (() => { const b = readBig(miniFatStart), v = new DataView(b.buffer); return Uint32Array.from({ length: b.length / 4 }, (_, i) => v.getUint32(i * 4, true)); })() : new Uint32Array(0);
+    const data = e => {
+      if (e.size < cutoff && e.type === 2) { const c = chain(e.start, miniFat); const b = new Uint8Array(c.length * mss); c.forEach((s, i) => b.set(miniStream.subarray(s * mss, s * mss + mss), i * mss)); return b.subarray(0, e.size); }
+      return readBig(e.start).subarray(0, e.size);
+    };
+    // 이름 → 항목(저장소 안 자식은 빨강검정 나무를 따라 모은다)
+    const kids = i => { const out = [], st = [ents[i].child]; while (st.length) { const k = st.pop(); if (k >= ents.length || k === 0xFFFFFFFF) continue; out.push(ents[k]); st.push(ents[k].left, ents[k].right); } return out; };
+    const top = kids(0);
+    return { find: name => top.find(e => e.name === name), children: name => { const i = ents.indexOf(top.find(e => e.name === name)); return i > 0 ? kids(i) : []; }, data };
+  }
+  // 한글 본문은 압축 끝 뒤에 채움 바이트가 붙어 있어 끝까지 받으면 오류가 난다 — 오류 전까지 받은 조각을 쓴다
+  async function inflateRaw(u8) {
+    const rd = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(), parts = [];
+    try { for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); } } catch (e) { if (!parts.length) throw e; }
+    const out = new Uint8Array(parts.reduce((a, x) => a + x.length, 0)); let o = 0; parts.forEach(x => { out.set(x, o); o += x.length; }); return out;
+  }
+  // 문단 글자(UTF-16LE)에서 조판 부호를 걷어 낸다: 확장·인라인 부호는 8글자(16바이트) 묶음, 탭(9)은 칸 나눔
+  const HWP_LONG = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]);
+  function hwpParaText(b) {
+    let s = '';
+    for (let i = 0; i + 1 < b.length; i += 2) {
+      const c = b[i] | (b[i + 1] << 8);
+      if (c < 32) { if (c === 9) s += TAB; if (HWP_LONG.has(c)) i += 14; continue; }
+      s += String.fromCharCode(c);
+    }
+    return s;
+  }
+  async function readHwp(buf) {
+    const cfb = readCfb(buf);
+    const fh = cfb.find('FileHeader'); if (!fh) throw new Error('한글(hwp) 형식이 아니에요');
+    const h = cfb.data(fh), flags = new DataView(h.buffer, h.byteOffset, h.byteLength).getUint32(36, true);
+    if (flags & 2) throw new Error('암호가 걸린 한글 파일이에요');
+    const compressed = !!(flags & 1);
+    const secs = cfb.children('BodyText').filter(e => /^Section\d+$/.test(e.name)).sort((a, b) => +a.name.slice(7) - +b.name.slice(7));
+    const lines = [];
+    for (const e of secs) {
+      let b = cfb.data(e); if (compressed) b = await inflateRaw(b);
+      const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+      let row = null, rowNo = -1, cellLevel = -1, cell = [];
+      const flushCell = () => { if (row) row.push(cell.join(' ').trim()); cell = []; };
+      const flushRow = () => { flushCell(); if (row && row.some(Boolean)) lines.push(row.join(TAB)); row = null; rowNo = -1; };
+      for (let p = 0; p + 4 <= b.length;) {
+        const hd = v.getUint32(p, true); let tag = hd & 0x3FF, lvl = (hd >> 10) & 0x3FF, size = hd >>> 20; p += 4;
+        if (size === 0xFFF) { size = v.getUint32(p, true); p += 4; }
+        const body = b.subarray(p, p + size); p += size;
+        if (tag === 72 && size >= 12) {   // 표 칸 머리: 문단수 2 + ? 2 + 속성 4, 그다음 열 2·행 2
+          const bv = new DataView(body.buffer, body.byteOffset, body.byteLength), r = bv.getUint16(10, true);
+          if (row && r !== rowNo) flushRow(); else if (row) flushCell();
+          if (!row) row = []; rowNo = r; cellLevel = lvl; continue;
+        }
+        if (row && lvl < cellLevel) flushRow();   // 표 밖 문단
+        if (tag === 67) { const t = hwpParaText(body).trim(); if (!t) continue; if (row) cell.push(t); else lines.push(t); }
+      }
+      if (row) flushRow();
+    }
+    return lines.filter(l => l.trim()).join(NL);
+  }
+  // CSV: 따옴표 칸 안의 쉼표·줄바꿈 처리. 한글 엑셀 저장본(EUC-KR)도 깨진 글자가 많으면 다시 읽는다
+  function readCsv(buf) {
+    let text = new TextDecoder('utf-8').decode(buf);
+    if ((text.match(/�/g) || []).length > 3) text = new TextDecoder('euc-kr').decode(buf);
+    text = text.replace(/^﻿/, '');
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; continue; }
+      if (ch === '"') q = true; else if (ch === ',') { row.push(cur); cur = ''; } else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; } else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  // 표 행 배열 → 글줄(빈 칸 빼고 탭으로)
+  const rowsToText = rows => rows.map(r => r.map(c => String(c == null ? '' : c).trim()).filter(Boolean).join(TAB)).filter(Boolean).join(NL);
+
+  // .xlsx(엑셀) 읽기 — 라이브러리 없이: zip 안의 sharedStrings·첫 시트만 풀어 행 배열로. 압축 풀기는 브라우저 기본 기능(DecompressionStream)
+  async function readXlsx(buf, allSheets) {
+    const z = openZip(buf), get = z.get;
+    const unx = unXml;
     const ss = [...(await get('xl/sharedStrings.xml')).matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => unx([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(t => t[1]).join('')));
-    const sheetName = Object.keys(files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort()[0];
+    const sheetNames = z.names.filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort((a, b) => +a.match(/(\d+)\.xml$/)[1] - +b.match(/(\d+)\.xml$/)[1]);
+    if (!sheetNames.length) throw new Error('엑셀(xlsx) 형식이 아니에요');
+    const sheets = [];
+    for (const sheetName of (allSheets ? sheetNames : sheetNames.slice(0, 1))) {
     const xml = await get(sheetName);
     const colNo = ref => { let c = 0; for (const ch of ref.replace(/\d+/g, '')) c = c * 26 + ch.charCodeAt(0) - 64; return c - 1; };
     // 엑셀 날짜(일련번호) → YYYY-MM-DD (날짜 서식 칸만 바꾸기는 어려워 4만~6만 사이 정수 + 열 제목에 '일'이 있을 때 parseIPList 가 다시 판단)
@@ -1483,7 +1629,9 @@
       }
       rows.push(Array.from(row, x => x === undefined ? '' : x));
     }
-    return rows;
+    sheets.push(rows);
+    }
+    return allSheets ? sheets : sheets[0];
   }
   const xlDate = v => { const n = Number(v); if (!/^\d{5}(\.\d+)?$/.test(String(v)) || n < 20000 || n > 70000) return v; const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000); return d.toISOString().slice(0, 10); };
 
@@ -1589,6 +1737,9 @@
     const lines = raw.split('\n').map(l => l.replace(/ /g, ' ').trim());
     const pairs = [];
     for (const l of lines) {
+      // 빈 서식의 표 머리줄('주소<탭>면적<탭>용도')은 라벨만 늘어선 줄 — 값으로 읽지 않는다(L-163)
+      const cells = l.split(/\t+/).map(c => c.trim()).filter(Boolean);
+      if (cells.length >= 3 && cells.every(c => /^[가-힣()·\s]{1,8}$/.test(c))) continue;
       const m = l.match(/^[●•○◎▶■□\-*]\s*([^\t]+?)(?:\t+|\s{2,})(.*)$/) || l.match(/^[●•○◎▶■□\-*]\s*(.+?)$/);
       if (m) pairs.push([m[1].replace(/\s+/g, ' ').trim(), (m[2] || '').trim()]);
       else {   // L-160: 글머리 없이 '사업자등록번호<탭>246-…' · '메일: …' 꼴
@@ -1690,9 +1841,86 @@
     // '장기차입금 1억5천' → 결산 장기차입금(백만원)
     { const lt = rawLines.map(l => l.match(/^장기\s*차입금\s*[:：]?\s*(\d+)\s*억\s*(?:(\d+)\s*천)?/)).find(Boolean);
       if (lt) put('sme_lt_loan', String(+lt[1] * 100 + (lt[2] ? +lt[2] * 10 : 0)), 0.5, '메모 금액 — 재무제표와 대조'); }
+    // ── S-9 키워드 사전(L-163): 칸이 있으면 그 칸으로, 칸이 없으면 '기타 항목' 줄 후보로 ──
+    const extraRows = [], ipItems = [], usedPairs = new Set();
+    const sk = k => k.replace(/\s+/g, '');
+    const take = re => safe.filter(p => re.test(sk(p[0])) && p[1]).map(p => { usedPairs.add(p); return p; });
+    // 대표자 경력·주요 역량: '경력·약력·학력·자격·주요 역량·핵심 역량·전문 분야' 라벨을 모아 한 칸에
+    { const got = take(/^(대표자?의?)?(주요)?(경력|약력|이력|학력|자격(증)?|보유자격|주요역량|핵심역량|기술역량|역량|전문분야|전문성)/)
+        .map(([k, v]) => /경력|약력|이력/.test(k) ? v : `${sk(k).replace(/^대표자?의?/, '')} ${v}`);
+      const all = [f.corp_ceo_career, ...got].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i);
+      if (got.length) put('corp_ceo_career', all.join(' / ').slice(0, 300), 0.7, '문서의 경력·역량 — 확인 후 다듬기'); }
+    // 신용점수: 라벨 없이 'KCB 895 · NICE 885 · 나이스 880' 이 줄 어디에 있어도
+    if (!f.sme_kcb || !f.sme_nice) {
+      const all = rawLines.join(' ');
+      const k2 = all.match(/(?:KCB|올크레딧|케이씨비)\s*(?:신용)?(?:점수|평점)?\s*[:：]?\s*(\d{3,4})\s*점?/i), n2 = all.match(/(?:NICE|나이스)\s*(?:신용)?(?:점수|평점)?\s*[:：]?\s*(\d{3,4})\s*점?/i);
+      if (k2 && !f.sme_kcb && +k2[1] <= 1000) put('sme_kcb', k2[1], 0.7);
+      if (n2 && !f.sme_nice && +n2[1] <= 1000) put('sme_nice', n2[1], 0.7);
+    }
+    // 등록업종(면허) → 건설업 면허 칸
+    { const lic = take(/^(등록업종|등록면허|보유면허|건설업면허|면허|업종면허|건설업종|전문건설업|종합건설업)/).map(p => p[1]);
+      if (lic.length) put('const_lic', lic.join(' / ').replace(/\s*,\s*/g, ', '), 0.7, '문서의 등록업종(면허) — 등록증과 대조'); }
+    // 실질자본금: 금액은 기타 항목 줄로, '충족·적격/결손·미달' 말이 있으면 충족도 칸도
+    take(/실질자본금/).forEach(([k, v]) => {
+      extraRows.push(['실질자본금', v]);
+      if (/결손|부족|미달|우려|미충족/.test(v)) put('const_cap', 'warn', 0.6, '문서 문구로 판단 — 확인');
+      else if (/충족|적격|이상|양호/.test(v)) put('const_cap', 'ok', 0.6, '문서 문구로 판단 — 확인');
+    });
+    // 거래처·매입처·상시근로자
+    { const c = take(/^(주요)?(거래처|매출처|납품처|고객사)/).map(p => p[1]); if (c.length && !f.corp_clients) put('corp_clients', c.join(', '), 0.65); }
+    { const c = take(/^(주요)?(매입처|구매처|원자재매입처|협력사)/).map(p => p[1]); if (c.length && !f.corp_vendors) put('corp_vendors', c.join(', '), 0.65); }
+    { const e = take(/^(상시)?(근로자|직원|종업원|인원)(수|현황)?$/).map(p => (p[1].match(/(\d{1,4})\s*(명|인)?/) || [])[1]).find(Boolean); if (e) put('sme_employees', e, 0.6, '문서의 인원 — 4대보험 명부와 대조'); }
+    // 특허·실용신안·디자인·상표 줄(S-10): '특허 제10-2345678호 지반 보강 장치 (2023.04.12 등록)' 꼴 → 지식재산권 표 후보
+    { const IPK = /(특허|실용신안|디자인|상표)/;
+      const src = [...take(/^(보유)?(특허|실용신안|디자인|상표|지식재산권?|지재권|산업재산권)/).map(([k, v]) => `${k} ${v}`),
+        ...rawLines.filter(l => IPK.test(l) && /(\d{2}-\d{4}-\d{7}|\d{2}-\d{7}|제\s*\d{5,})/.test(l) && !NOTE_SECRET.test(l))];
+      const seen = new Set();
+      // 한 칸에 여러 건이면 ';'·탭으로, 등록번호가 둘 이상이면 쉼표로도 나눈다
+      const splitIp = s => s.split(/\s*;\s*|	+/).flatMap(x => (x.match(/\d{2}-\d{7}|\d{2}-\d{4}-\d{7}/g) || []).length > 1 ? x.split(/\s*,\s*/) : [x]);
+      for (const one of src.flatMap(splitIp)) {
+        const kind = (one.match(IPK) || [])[1] || '특허';
+        const regNo = (one.match(/(?:등록\s*(?:번호)?\s*[:：]?\s*)?제?\s*(\d{2}-\d{7}|\d{2}-\d{4}-\d{7})\s*호?/) || [])[1] || '';
+        const ds = [...one.matchAll(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})\s*일?/g)].map(m => ({ i: m.index, d: `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`, ctx: one.slice(Math.max(0, m.index - 6), m.index + m[0].length + 6) }));
+        const regDate = (ds.find(x => /등록/.test(x.ctx)) || ds.find(x => !/출원/.test(x.ctx)) || {}).d || '';
+        const appDate = (ds.find(x => /출원/.test(x.ctx)) || {}).d || '';
+        const title = one.replace(/^\s*(보유)?\s*(특허|실용신안|디자인|상표|지식재산권?|지재권|산업재산권)(권|등록)?\s*[:：]?/, '')
+          .replace(/\(?\s*(출원|등록)?\s*(번호|일자?)?\s*[:：]?\s*제?\s*\d{2}-\d{4,7}(-\d{7})?\s*호?\s*\)?/g, '')
+          .replace(/\(?\s*\d{4}\s*[년.\-/]\s*\d{1,2}\s*[월.\-/]\s*\d{1,2}\s*일?\s*(출원|등록)?\s*\)?/g, '')
+          .replace(/[()\[\]「」『』"“”]/g, ' ').replace(/\s*(출원|등록)\s*$/, '').replace(/\s+/g, ' ').replace(/^[\s,·;:]+|[\s,·;:]+$/g, '').trim();
+        if (!regNo && !title) continue;
+        if (!regNo && title.length < 3) continue;
+        const key = regNo || title; if (seen.has(key)) continue; seen.add(key);
+        ipItems.push({ kind, title: title.slice(0, 80), appNo: '', appDate, applicant: '', inventor: '', regNo, regDate });
+      }
+    }
+    // 칸이 없는 정보 → 기타 항목 줄 후보(메일·홈페이지·세무대리인·자금 계획·증자·관계사 등). 비밀 줄은 위에서 이미 빠짐
+    const EXTRA_KEY = /메일|e-?mail|홈페이지|웹사이트|세무|기장|회계사무소|자택|거주지|부동산|자금\s*(니즈|계획|용도|필요|수요)|필요\s*자금|증자|관계사|계열사|자회사|사업자\s*등록일|공장\s*(면적|규모)|매출\s*목표|수출|특이\s*사항|비고|애로|요청\s*사항|희망/i;
+    for (const p of safe) {
+      if (usedPairs.has(p) || !p[1] || !EXTRA_KEY.test(p[0]) || p[0].length > 20) continue;
+      if (extraRows.some(r => r[0] === p[0])) continue;
+      extraRows.push([p[0], p[1].slice(0, 200)]);
+    }
     const dropped = lines.filter(l => NOTE_SECRET.test(l)).length;
     if (dropped) notes.push(`비밀번호·계정·계좌 같은 줄 ${dropped}개는 읽지 않았어요`);
-    return { fields: f, meta, debtItems, vatYears, notes };
+    return { fields: f, meta, debtItems, vatYears, notes, extraRows, ipItems };
+  }
+
+  // 워드·한글·엑셀·CSV 글(L-163): 아는 서류(사업자등록증 등)로 먼저 읽고, 빈 칸은 상담 메모 규칙으로 채운다
+  function parseOfficeText(text, fileName, title) {
+    const doc = parseTextDocument(text, fileName);
+    doc.ocr = false;
+    const memo = parseNotes(text);
+    const known = doc.status === 'ok' && doc.kind && doc.kind !== 'unknown' && (Object.keys(doc.fields || {}).length >= 2 || (doc.ipItems || []).length || doc.fs);
+    const base = known ? doc : { kind: 'notes', title: title || '문서', status: 'ok', fields: {}, meta: {}, debtItems: [], notes: [] };
+    Object.entries(memo.fields).forEach(([k, v]) => { if (!(k in base.fields)) { base.fields[k] = v; base.meta[k] = memo.meta[k]; } });
+    if (!known) { base.debtItems = memo.debtItems; base.vatYears = memo.vatYears; }
+    base.extraRows = memo.extraRows;
+    if (!(base.ipItems || []).length && memo.ipItems.length) base.ipItems = memo.ipItems;
+    base.corpName = base.corpName || doc.corpName || memo.fields.corp_name || '';
+    const n = Object.keys(base.fields).length + Object.keys(base.vatYears || {}).length + (base.debtItems || []).length + base.extraRows.length + (base.ipItems || []).length;
+    if (!n) return { status: 'skip', notes: ['글은 읽었지만 앱 칸에 넣을 내용을 찾지 못했어요("라벨  값" 꼴이나 표로 적힌 문서를 읽어요)'] };
+    base.notes = [known ? '' : `${n}칸 후보`, ...(base.notes || []), ...memo.notes].filter(Boolean);
+    return base;
   }
 
   // 서류 하나: 쪽별 글자 조각 → {kind,title,fields,debtItems,fs,notes,status}
@@ -1857,6 +2085,6 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom, bpCompose, bpFlags, bpSub, parseShare, parseBank };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, readDocx, readHwpx, readHwp, readCsv, rowsToText, parseOfficeText, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom, bpCompose, bpFlags, bpSub, parseShare, parseBank };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
