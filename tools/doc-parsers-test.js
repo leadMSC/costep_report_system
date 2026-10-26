@@ -431,6 +431,50 @@ ok('사업계획 정답지: 주유소·꽃집은 그 업종 말만, 사실은 �
   // 같은 입력 → 같은 글(매번 달라지지 않음)
   assert.deepStrictEqual(P.bpCompose({ code: '47851', section: 'G', size: 'smb', item: '꽃집' }, lib).fields, flo.fields);
 });
+ok('주주명부: 지분율 칸이 없어도 주식수로 계산, 대표이사는 아래 서명줄에서(가짜 양식 4꼴)', () => {
+  const A = [['주 주 명 부'], ['주주명', '소유주식수', '액면가액', '비고'], ['홍길동(800101-1******)', '9,000', '5,000'], ['김철수(840919-1******)', '1,000', '5,000'], ['합 계', '10,000'], ['위와 같이 주주명부를 작성함.'], ['2025. 01. 02'], ['가나기초 주식회사'], ['대표이사 김 철 수', '(인)']];
+  const a = P.parseShare(A);
+  assert.strictEqual(a.fields.corp_ceo_share, '대표이사 김철수 10% / 홍길동 90%');
+  assert.strictEqual(a.fields.corp_ceo, '김철수');
+  assert.ok(!/\d{6}/.test(a.fields.corp_ceo_share), '주민번호가 섞이면 안 됨');
+  const B = [['주주명부'], ['번호', '성명', '주식수', '지분율'], ['1', '대표이사 이영희', '6,000', '60%'], ['2', '박민수', '4,000', '40%'], ['합계', '10,000', '100%']];
+  assert.strictEqual(P.parseShare(B).fields.corp_ceo_share, '대표이사 이영희 60% / 박민수 40%');
+  const C = [['성명', '보유주식', '지분율(%)'], ['정우성', '300', '30.00'], ['김태희', '700', '70.00'], ['계', '1,000', '100']];
+  assert.strictEqual(P.parseShare(C).fields.corp_ceo_share, '정우성 30% / 김태희 70%');
+  const D = [['주주명부'], ['주주', '주식수'], ['최대표', '5,000'], ['나주주', '5,000']];
+  assert.strictEqual(P.parseShare(D, '최대표').fields.corp_ceo_share, '대표이사 최대표 50% / 나주주 50%');
+});
+ok('통장사본: 은행·계좌번호 → 주거래은행(가짜 값)', () => {
+  const t = 'SWIFT CODE : IBKOKRSE\n예 금 주 (Name)   가나기초 주식회사 님\n계좌번호 (Account No.)  123-456789-01-012\n예금종류  기업자유예금\n계좌관리점  용인 031-336-8321\n고객센터 1566-2566';
+  const r = P.parseTextDocument(t, 'x.png');
+  assert.strictEqual(r.kind, 'bank');
+  assert.strictEqual(r.fields.corp_main_bank, 'IBK기업은행 123-456789-01-012');
+  assert.strictEqual(P.parseBank('국민은행 통장사본\n예금주: 홍길동\n계좌번호 123456-01-123456').fields.corp_main_bank, 'KB국민은행 123456-01-123456');
+  assert.strictEqual(P.parseBank('신한은행 예금주 홍길동 고객센터 1599-8000 지점 02-123-4567').fields.corp_main_bank, '신한은행');   // 전화번호를 계좌로 오인하지 않음
+});
+ok('상담 메모: 라벨<탭>값 양식·대표자 묶음·보증 이력(가짜 값)', () => {
+  const T = String.fromCharCode(9);
+  const t = ['가나기초이엔씨 주식회사', '사업자등록번호' + T + T + '220-81-62517', '법인등록번호' + T + T + '110111-1234567', '사업장소재지' + T + T + '서울시 중구 세종대로 1, 3층', '', '개업일' + T + T + T + '2019.11.01', '업종' + T + T + T + T + '건설업', '업태' + T + T + T + T + '보링,그라우팅', '',
+    '홍길동', '주민등록번호' + T + '900101-1234568', '전화' + T + T + ' 010-1234-5678(KT )', '메일' + T + T + T + 'test@example.com', '서울대학교 토목공학과 토목기사 15년', '', '',
+    '공동인증서 abcd1234!', '', '보증 이력', '2022년 4월 24일' + T + T + '기보' + T + T + '1억' + T + T + '기업은행', '', '25년 매출 2,084,127,274', '', '장기차입금 1억5천'].join(String.fromCharCode(10));
+  const r = P.parseNotes(t, new Date('2026-10-26'));
+  const f = r.fields;
+  assert.strictEqual(f.corp_name, '가나기초이엔씨 주식회사');
+  assert.strictEqual(f.corp_biz_no, '220-81-62517');
+  assert.strictEqual(f.corp_est_date, '2019-11-01');
+  assert.strictEqual(f.corp_biz_up, '건설업');
+  assert.strictEqual(f.corp_biz_item, '보링, 그라우팅');
+  assert.strictEqual(f.corp_ceo, '홍길동');
+  assert.strictEqual(f.corp_ceo_rrn, '900101-1234568');
+  assert.strictEqual(f.corp_ceo_phone, '010-1234-5678');
+  assert.strictEqual(f.corp_ceo_telecom, 'KT');
+  assert.ok(/토목기사 15년/.test(f.corp_ceo_career));
+  assert.strictEqual(f.sme_sales, '2084.1');
+  assert.strictEqual(f.sme_lt_loan, '150');
+  assert.strictEqual(r.debtItems.length, 1);
+  assert.strictEqual(r.debtItems[0].institution, '기업은행');
+  assert.ok(!/abcd1234/.test(JSON.stringify(r)), '비밀번호 줄은 읽지 않음');
+});
 ok('한글 금액', () => {
   assert.strictEqual(P.koreanAmount('삼천만'), 30000000);
   assert.strictEqual(P.koreanAmount('일백이십만'), 1200000);

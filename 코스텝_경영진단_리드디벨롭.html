@@ -8754,7 +8754,9 @@
     #debt_card .debt-sum strong { font-size: 17px; font-weight: 900; color: #0F172A; }
     #debt_card .debt-sum em { font-style: normal; font-size: 11px; color: #64748B; margin-left: 4px; }
     /* 보유 인증 체크 목록 */
-    .cert-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 10px; }
+    /* 보유 기업인증: 칸이 넓어지면 3~5열까지(L-161) — 인증 묶음은 카드 한 줄 전체를 쓴다 */
+    div:has(> #cert_box) { grid-column: 1 / -1; }
+    .cert-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(136px, calc((100% - 48px) / 5)), 1fr)); gap: 4px 12px; }   /* 최대 5열 */
     .cert-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; cursor: pointer; white-space: nowrap; overflow: hidden; }
     .cert-item span { overflow: hidden; text-overflow: ellipsis; }
     .cert-row .cert-del { width: 28px; height: 28px; flex: none; border-radius: 8px; color: #94A3B8; font-size: 16px; }
@@ -9589,6 +9591,7 @@
     ['ip', '지식재산권 등록증', t => /특허증|실용신안등록증|디자인등록증|상표등록증/.test(t) || (/출원번호/.test(t) && /[등동]록일/.test(t)) || /CERTIFICATEOF(PATENT|UTILITY|DESIGN|TRADEMARK)/i.test(t) || (/(Patent|Registration)Number/i.test(t) && /ApplicationNumber/i.test(t))],
     ['corpreg', '법인등기부등본', t => /등기사항|법인등기|등기부/.test(t)],
     ['lease', '임대차계약서', t => /임대차/.test(t)],
+    ['bank', '통장사본', t => /통장사본/.test(t) || (/예금주|Name\)?.*AccountNo/i.test(t) && /계좌번호|AccountNo/i.test(t))],
     ['idcard', '신분증', t => /주민등록증|운전면허증|신분증/.test(t)],
     ['bizreg', '사업자등록증', t => /사업자등록증/.test(t)]
   ];
@@ -10161,15 +10164,92 @@
     return { fields: total ? { sme_employees: String(emp || total) } : {}, notes: ['가입자 ' + total + '명 · 고용보험 ' + emp + '명'] };
   }
 
-  // 주주명부: 대표이사 지분율만
-  function parseShare(rows) {
-    for (const r of rows) {
-      const pct = r.find(c => /^\d{1,3}(\.\d+)?%$/.test(c));
-      if (pct && r.some(c => /대표/.test(c))) return { fields: { corp_ceo_share: '대표이사 ' + pct }, notes: [] };
+  // 주주명부(양식 무관, L-160): 머리줄을 뜻으로 찾아 주주별 주식수·지분율을 읽고, 지분율 칸이 없으면 주식수 ÷ 합계로 계산.
+  // 대표자는 ① 주주 줄의 '대표' 표시 ② 아래 '대표이사 ○ ○ ○'(글자 사이 띄어쓰기) ③ 앱이 넘겨준 대표자 이름(hint) 순으로 찾는다.
+  // 결과: corp_ceo_share = '대표이사 김○○ 10.0% / 홍○○ 90.0%'(주민번호 등 괄호 안은 버림), corp_ceo(문서에 대표이사가 적혀 있으면)
+  function parseShare(rows, hint) {
+    const R = (rows || []).map(r => (Array.isArray(r) ? r : [r]).map(c => String(c == null ? '' : c).trim()).filter(Boolean)).filter(r => r.length);
+    const joinHangul = s => String(s || '').replace(/([가-힣])\s+(?=[가-힣](\s|$|\())/g, '$1');   // '김 민 재' → '김민재'
+    const cleanName = s => joinHangul(String(s || '').replace(/\(.*?\)|（.*?）/g, '').replace(/^\d+[.)]?\s*/, '').replace(/^\s*(대표\s*이사|대표자|사내\s*이사|공동\s*대표|대표|감사|이사)\s+/, '').replace(/\s+(대표\s*이사|대표자|대표|감사|이사)\s*$/, '').replace(/[^가-힣A-Za-z\s·.&]/g, '').trim());
+    const num = s => { const m = String(s || '').replace(/\s/g, '').match(/^-?[\d,]+(\.\d+)?$/); return m ? Number(m[0].replace(/,/g, '')) : null; };
+    const pctOf = s => { const m = String(s || '').replace(/\s/g, '').match(/^(\d{1,3}(?:\.\d+)?)%$/); return m ? Number(m[1]) : null; };
+    // 1) 머리줄: 이름 칸 + (주식수 칸 또는 지분율 칸)
+    let hi = -1, col = {};
+    R.forEach((r, i) => {
+      if (hi >= 0) return;
+      const nameI = r.findIndex(c => /주주\s*명|성\s*명|주주|명\s*의|이\s*름/.test(c) && !/주주\s*명\s*부/.test(c));
+      const shI = r.findIndex(c => /주\s*식\s*수|소유\s*주식|보유\s*주식|주\s*수/.test(c));
+      const pcI = r.findIndex(c => /지\s*분|비\s*율|소유\s*비|%/.test(c));
+      if (nameI >= 0 && (shI >= 0 || pcI >= 0)) { hi = i; col = { name: nameI, sh: shI, pc: pcI }; }
+    });
+    // 2) 주주 줄
+    const people = []; let total = null;
+    const body = hi >= 0 ? R.slice(hi + 1) : R;
+    for (const r of body) {
+      const line = r.join(' ');
+      if (/합\s*계|총\s*계|발행\s*주식\s*총수|계\s*$/.test(r[0] || '') || /^합\s*계|^총\s*계/.test(line)) { const n = r.map(num).filter(v => v !== null && v > 0); if (n.length) total = n[0]; continue; }
+      if (/주주명부|위와\s*같|상기|확인|발행|작성|^\d{4}\s*[.년]/.test(line) && !/\d{1,3}(\.\d+)?%/.test(line)) continue;
+      const nameCell = hi >= 0 && col.name >= 0 ? (r[col.name] || r[0]) : r.find(c => /[가-힣]{2,}/.test(c) && num(c) === null && pctOf(c) === null);
+      const name = cleanName(nameCell);
+      if (!name || name.length < 2 || /주식회사|유한|법인/.test(name) && !/\(주\)|㈜/.test(nameCell || '') && name.length > 10) continue;
+      // 숫자 칸: 머리줄 위치를 쓰되 줄마다 칸 수가 다르면 순서로
+      const cells = r.filter(c => c !== nameCell);
+      let pct = cells.map(pctOf).find(v => v !== null) ?? null;
+      const nums = cells.map(num).filter(v => v !== null);
+      let shares = null;
+      if (hi >= 0 && col.sh >= 0 && r[col.sh] != null && num(r[col.sh]) !== null) shares = num(r[col.sh]);
+      else if (nums.length) shares = nums[0];
+      if (pct === null && hi >= 0 && col.pc >= 0 && r[col.pc] != null) { const v = num(r[col.pc]); if (v !== null && v <= 100) pct = v; }
+      if (shares === null && pct === null) continue;
+      people.push({ name, shares, pct, docPct: pct !== null, ceo: /대표/.test(line) });
     }
-    return { fields: {}, notes: ['대표이사 지분을 찾지 못함'] };
+    if (!people.length) return { fields: {}, notes: ['주주명부에서 주주 줄을 찾지 못함 — 표가 사진이면 글자 인식 결과를 확인해 주세요'] };
+    const sum = people.reduce((a, p) => a + (p.shares || 0), 0);
+    const base = total || sum;
+    people.forEach(p => { if (p.pct === null && p.shares && base) p.pct = Math.round(p.shares / base * 1000) / 10; });
+    // 3) 대표자
+    const all = R.map(r => r.join(' ')).join('\n');
+    const foot = joinHangul((all.match(/대표\s*이사\s*[:：]?\s*((?:[가-힣]\s*){2,4})/) || [])[1] || '').replace(/\s/g, '');
+    const ceoName = foot || (people.find(p => p.ceo) || {}).name || cleanName(hint || '');
+    people.forEach(p => { if (ceoName && p.name.replace(/\s/g, '') === ceoName) p.ceo = true; });
+    const fmtP = v => (Math.round(v * 10) / 10).toString().replace(/\.0$/, '') + '%';
+    const ordered = [...people.filter(p => p.ceo), ...people.filter(p => !p.ceo)];
+    const text = ordered.map(p => (p.ceo ? '대표이사 ' : '') + p.name + (p.pct != null ? ' ' + fmtP(p.pct) : '')).join(' / ');
+    const fields = { corp_ceo_share: text };
+    if (foot) fields.corp_ceo = foot;
+    const notes = [`주주 ${people.length}명${base ? ' · 총 ' + base.toLocaleString() + '주' : ''}${people.some(p => !p.docPct && p.pct != null) ? ' · 지분율은 주식수 ÷ 합계로 계산' : ''}`];
+    if (ceoName && !people.some(p => p.ceo)) notes.push('대표이사(' + ceoName + ')가 주주 목록에 없음');
+    // 회사 이름(서명줄 근처 'OO 주식회사') — 사업자번호가 없는 서류라 다른 회사 서류인지 이름으로 확인
+    const corpLine = R.map(r => r.join(' ')).find(l => /주식회사|㈜|\(주\)|유한회사/.test(l) && !/주주명부|작성|위와|확인/.test(l) && l.length <= 40);
+    const corpName = corpLine ? joinHangul(corpLine.replace(/대표\s*이사.*$/, '').trim()) : '';
+    return { fields, notes, corpName, shareholders: people.map(p => ({ name: p.name, shares: p.shares, pct: p.pct, ceo: !!p.ceo })) };
   }
 
+
+  // 통장사본(L-160): 은행·계좌번호·예금주 → 주거래은행 칸('IBK기업은행 239-…'), 예금주는 다른 회사 확인용
+  const BANKS = [[/IBK|기업은행|중소기업은행|IBKOKRSE/i, 'IBK기업은행'], [/KB|국민은행|CZNBKRSE/i, 'KB국민은행'], [/신한|SHBKKRSE/i, '신한은행'], [/우리은행|HVBKKRSE/i, '우리은행'],
+    [/하나은행|KEB|KOEXKRSE|HNBNKRSE/i, '하나은행'], [/NH|농협|NACFKRSE/i, 'NH농협은행'], [/수협|NFFCKRSE/i, 'Sh수협은행'], [/신협/, '신협'], [/새마을금고|MG/, '새마을금고'],
+    [/우체국/, '우체국'], [/카카오뱅크/, '카카오뱅크'], [/토스뱅크/, '토스뱅크'], [/케이뱅크/, '케이뱅크'], [/SC제일|제일은행|SCBLKRSE/i, 'SC제일은행'], [/씨티|CITIKRSX/i, '한국씨티은행'],
+    [/iM뱅크|대구은행|DAEBKR22/i, 'iM뱅크'], [/부산은행|PUSBKR2P/i, 'BNK부산은행'], [/경남은행|KYNAKR22/i, 'BNK경남은행'], [/광주은행|KWABKRSE/i, '광주은행'], [/전북은행|JEONKRSE/i, '전북은행'],
+    [/제주은행|JJBKKR22/i, '제주은행'], [/산업은행|KODBKRSE/i, 'KDB산업은행']];
+  function parseBank(text) {
+    const t = String(text || '').replace(/\r/g, '');
+    const one = t.replace(/\s+/g, ' ');
+    const bankHit = BANKS.find(([re]) => re.test(one));
+    // 계좌번호: '계좌번호' 뒤의 숫자 묶음 우선, 없으면 하이픈으로 이어진 10자리 이상 숫자
+    const acctRe = /(\d{2,6}(?:\s*-\s*\d{1,8}){1,4})/;
+    let acct = ((one.match(new RegExp('계\\s*좌\\s*번\\s*호[^0-9]{0,30}' + acctRe.source)) || [])[1] || '');
+    if (!acct) acct = (one.match(/(?:^|[^\d-])(\d{2,6}(?:-\d{1,8}){1,4})(?![\d-])/g) || []).map(x => x.replace(/^[^\d]/, '')).find(x => x.replace(/\D/g, '').length >= 10 && !/^(\d{2,3}-\d{3,4}-\d{4}|1\d{3}-\d{4})$/.test(x)) || '';
+    acct = acct.replace(/\s+/g, '');
+    const holder = ((one.match(/예\s*금\s*주\s*(?:\(\s*Name\s*\))?\s*[:：]?\s*([가-힣A-Za-z0-9()（）㈜.\s]{2,40}?)\s*(?:님|귀하|계\s*좌|Account|$)/i) || [])[1] || '').trim();
+    const fields = {}, meta = {}, notes = [];
+    if (bankHit && acct) { fields.corp_main_bank = `${bankHit[1]} ${acct}`; meta.corp_main_bank = { conf: 0.85, note: '통장사본에서 읽음' }; }
+    else if (bankHit) { fields.corp_main_bank = bankHit[1]; meta.corp_main_bank = { conf: 0.6, note: '계좌번호를 못 읽음 — 확인' }; }
+    if (holder) notes.push('예금주 ' + holder);
+    if (!bankHit) notes.push('은행 이름을 찾지 못함');
+    if (!acct) notes.push('계좌번호를 찾지 못함');
+    return { fields, meta, notes, holder, corpName: /주식회사|㈜|\(주\)|유한회사/.test(holder) ? holder : '' };
+  }
   // 대표자 신분증의 주민등록번호 13자리(사용자 결정 L-137 — 신분증에 한해 뒷자리까지). 가리기 전 원문에서 찾는다
   // 날짜 꼴 앞 6자리 + 성별 자리 1~8 + 6자리. 검증식이 맞는 후보를 먼저(2020.10 이후 발급분은 검증식이 안 맞을 수 있어 없으면 첫 후보)
   function rrnFrom(text) {
@@ -10329,6 +10409,7 @@
     if (c.kind === 'ip') { const ip = parseIP(text); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     if (c.kind === 'idcard') r = parseIdCard(text);
     else if (c.kind === 'lease') r = parseLease(text);
+    else if (c.kind === 'bank') r = parseBank(text);
     else if (c.kind === 'bizcert') r = parseBizCert(rows);
     else if (c.kind === 'bizreg') r = parseBizReg(rows);
     else if (c.kind === 'share') r = parseShare(rows);
@@ -10356,7 +10437,7 @@
     else { out.status = 'skip'; out.notes.push(c.kind === 'unknown' ? '어떤 서류인지 알아보지 못했어요. 옆에서 종류를 골라 주세요' : '이 서류는 사진에서 아직 읽지 못해요(PDF 로 올려 주세요)'); return out; }
     if (['bizcert', 'bizreg'].includes(c.kind)) fillByLines(r, text);
     if (c.kind === 'vat') { const lf = lineFields(text); if (!lf.corp_biz_no) lf.corp_biz_no = soleBizNo(text); r.meta = r.meta || {}; ['corp_biz_no', 'corp_ceo', 'corp_name'].forEach(k => { if (lf[k] && !r.fields[k]) { r.fields[k] = lf[k]; r.meta[k] = { conf: 0.6 }; } }); }
-    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || [];
+    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || []; if (r.corpName) out.corpName = r.corpName;
     // 사진 인식은 한 단계 낮은 정확도로
     Object.keys(out.fields).forEach(k => { const m = out.meta[k] = out.meta[k] || {}; m.conf = Math.min(m.conf ?? 0.9, 0.75); });
     return out;
@@ -10657,6 +10738,10 @@
     for (const l of lines) {
       const m = l.match(/^[●•○◎▶■□\-*]\s*([^\t]+?)(?:\t+|\s{2,})(.*)$/) || l.match(/^[●•○◎▶■□\-*]\s*(.+?)$/);
       if (m) pairs.push([m[1].replace(/\s+/g, ' ').trim(), (m[2] || '').trim()]);
+      else {   // L-160: 글머리 없이 '사업자등록번호<탭>246-…' · '메일: …' 꼴
+        const t = l.match(/^([가-힣A-Za-z][가-힣A-Za-z\s()]{0,18}?)(?:\t+|\s*[:：]\s*|\s{2,})(\S.*)$/);
+        if (t && !/^\d/.test(t[1])) pairs.push([t[1].replace(/\s+/g, ' ').trim(), t[2].trim()]);
+      }
     }
     // 비밀 줄은 처음부터 뺀다: 라벨·값에 비번·아이디·계좌 등이 있거나, 값이 비밀번호처럼 생긴 것(특수문자 섞인 한 덩어리)
     const looksSecret = v => /^\S{6,}$/.test(v) && /[!@#$%^&]/.test(v) && !/@[\w-]+\.[a-z]{2,}$/i.test(v);   // '*' 는 뺌(주민번호 가림 표시)
@@ -10666,6 +10751,7 @@
     // 첫 줄: '상호 123-45-67890'
     const first = lines.find(l => l && !/^[●•]/.test(l)) || '';
     const fm = first.match(/^(.+?)\s*(\d{3}-\d{2}-\d{5})/);
+    if (!fm && /주식회사|㈜|\(주\)|유한회사|합자회사/.test(first) && !/\d{3}/.test(first) && first.length <= 40) put('corp_name', first.replace(/\s+/g, ' ').trim(), 0.8);
     if (fm) { put('corp_name', fm[1].trim(), 0.85); const no = bizNoOf(fm[2]); put('corp_biz_no', no, bizNoValid(no) ? 0.85 : 0.3, bizNoValid(no) ? '' : '번호 검증식이 맞지 않아요 — 원본 확인'); }
     put('corp_ceo', get(/^대표자?$/).replace(/\s+/g, ''), 0.8);
     const day = s => { const m = String(s).match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/); return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : ''; };
@@ -10704,6 +10790,53 @@
       if (!inst) return;
       debtItems.push({ institution: inst, type: m[4] ? m[4].trim() : '', balance: Math.round(+m[2] * unit), rate: '', monthlyInterest: '', payback: '', _from: '상담 메모(추정)' });
     });
+    // ── L-160 보강: 상담 메모 '라벨<탭>값' 양식(동남 메모 같은 꼴) ──
+    if (!f.corp_biz_no) { const no = bizNoOf(get(/^사업자\s*(등록)?\s*번호$/)); if (no) put('corp_biz_no', no, bizNoValid(no) ? 0.85 : 0.3, bizNoValid(no) ? '' : '번호 검증식이 맞지 않아요 — 원본 확인'); }
+    { const src = get(/^법인\s*(등록)?\s*번호$/) || (String(text || '').split(/\r?\n/).find(l => /^\s*법인\s*(등록)?\s*번호/.test(l)) || '');
+      const cr = src.match(/(\d{6})\s*-?\s*(\d{7})/) || []; if (cr[1]) put('corp_reg_no', cr[1] + '-' + cr[2], corpRegValid(cr[1] + cr[2]) ? 0.8 : 0.5, corpRegValid(cr[1] + cr[2]) ? '' : '검증식이 맞지 않아요 — 등기부와 대조'); }
+    if (!f.corp_address) put('corp_address', get(/^사업장\s*소재지$|^사업장\s*주소$|^주\s*소$/), 0.75);
+    // 업종·업태·종목: 넓은 말(○○업, 8자 이하)은 업태, 나머지는 종목(사업자등록증 원문 칸)
+    { const vals = ['업태', '업종', '종목'].map(k => get(new RegExp('^' + k + '$'))).filter(Boolean);
+      const broad = vals.find(v => /업$/.test(v.replace(/\s/g, '')) && v.replace(/\s/g, '').length <= 8);
+      const items = vals.filter(v => v !== broad);
+      if (broad) put('corp_biz_up', broad, 0.7, '메모의 업종·업태 — 사업자등록증과 대조');
+      if (items.length) put('corp_biz_item', items.join('\n').replace(/\s*,\s*/g, ', '), 0.7, '메모의 업종·업태 — 사업자등록증과 대조'); }
+    // 대표자 묶음: 이름만 있는 줄 바로 뒤에 주민등록번호·전화 라벨이 이어지면 그 이름이 대표자
+    const rawLines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.replace(/ /g, ' ').trim());
+    const ni = rawLines.findIndex((l, i) => /^[가-힣]{2,4}$/.test(l) && rawLines.slice(i + 1, i + 4).some(x => /^(주민|전화|휴대|연락처|핸드폰)/.test(x)));
+    if (ni >= 0) {
+      if (!f.corp_ceo) put('corp_ceo', rawLines[ni], 0.75, '메모의 대표자 묶음');
+      const block = []; for (let i = ni + 1; i < rawLines.length && i < ni + 10; i++) { if (!rawLines[i] && !rawLines[i + 1]) break; block.push(rawLines[i]); }
+      // 주민등록번호 13자리(사용자 결정 L-137) — 가리기 전 원문의 그 줄에서만
+      const rl = block.find(x => /^주민/.test(x)); const rr = rl ? rrnFrom(rl) : '';
+      if (rr) put('corp_ceo_rrn', rr, 0.7, '메모의 주민등록번호 — 숫자 확인');
+      const ph = block.find(x => /^(전화|휴대|연락처|핸드폰)/.test(x)) || '';
+      const pm = ph.match(/(01[016789])[-\s.]?(\d{3,4})[-\s.]?(\d{4})/); if (pm) put('corp_ceo_phone', `${pm[1]}-${pm[2]}-${pm[3]}`, 0.8);
+      const tel = ph.match(/\b(SKT|SK텔레콤|KT|LG\s*U\+?|LGU\+?|LG|알뜰)/i);
+      if (tel) put('corp_ceo_telecom', /^SK/i.test(tel[1]) ? 'SKT' : /^KT$/i.test(tel[1]) ? 'KT' : /^LG/i.test(tel[1]) ? 'LG U+' : '알뜰폰', 0.75);
+      // 경력: 라벨 없는 줄 중 학교·자격·경력 낱말
+      const car = block.find(x => !/^(주민|전화|휴대|연락처|핸드폰|주소|메일|이메일|e-?mail)/i.test(x) && /대학|학과|기사|자격|경력|\d+\s*년/.test(x) && !NOTE_SECRET.test(x));
+      if (car) put('corp_ceo_career', car.replace(/\s+/g, ' '), 0.7);
+    }
+    // 보증 이력: '2022년 4월 24일  기보  1억  기업은행' → 대출표 후보(보증부, 잔액은 보증 당시 금액)
+    const gi = rawLines.findIndex(l => /^보증\s*이력/.test(l));
+    if (gi >= 0) for (let i = gi + 1; i < rawLines.length && rawLines[i]; i++) {
+      const g = rawLines[i].match(/(\d{4})\s*[년.]\s*(\d{1,2})\s*[월.]?\s*(?:(\d{1,2})\s*일?)?\s+(기보|신보|기술보증|신용보증|지역신보|재단|[가-힣]+신용보증재단)\s+(\d+(?:\.\d+)?)\s*(억|천만?|백만|만)\s*원?\s*(\S*은행|\S*농협|\S*금고|\S*신협)?/);
+      if (!g) continue;
+      const unit = { '억': 10000, '천': 1000, '천만': 1000, '백만': 100, '만': 1 }[g[6]] || 1;
+      debtItems.push({ institution: (g[7] || g[4]).trim(), type: `${g[4]} 보증부(${g[1]}.${g[2].padStart(2, '0')})`, balance: Math.round(+g[5] * unit), rate: '', monthlyInterest: '', payback: '', _from: '상담 메모 보증 이력(보증 당시 금액 — 지금 잔액 확인)' });
+    }
+    // 'NN년 매출 2,084,127,274' (글머리 없는 줄)
+    for (const l of rawLines) {
+      const m = l.match(/^(\d{2,4})\s*년\s*매출\s*[:：]?\s*([\d,]{6,})\s*원?$/);
+      if (!m) continue;
+      const y = m[1].length === 2 ? 2000 + +m[1] : +m[1], won = Number(m[2].replace(/,/g, ''));
+      if (!vatYears[y]) vatYears[y] = won;
+      if (y === yr - 1 && !f.sme_sales) put('sme_sales', String(Math.round(won / 1e5) / 10), 0.6, `메모의 ${y}년 매출 — 결산서와 대조`);
+    }
+    // '장기차입금 1억5천' → 결산 장기차입금(백만원)
+    { const lt = rawLines.map(l => l.match(/^장기\s*차입금\s*[:：]?\s*(\d+)\s*억\s*(?:(\d+)\s*천)?/)).find(Boolean);
+      if (lt) put('sme_lt_loan', String(+lt[1] * 100 + (lt[2] ? +lt[2] * 10 : 0)), 0.5, '메모 금액 — 재무제표와 대조'); }
     const dropped = lines.filter(l => NOTE_SECRET.test(l)).length;
     if (dropped) notes.push(`비밀번호·계정·계좌 같은 줄 ${dropped}개는 읽지 않았어요`);
     return { fields: f, meta, debtItems, vatYears, notes };
@@ -10747,6 +10880,7 @@
     }
     else if (c.kind === 'ins') r = parseIns(rows);
     else if (c.kind === 'share') r = parseShare(rows);
+    else if (c.kind === 'bank') r = parseBank(rows.map(x => x.join('  ')).join(String.fromCharCode(10)));
     else if (c.kind === 'corpreg') r = parseCorpReg(rows);
     else if (c.kind === 'ip') { const ip = parseIP(rows.map(r => r.join('  ')).join(String.fromCharCode(10))); out.ipItems = ip.items.length ? ip.items : [ip.item]; out.notes = ip.notes; return out; }
     else if (c.kind === 'ledger' || c.kind === 'creditor') {
@@ -10764,7 +10898,7 @@
       const t = parseTextDocument(rows.map(x => x.join('  ')).join(String.fromCharCode(10)), fileName, c.kind);
       if (t.status === 'ok' && Object.keys(t.fields || {}).length) { t.ocr = false; Object.keys(t.meta || {}).forEach(k => { if (t.meta[k]) t.meta[k].conf = Math.max(t.meta[k].conf || 0, 0.8); }); t.notes = (t.notes || []).concat('줄 글 규칙으로 읽음'); return Object.assign(out, t, { kind: c.kind, title: c.title }); }
     }
-    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes;
+    out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes; if (r.corpName) out.corpName = r.corpName;
     if (r.yearTotals) out.vatYears = r.yearTotals;
     if (r.halfTotals) out.vatHalves = r.halfTotals;
     return out;
@@ -10870,7 +11004,7 @@
     if (!s.loans && !s.delinquencies) n.push('표를 읽지 못함');
     return n;
   }
-  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom, bpCompose, bpFlags, bpSub };
+  const api = { parseLedger, parseCreditorChange, parseDebtDocument, itemsToLines, toDebtItems, UNIT_TO_MAN, itemsToRows, pagesToCells, pagesToRows, classify, parseDocument, fsToFields, DOC_TYPES, bizNoValid, formValue, redact, parseTextDocument, cleanScan, koreanAmount, parseIP, parseIPPages, parseIPList, fixYear, mergeTitleOcr, readXlsx, parseBizReg, parseNotes, parseFSFull, parseVAT, corpRegOf, corpRegValid, parseCorpReg, parseIdCard, parseFSAcct, garbledText, parseVATText, lineFields, suggestKsic, searchKsic, sizeRule, sizeTier, splitBundle, splitBundleText, rrnFrom, bpCompose, bpFlags, bpSub, parseShare, parseBank };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MSCDocParsers = api;
 })(typeof window !== 'undefined' ? window : globalThis);
   </script>
@@ -11141,9 +11275,16 @@
         const nos = files.map(f => f.res && f.res.status === 'ok' ? bizDigits((f.res.fields || {}).corp_biz_no) : '').filter(okNo);
         const count = {}; nos.forEach(n => { count[n] = (count[n] || 0) + 1; });
         const target = cur.length === 10 ? cur : Object.keys(count).sort((a, b) => count[b] - count[a])[0] || '';
+        // 사업자번호가 없는 서류(주주명부·통장사본 등)는 회사 이름으로 비교 — '주식회사·(주)·㈜'·띄어쓰기는 빼고(L-160)
+        const nm = s => String(s || '').replace(/주식회사|유한회사|\(주\)|㈜|\(유\)|\s|님$/g, '');
+        const curName = nm(document.getElementById('corp_name')?.value);
+        const docName = (files.map(f => f.res && f.res.status === 'ok' ? nm((f.res.fields || {}).corp_name) : '').filter(Boolean)[0]) || '';
+        const targetName = curName || docName;
         files.forEach(f => {
           const n = f.res && f.res.status === 'ok' ? bizDigits((f.res.fields || {}).corp_biz_no) : '';
           f.other = target && okNo(n) && n !== target ? { no: n, byInput: cur.length === 10 } : null;
+          const cn = f.res && f.res.status === 'ok' && !n ? nm(f.res.corpName) : '';
+          if (!f.other && cn && targetName && cn !== targetName) f.other = { name: f.res.corpName, byInput: !!curName };
         });
       }
       // 후보 모으기 → 같은 칸끼리 묶기(값이 다르면 충돌)
@@ -11331,7 +11472,7 @@
         document.getElementById('docs_files').innerHTML = files.map((f, i) => {
           const r = f.res;
           const fmtNo = n => n.slice(0, 3) + '-' + n.slice(3, 5) + '-' + n.slice(5);
-          const st = !r ? '<span class="st">읽는 중…</span>' : f.other ? `<span class="st warn">다른 회사 서류(사업자번호 ${fmtNo(f.other.no)}) — ${f.other.byInput ? '지금 입력된 사업자번호와 달라요' : '다른 서류들과 달라요'} · 값은 기본으로 체크하지 않아요</span>`
+          const st = !r ? '<span class="st">읽는 중…</span>' : f.other ? `<span class="st warn">다른 회사 서류(${f.other.name ? '상호 ' + esc(f.other.name) : '사업자번호 ' + fmtNo(f.other.no)}) — ${f.other.byInput ? (f.other.name ? '지금 입력된 상호와 달라요' : '지금 입력된 사업자번호와 달라요') : '다른 서류들과 달라요'} · 값은 기본으로 체크하지 않아요</span>`
             : r.status === 'ok' ? `<span class="st ok">읽음${r.notes && r.notes.length ? ' · ' + esc(r.notes.join(' · ')) : ''}</span>`
             : r.status === 'scan' ? '<span class="st warn">글자층 없는 PDF</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
           const sel = `<select data-i="${i}" aria-label="서류 종류">${kinds.map(([k, t]) => `<option value="${k}" ${r && r.kind === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="unknown" ${!r || r.kind === 'unknown' ? 'selected' : ''}>어떤 서류인지 골라 주세요</option></select>`;
