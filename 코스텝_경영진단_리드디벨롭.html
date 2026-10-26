@@ -759,7 +759,7 @@
             <textarea id="done_opinion" rows="2" placeholder="대표자가 말한 만족도·요청 사항" oninput="syncCompanyData()" class="form-input-control"></textarea>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div id="doc_issue_grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div>
             <label class="font-bold text-slate-700 block mb-1">시행일자</label>
             <input type="date" id="doc_date" value="" onchange="syncCompanyData()" class="form-input-control font-mono">
@@ -1122,6 +1122,7 @@
           <div><span>가중평균 금리</span><strong id="debt_avg_rate">연 0.00%</strong></div>
           <div><span>월 이자 합계</span><strong id="debt_total_monthly_interest">0천원</strong></div>
         </div>
+        <div id="debt_fs_gap" class="hidden rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-900"></div>
         <div id="debt_high_rate_alert" class="hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <b>연 7% 이상 고금리 대출 있음</b> · <span id="debt_alert_text"></span>
         </div>
@@ -3614,6 +3615,15 @@
       const elAlertText = document.getElementById('debt_alert_text');
 
       if (elTotBal) elTotBal.innerText = fmtChun(totalBal);
+      // 재무제표 차입금(단기+장기, 백만원)과 대출표 잔액 합계 비교 — 10% 넘게 다르면 알림(빠진 대출·상환 확인용)
+      const gapEl = document.getElementById('debt_fs_gap');
+      if (gapEl) {
+        const n = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.-]/g, '')); return isFinite(v) ? v : 0; };
+        const fsMan = (n('sme_st_loan') + n('sme_lt_loan')) * 100;
+        const show = window.appState.bizTrack !== 'smb' && fsMan > 0 && totalBal > 0 && Math.abs(fsMan - totalBal) / Math.max(fsMan, totalBal) > 0.1;
+        if (show) gapEl.classList.remove('hidden'); else gapEl.classList.add('hidden');
+        if (show) gapEl.innerHTML = `<b>재무제표 차입금과 대출표 합계가 달라요</b> · 재무제표(단기+장기) ${fmtChun(fsMan)} / 대출표 ${fmtChun(totalBal)} — 빠진 대출이나 결산 뒤 상환·신규 대출이 있는지 확인해 주세요.`;
+      }
       // 억 단위 읽기 보조: 1억 이상일 때만 실제 합계로 표시 (예: 58,500만원 → (5억 8,500만원))
       const elTotBalKr = document.getElementById('debt_total_balance_kr');
       if (elTotBalKr) {
@@ -7133,9 +7143,27 @@
       const now = [c.emp != null ? `근로자 ${c.emp.toLocaleString()}명` : '', c.salesEok != null ? `연매출 약 ${c.salesEok.toFixed(1)}억` : ''].filter(Boolean).join(' · ');
       const cur = window.appState.bizTrack;
       box.innerHTML = `${escapeHtml(c.code)}(${c.basis}) 법정 기준 — 소상공인: 근로자 <b>${r.smbEmp}명 미만</b> · 소기업: 매출 <b>${r.smallEok.toLocaleString()}억 이하</b> · 중소기업: <b>${r.smeEok.toLocaleString()}억 이하</b>`
-        + (c.tier ? `<br>지금 값(${now})이면 <b>${name[c.tier]}</b>` + (c.tier !== 'over' && c.tier !== cur ? `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}로 바꾸기</button>` : c.tier === cur ? ' <span class="ok">· 지금 선택과 같아요</span>' : '') : `<br>${now ? '지금 값(' + now + ')으로는 판정이 부족해요 — 연매출을 넣어 주세요' : '근로자 수·연매출을 넣으면 판정해요'}`);
+        + (c.salesEok == null ? '<br><span style="color:#fcd34d;font-weight:700">임시 선택</span> — 실태·재무 단계에서 매출을 넣으면 법정 기준으로 다시 판정해 알려 드려요' : '')
+        + (c.tier ? `<br>지금 값(${now})이면 <b>${name[c.tier]}</b>` + (c.tier !== 'over' && c.tier !== cur ? `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>` : c.tier === cur ? ' <span class="ok">· 지금 선택과 같아요</span>' : '') : `<br>${now ? '지금 값(' + now + ')으로는 판정이 부족해요 — 연매출을 넣어 주세요' : '근로자 수·연매출을 넣으면 판정해요'}`);
     }
     window.renderSizeRule = renderSizeRule;
+    // 실태·재무 단계 맨 위: 넣은 매출·근로자 수로 본 법정 규모가 지금 고른 규모와 다르면 바로 알림
+    function renderSizeNote() {
+      const c = sizeContext ? sizeContext() : null, cur = window.appState.bizTrack;
+      const name = { smb: '소상공인', small: '소기업', sme: '중기업' };
+      ['section_smb_input', 'section_sme_input'].forEach(id => {
+        const sec = document.getElementById(id); if (!sec) return;
+        let n = sec.querySelector(':scope > .size-note');
+        if (!n) { n = document.createElement('div'); n.className = 'size-note hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center gap-2'; sec.insertBefore(n, sec.firstChild); }
+        const diff = c && c.rule && c.tier && c.tier !== 'over' && c.salesEok != null && c.tier !== cur;
+        n.classList.toggle('hidden', !diff);
+        if (diff) n.innerHTML = `<span class="mr-auto">넣은 값(연매출 약 ${c.salesEok.toFixed(1)}억${c.emp != null ? ' · 근로자 ' + c.emp + '명' : ''})으로 보면 법정 기준 <b>${name[c.tier]}</b>입니다. 지금은 ${name[cur] || cur}${josaRo(name[cur] || cur)} 작성 중이에요.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`;
+      });
+    }
+    window.renderSizeNote = renderSizeNote;
+    // 조사 '으로/로': 받침 있으면 '으로'(ㄹ 받침은 '로')
+    function josaRo(w) { const c = String(w || '').slice(-1).charCodeAt(0) - 0xAC00; if (c < 0 || c > 11171) return '로'; const j = c % 28; return j === 0 || j === 8 ? '로' : '으로'; }
+    window.josaRo = josaRo;
 
     // ===== 업종 특화 칸 중 고객사 정보와 같은 사실(인증·지식재산·판매 경로)은 한 번만 적게 — 고객사 정보 값을 읽어 보여 줌 =====
     // 기존 칸 id 는 그대로 두고(서식·권고 문장·저장 자료 호환) 값만 고객사 정보에서 자동으로 맞춘다
@@ -7350,7 +7378,32 @@
       try { el.setSelectionRange(i, i); } catch (e) { /* 없음 */ }
     }
     window.fmtPhone = fmtPhone; window.fmtPhoneInput = fmtPhoneInput;
-    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); syncIndShared(); renderKsicQa(); renderIndAuto(); } catch (e) { /* 화면 없음 */ } }
+    // 사업계획 자동 생성에 쓰이는 핵심 사실 — 빈 칸은 눌러서 바로 이동(L-156)
+    function renderBpReady() {
+      const btn = [...document.querySelectorAll('button[onclick^="autoGenerateBusinessPlan"]')][0]; if (!btn) return;
+      let box = document.querySelector('.bp-ready');
+      if (!box) { box = document.createElement('div'); box.className = 'bp-ready'; const head = btn.closest('.flex.flex-wrap') || btn.parentElement; head.insertAdjacentElement('afterend', box); }
+      const v = id => String(document.getElementById(id)?.value || '').trim();
+      let ks = false; try { ks = !!((JSON.parse(v('corp_ksic') || '[]') || [])[0] || {}).code; } catch (e) { ks = false; }
+      const track = window.appState.bizTrack;
+      const items = [
+        ['표준산업분류', ks, 'corp_biz_item'],
+        ['매출', !!(track === 'smb' ? v('smb_monthly_sales') : (v('sme_sales') || v('smb_monthly_sales'))), track === 'smb' ? 'smb_monthly_sales' : 'sme_sales'],
+        ['근로자 수', v('sme_employees') !== '', 'sme_employees'],
+        ['판매 방식', !!v('corp_sales_channel'), 'corp_sales_channel'],
+        ['대표자 경력', !!v('corp_ceo_career'), 'corp_ceo_career'],
+        ['개업일', !!v('corp_est_date'), 'corp_est_date']
+      ];
+      const done = items.filter(x => x[1]).length;
+      box.innerHTML = `<span class="lbl">자동 생성에 반영 ${done}/${items.length}</span>` + items.map(([n, ok, id]) => ok ? `<span class="ok">${n}</span>` : `<button type="button" data-go="${id}">${n} 비어 있음 →</button>`).join('');
+    }
+    window.renderBpReady = renderBpReady;
+    document.addEventListener('click', e => {
+      const b = e.target.closest && e.target.closest('.bp-ready [data-go]'); if (!b) return;
+      const el = document.getElementById(b.dataset.go); if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => el.focus({ preventScroll: true }), 350);
+    });
+    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); renderSizeNote(); if (typeof calcDebtTotals === 'function') calcDebtTotals(); syncIndShared(); renderKsicQa(); renderIndAuto(); renderBpReady(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
       const ext = elv('cust_ext'), kb = elv('ksic_box');
@@ -8707,6 +8760,11 @@
     /* 대표자 묶음: 칸 수가 화면 폭 따라 바뀌어도(auto-fill) 연락처·경력은 한 줄 전체 */
     #cust_ext .cust-row-full { grid-column: 1 / -1; }
     #cust_ext .cust-phone { max-width: 380px; }
+    .bp-ready { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; }
+    .bp-ready .lbl { font-weight: 800; color: #cbd5e1; margin-right: 4px; }
+    .bp-ready .ok { padding: 2px 9px; border-radius: 999px; background: rgba(94,234,212,.14); color: #5eead4; font-weight: 700; }
+    .bp-ready button { padding: 2px 9px; border-radius: 999px; border: 1px dashed #fcd34d; background: transparent; color: #fcd34d; font-weight: 800; cursor: pointer; }
+    .bp-ready button:focus-visible { outline: 2px solid #fcd34d; outline-offset: 2px; }
     .ind-auto:empty { display: none; }
     .ind-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid rgba(94,234,212,.35); border-radius: 10px; background: rgba(15,23,42,.45); color: #cbd5e1; font-size: 12px; line-height: 1.5; }
     .ind-auto .code { font-variant-numeric: tabular-nums; font-weight: 800; color: #5eead4; }
@@ -11381,7 +11439,7 @@
     #l3_preview.radar #l3_stage, #l3_preview.radar .l3-view, #l3_preview.radar .l3-print { display: none !important; }
     #l3_preview:not(.radar) #l3_radar { display: none; }
     /* 고객사 정보: 선택 → 새 고객(서류+기본정보) / 기존(불러오기+기본정보) */
-    #l3 .l3-step[data-cust=""] > :not(#l3_cchoice) { display: none !important; }
+    #l3 .l3-step[data-cust=""] > :not(#l3_cchoice):not(#l3_me_notice) { display: none !important; }
     #l3 .l3-step[data-cust="new"] > #client_bar { display: none !important; }
     #l3 .l3-step[data-cust=""] .l3-seg, #l3 .l3-step:not([data-cust=""]) .l3-ask { display: none; }
     #l3 .l3-ask { text-align: center; }
@@ -11674,21 +11732,29 @@
       // 3단 보기가 기본. 예전 화면: ?view=classic · 시험 도구(__MSC_CLASSIC__) · 좁은 화면(900px 미만, 휴대폰·작은 태블릿)
       const viewQ = new URLSearchParams(location.search).get('view');
       if (viewQ === 'classic' || window.__MSC_CLASSIC__ || (viewQ !== '3d' && window.innerWidth < 900)) return;
+      // 고객 작성 흐름(L-156): 고객사 정보(업종 특화 포함) → 진단 대상 → 거래처·인증 → 실태·재무 → 대출 → 사업계획·발행
+      // '내 정보'(펌·나)는 한 번만 설정하면 되므로 단계에서 빼고 계정 메뉴의 설정 창으로
       const STEPS = [
-        ['내 정보', ['l3_me']],
-        ['고객사 정보', ['l3_cchoice', 'client_bar', 'docs_card', ':basic']],
+        ['고객사 정보', ['l3_cchoice', 'client_bar', 'docs_card', ':basic', 'section_ind_spec']],
         ['진단 대상', ['case_card', ':tier']],
         ['거래처·인증', [':trade']],
-        ['대출', ['debt_card']],
         ['실태·재무', ['section_smb_input', 'section_sme_input']],
-        ['업종 특화', ['section_ind_spec']],
-        ['사업계획', [':bplan', ':action']]
+        ['대출', ['debt_card']],
+        ['사업계획·발행', [':bplan', 'doc_issue_card', ':action']]
       ];
       document.addEventListener('DOMContentLoaded', () => {
         const scr = document.getElementById('screen_input');
         const kids = [...scr.children];
         // id 없는 카드는 원래 순서로 찾는다: 대상 구분, 기본정보, 거래처, 대출 … 사업계획, 버튼 줄
         const noId = kids.filter(k => !k.id);
+        { const g = document.getElementById('doc_issue_grid');
+          if (g) {
+            const card = document.createElement('div');
+            card.id = 'doc_issue_card';
+            card.className = 'bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-3';
+            card.innerHTML = '<h3 class="text-sm font-extrabold text-slate-900 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span><span>발행 정보</span><span class="text-[11px] font-normal text-slate-500">서식1 시행일자·경유·근거 — 비우면 오늘 날짜·기본 문구</span></h3>';
+            card.appendChild(g); scr.appendChild(card);
+          } }
         const named = { ':tier': noId[0], ':basic': noId[1], ':trade': noId[2], ':bplan': noId[noId.length - 2], ':action': noId[noId.length - 1] };
         const pick = k => named[k] || document.getElementById(k);
 
@@ -11801,7 +11867,19 @@
           '<div id="l3_me_sync" class="hidden -mt-2 flex items-center gap-2 text-[11px] font-bold text-slate-500"><span id="l3_me_sync_msg" class="min-w-0"></span><button type="button" id="l3_me_org_btn" class="hidden ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-[#0f766e] text-white font-extrabold cursor-pointer">펌 등록</button></div>' +
           '<div><h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 mb-3 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span><span>나</span></h3>' +
           '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs" id="l3_me_person">' + fld('mobile', '휴대폰', '000-0000-0000') + fld('email', '메일', 'name@example.com') + '</div></div>';
-        scr.insertBefore(meCard, scr.firstChild);
+        // 내 정보는 단계가 아니라 설정 창(계정 메뉴 '내 정보 수정')에 둔다(L-156)
+        const meModal = document.createElement('div');
+        meModal.id = 'l3_me_modal';
+        meModal.className = 'no-print hidden fixed inset-0 z-[95] bg-slate-900/50 flex items-start sm:items-center justify-center p-3';
+        meModal.setAttribute('role', 'dialog'); meModal.setAttribute('aria-modal', 'true'); meModal.setAttribute('aria-label', '내 정보');
+        meModal.innerHTML = '<div class="w-full max-w-2xl max-h-[calc(100vh-24px)] overflow-y-auto relative"><button type="button" data-me-close class="absolute right-3 top-3 z-[1] px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 border border-slate-300 cursor-pointer">닫기</button></div>';
+        meModal.firstChild.appendChild(meCard);
+        document.body.appendChild(meModal);
+        const meOpen = () => { meModal.classList.remove('hidden'); meCard.querySelector('input')?.focus(); };
+        const meClose = () => { meModal.classList.add('hidden'); if (window.renderMeNotice) renderMeNotice(); };
+        window.openMe = meOpen;
+        meModal.addEventListener('click', e => { if (e.target === meModal || e.target.closest('[data-me-close]')) meClose(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !meModal.classList.contains('hidden')) meClose(); });
         meCard.querySelector('#l3_me_org_btn').addEventListener('click', meCreateOrg);
 
         // 짧은 글(만원·명·태그·버튼 이름 등 10자 이하)은 한 줄로 — 좁은 칸에서 '만/원'처럼 갈라지지 않게
@@ -12047,6 +12125,14 @@
 
         // 고객사 정보: 새 고객이면 업로드 카드 + 기본 정보, 기존이면 불러오기 줄 + 업로드 카드 + 기본 정보
         const custStep = choice.closest('.l3-step');
+        const meNote = document.createElement('div');
+        meNote.id = 'l3_me_notice';
+        meNote.className = 'hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-center gap-2';
+        meNote.innerHTML = '<span class="mr-auto"><b>서식 발신란(소속 펌·담당자)이 비어 있어요.</b> 한 번만 적어 두면 모든 고객 서식에 들어갑니다.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer">내 정보 채우기</button>';
+        meNote.querySelector('button').onclick = () => window.openMe && openMe();
+        custStep.insertBefore(meNote, custStep.firstChild);
+        window.renderMeNotice = () => { const firm = (meCard.querySelector('[data-me="firm"]')?.value || '').trim(); meNote.classList.toggle('hidden', !!firm); };
+        setTimeout(window.renderMeNotice, 800);
         { const dc = document.getElementById('docs_card'), cb = document.getElementById('client_bar');
           if (dc && cb && cb.parentElement === custStep && dc.parentElement === custStep) custStep.insertBefore(dc, cb.nextSibling); }
         function setCust(mode, init) {
@@ -12280,7 +12366,7 @@
         menu.addEventListener('click', e => {
           const act = e.target.closest('button')?.dataset.act; if (!act) return;
           menu.classList.remove('open');
-          if (act === 'me') box.scrollTo({ top: secs[0].offsetTop, behavior: 'smooth' });
+          if (act === 'me') window.openMe && openMe();
           if (act === 'admin') openAdmin();
           if (act === 'theme') toggleTheme();
           if (act === 'out') authSignOut();
