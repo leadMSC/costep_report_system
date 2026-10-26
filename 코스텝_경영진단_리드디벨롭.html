@@ -1135,7 +1135,7 @@
             <span class="w-3 h-3 rounded-full bg-[#169aa8]"></span>
             <h3 class="text-sm sm:text-base font-extrabold text-blue-950">소상공인 사업장 현황 실태조사서 (간이 확인식)</h3>
           </div>
-          <span class="text-xs font-bold text-blue-700 bg-white px-3 py-1 rounded-full border border-blue-300">소상공인 기준 적용</span>
+          <span class="flex items-center gap-2"><button type="button" id="smb_fs_open_btn" onclick="openSmbFs()" class="no-print text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-300 cursor-pointer">재무제표 있음 · 결산 입력 열기</button><span class="text-xs font-bold text-blue-700 bg-white px-3 py-1 rounded-full border border-blue-300">소상공인 기준 적용</span></span>
         </div>
 
         <!-- Row 1: Sales Tier & Margin -->
@@ -1284,7 +1284,7 @@
         <div class="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
           <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 flex items-center space-x-2">
             <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-            <span>중소기업 최근 3개년 표준재무제표 및 대표자 신용평점</span>
+            <span>최근 3개년 표준재무제표 및 대표자 신용평점</span>
             <button type="button" onclick="openDocsModal && openDocsModal()" class="no-print ml-auto px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer">업로드로 자동채우기</button>
           </h3>
           <textarea id="sme_fs_full" hidden></textarea>
@@ -3436,7 +3436,7 @@
 
       if (track === 'smb') {
         if (smbSection) smbSection.classList.remove('hidden');
-        if (smeSection) smeSection.classList.add('hidden');
+        syncSmbFsSection();
       } else {
         if (smbSection) smbSection.classList.add('hidden');
         if (smeSection) smeSection.classList.remove('hidden');
@@ -3448,8 +3448,7 @@
         scaleSelect.value = 'auto';
       }
 
-      const dbTarget = COSTEP_REPORTS_DB[track] ? track : (track === 'smb' ? 'smb' : 'sme');
-      const keys = Object.keys(COSTEP_REPORTS_DB[dbTarget]);
+      const keys = Object.keys(reportsDb(track));
       if (window.renderSizeRule) setTimeout(renderSizeRule, 0);
       // 완료 보고서는 규모 공통이라 규모가 바뀌어도 그대로 둔다
       if (window.appState.activeReportKey !== 'done') window.appState.activeReportKey = keys[0];
@@ -3702,6 +3701,7 @@
     window.calcSmbMetrics = calcSmbMetrics;
 
     function syncCompanyData() {
+      if (window.syncSmbFsSection) syncSmbFsSection();
       const consName = document.getElementById('consultant_name')?.value || '';
       const badge = document.getElementById('top_consultant_badge');
       if (badge && consName) badge.innerText = consName;
@@ -3810,7 +3810,7 @@
       if (!bar) return;
 
       const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const db = reportsDb(track);
       const activeKey = window.appState.activeReportKey;
 
       const badge = document.getElementById('sidebar_tier_badge');
@@ -3835,7 +3835,59 @@
     }
     window.renderReportButtons = renderReportButtons;
     // 보고서 단계: 규모별 6종을 순번으로 착수(1·2)·진단(3·4)·보완(5·6), 마지막에 규모 공통 '컨설팅 완료 보고서'
-    const REPORT_STAGES = [['착수', [0, 1]], ['진단', [2, 3]], ['보완', [4, 5]], ['완료', ['done']]];
+    // 7번째(소상공인 + 결산 재무제표 → 사업구조 혁신진단서)는 진단 단계에 붙인다
+    const REPORT_STAGES = [['착수', [0, 1]], ['진단', [2, 3, 6]], ['보완', [4, 5]], ['완료', ['done']]];
+    // 소상공인이라도 결산 재무제표가 있으면 재무 5개 영역 진단을 담은 '사업구조 혁신진단서'를 더한다
+    const SMB_FS_REPORT = {
+      key: 'fs_strategy',
+      tabTitle: '7. 재무제표 기반 사업구조 혁신진단서',
+      title: '사업구조 혁신진단서',
+      docNo: 'COSTEP-2026-소상-0107',
+      subject: '결산 재무제표 기반 사업구조 진단 및 정책자금 연계 안내',
+      summary: '최근 결산 재무제표로 수익성·안정성·성장성을 진단하고 소상공인 정책자금·보증 연계와 사업구조 개선 과제를 정리',
+      sections: [
+        { title: 'Ⅰ. 진단 배경 및 기업 현황', items: ['진단 대상: 결산 재무제표를 갖춘 법인·복식부기 소상공인', '현황 분석: 매출·이익·부채 구조를 결산 기준으로 비교해 사업구조 개선 우선순위 도출'] },
+        { title: 'Ⅱ. 맞춤 지원제도 연계', items: ['추천 사업: 소상공인 정책자금(혁신성장촉진자금) 및 지역신용보증재단 보증', '연계 검토: 매출·고용이 늘면 소기업 전환에 대비한 벤처·이노비즈 인증 사전진단'] }
+      ],
+      official_body: [
+        '가. 결산 재무제표 기준 수익성·안정성·성장성 진단 및 개선 과제 도출',
+        '나. 고금리·단기 차입 구조의 정책자금 대환 가능성 검토',
+        '다. 성장 단계에 맞춘 소기업 전환·인증 준비 일정 수립'
+      ],
+      steps: [
+        '1단계: 최근 3개년 결산 재무제표 및 부가가치세 과세표준증명 준비',
+        '2단계: 소상공인시장진흥공단 정책자금 누리집 사전 상담·신청',
+        '3단계: 자금 집행 뒤 다음 결산에서 재무지표 변화 점검'
+      ],
+      docs: ['사업자등록증명 1부', '최근 3개년 결산 재무제표 1부', '부가가치세 과세표준증명 1부', '금융기관 대출잔액 증명 1부']
+    };
+    function smbHasFs() {
+      try { if (fsHasData(fsView())) return true; } catch (e) { /* 표준재무제표 모듈 준비 전 */ }
+      return ['sme_sales', 'sme_assets', 'sme_debt', 'sme_equity'].some(id => /[1-9]/.test(document.getElementById(id)?.value || ''));
+    }
+    function reportsDb(track) {
+      track = track || window.appState.bizTrack || 'smb';
+      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      return track === 'smb' && smbHasFs() ? { ...db, fs_strategy: SMB_FS_REPORT } : db;
+    }
+    window.reportsDb = reportsDb;
+    // 소상공인 화면: 재무제표가 들어왔거나 '재무제표 입력 열기'를 누르면 결산 재무 칸을 함께 보여 준다
+    function syncSmbFsSection() {
+      if ((window.appState.bizTrack || 'smb') !== 'smb') return;
+      const sec = document.getElementById('section_sme_input'), has = smbHasFs();
+      const show = (el, on) => { if (el) el.classList[on ? 'remove' : 'add']('hidden'); };
+      show(sec, has || window.appState.smbFsOpen);
+      show(document.getElementById('smb_fs_open_btn'), !(has || window.appState.smbFsOpen));
+      if (window.appState._smbFsHad !== has) {
+        window.appState._smbFsHad = has;
+        const gone = !has && window.appState.activeReportKey === 'fs_strategy';
+        if (gone) window.appState.activeReportKey = Object.keys(reportsDb('smb'))[0];
+        renderReportButtons(); renderReportKeyChips();
+        if (gone && window.renderActiveReport) renderActiveReport();
+      }
+    }
+    window.syncSmbFsSection = syncSmbFsSection;
+    window.openSmbFs = () => { window.appState.smbFsOpen = true; syncSmbFsSection(); document.getElementById('section_sme_input')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     const DONE_REPORT = { key: 'done', tabTitle: '컨설팅 완료 보고서', title: '경영컨설팅 완료 보고서' };
     function reportStageGroups(db) {
       const keys = Object.keys(db);
@@ -3847,7 +3899,7 @@
       const box = document.getElementById('report_key_chips');
       if (!box) return;
       const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const db = reportsDb(track);
       const keys = Object.keys(db);
       const cur = window.appState.activeReportKey;
       const active = cur === 'done' || keys.includes(cur) ? cur : keys[0];
@@ -5317,7 +5369,7 @@
       const v = id => (document.getElementById(id)?.value || '').trim();
       const e = id => escapeHtml(v(id));
       const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const db = reportsDb(track);
       const brand = getBrand(), brandName = escapeHtml(brand.name);
       const consultantName = e('consultant_name') || '담당 컨설턴트';
       const consultantLabel = /컨설턴트$/.test(consultantName) ? consultantName : consultantName + ' 경영컨설턴트';
@@ -5330,7 +5382,7 @@
       const wide = (a, av) => av ? `<tr><td class="${th}">${a}</td><td class="${td}" colspan="3">${av}</td></tr>` : '';
       let fa = '';
       try {
-        if (track !== 'smb' && typeof faDiagnose === 'function') { const fd = faData(); if (fd.Y.some(y => y.S !== null || y.A !== null)) fa = faDiagHtml(faDiagnose(fd)); }
+        if ((track !== 'smb' || smbHasFs()) && typeof faDiagnose === 'function') { const fd = faData(); if (fd.Y.some(y => y.S !== null || y.A !== null)) fa = faDiagHtml(faDiagnose(fd)); }
       } catch (err) { fa = ''; }
       const block = (n, t, id) => v(id) ? `<div class="space-y-0.5"><div class="font-black text-slate-950 text-[11.5px] border-b border-slate-300 pb-0.5">${n}. ${t}</div><p class="text-[10.5px] text-slate-800 whitespace-pre-line leading-relaxed pl-1">${e(id)}</p></div>` : '';
       const blocks = [['주요 수행 내용', 'done_work'], ['성과 및 변화', 'done_result'], ['향후 과제 및 후속 지원', 'done_next'], ['기업 의견', 'done_opinion']].filter(([, id]) => v(id));
@@ -5393,7 +5445,7 @@
       // 서식2 재무표 바로 위: 재무진단 5개 영역 판정 + 자동 문장(소·중기업이고 재무 값이 있을 때)
       let faDiagReport = '';
       try {
-        if ((window.appState.bizTrack || 'smb') !== 'smb' && typeof faDiagnose === 'function') {
+        if (((window.appState.bizTrack || 'smb') !== 'smb' || window.appState.activeReportKey === 'fs_strategy') && typeof faDiagnose === 'function') {
           const fd = faData();
           if (fd.Y.some(y => y.S !== null || y.A !== null)) {
             const dg = faDiagnose(fd), cls = { good: 'g', mid: 'm', bad: 'b', none: 'n' };
@@ -5409,7 +5461,7 @@
       if (window.appState.activeReportKey === 'done') { area.innerHTML = doneReportHtml(); fitSheetsToA4(area); return; }
 
       const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const db = reportsDb(track);
       const key = window.appState.activeReportKey || 'manage';
       const rep = db[key] || Object.values(db)[0];
       const activeSheet = window.appState.activeSheet || 'all';
@@ -5836,8 +5888,8 @@
               </div>
             </div>
 
-            <!-- 제4절 기업 규모별 맞춤 경영지표 및 업종 특화 진단 -->
-            ${track === 'smb' ? `
+            <!-- 제4절 기업 규모별 맞춤 경영지표 및 업종 특화 진단 (소상공인 사업구조 혁신진단서는 결산 재무 지표로) -->
+            ${track === 'smb' && key !== 'fs_strategy' ? `
             <div class="border border-slate-300 rounded-lg p-2 bg-slate-50/50 space-y-1 text-[10px]">
               <div class="flex justify-between items-center border-b border-slate-200 pb-1">
                 <span class="font-extrabold text-slate-900">【 소상공인 경영수지 및 손익분기 분석 지표 】</span>
@@ -5876,7 +5928,7 @@
             ${faDiagReport}
             <div class="border border-slate-300 rounded-lg p-2 bg-slate-50/50 space-y-1 text-[10px]">
               <div class="flex justify-between items-center border-b border-slate-200 pb-1">
-                <span class="font-extrabold text-slate-900">【 중소·소기업 표준재무제표 및 경영건전성 종합 지표 】</span>
+                <span class="font-extrabold text-slate-900">【 ${track === 'smb' ? '소상공인 결산 재무제표' : '중소·소기업 표준재무제표'} 및 경영건전성 종합 지표 】</span>
                 <span class="text-[9.5px] text-slate-600">NICE ${niceScore !== '-' ? niceScore + '점' : '-'} / KCB ${kcbScore !== '-' ? kcbScore + '점' : '-'} | 가지급금: <strong class="text-red-600">${loanToCeo !== '-' ? loanToCeo + '백만원' : '-'}</strong> | 상시근로자: ${employees !== '-' ? employees + '명' : '-'}</span>
               </div>
               <!-- 3-Year Comparative Financial Table in Report — 별첨 표준재무제표가 있으면 한 줄 요약(L-158) -->
@@ -6284,7 +6336,7 @@
       if (!area) return;
 
       const track = window.appState.bizTrack || 'smb';
-      const db = COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      const db = reportsDb(track);
       const savedKey = window.appState.activeReportKey;
       const savedSheet = window.appState.activeSheet;
 
@@ -6347,7 +6399,7 @@
     };
     function xpDb() {
       const track = window.appState.bizTrack || 'smb';
-      return COSTEP_REPORTS_DB[track] || (track === 'smb' ? COSTEP_REPORTS_DB.smb : COSTEP_REPORTS_DB.sme);
+      return reportsDb(track);
     }
     function xpLoad() { try { return JSON.parse(localStorage.getItem(XP_KEY) || '{}') || {}; } catch (e) { return {}; } }
     function xpSave(v) { try { localStorage.setItem(XP_KEY, JSON.stringify(v)); } catch (e) { /* 저장 불가 */ } }

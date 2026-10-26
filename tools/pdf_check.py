@@ -66,6 +66,7 @@ for data in datasets:
         cases.append(({'case': 'batch', 'track': track, 'data': data, 'ind': 'mfg' if data != 'debt10' else 'logis'}, f'batch-{track}-{data}'))
 cases.append(({'case': 'single', 'track': 'smb', 'data': 'demo', 'key': 'manage', 'sheet': 'report'}, 'single-smb-manage-report'))
 cases.append(({'case': 'single', 'track': 'sme', 'data': 'long', 'key': 'finance', 'sheet': 'bplan'}, 'single-sme-finance-bplan-long'))
+cases.append(({'case': 'single', 'track': 'smb', 'data': 'demo', 'key': 'fs_strategy', 'sheet': 'report'}, 'single-smb-fsstrategy-report'))   # 소상공인 + 결산 재무제표(L-162)
 cases.append(({'case': 'export', 'track': 'smb', 'data': 'demo'}, 'export-smb-6x3-duplex-pno'))   # 내보내기: 6분야×서식3 + 양면용 빈 쪽 5 = 23쪽
 for params, label in cases:
     print(check(params, label), flush=True)
