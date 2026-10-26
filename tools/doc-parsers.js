@@ -1483,7 +1483,11 @@
     for (const part of parts) {
       if (/^<(?:\w+:)?tbl\b/.test(part)) {
         for (const tr of part.matchAll(/<((?:\w+:)?tr)\b[^>]*>([\s\S]*?)<\/\1>/g)) {
-          const cells = [...tr[2].matchAll(/<((?:\w+:)?tc)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(c => paras(c[2]).filter(Boolean).join(' '));
+          // 가로로 합친 칸(워드 gridSpan·한글 colSpan)은 빈 칸을 덧대 머리줄·자료줄 칸 자리를 맞춘다
+          const cells = [...tr[2].matchAll(/<((?:\w+:)?tc)\b[^>]*>([\s\S]*?)<\/\1>/g)].flatMap(c => {
+            const span = +((c[2].match(/<(?:\w+:)?gridSpan\b[^>]*?val="(\d+)"/) || c[2].match(/<(?:\w+:)?cellSpan\b[^>]*?colSpan="(\d+)"/) || [])[1] || 1);
+            return [paras(c[2]).filter(Boolean).join(' '), ...Array(Math.max(0, Math.min(span, 20) - 1)).fill('')];
+          });
           if (cells.some(Boolean)) lines.push(cells.join(TAB));
         }
       } else lines.push(...paras(part));
@@ -1735,8 +1739,41 @@
     const yr = (now || new Date()).getFullYear();
     const raw = redact(String(text || '')).replace(/\r/g, '');
     const lines = raw.split('\n').map(l => l.replace(/ /g, ' ').trim());
+    // ── L-170: 서식 표(머리줄 + 자료줄) → 항목별 기록. 빈 서식(자료줄이 비었거나 '( - - )' 자리표시·작성 안내문)은 아무것도 넣지 않는다 ──
+    const HEADW = /^(기간|근무기간|재직기간|근무처|회사명|업체명|기관명|업종|담당업무|업무|직위|최종직위|직책|거래처|거래처명|매출처|매입처|납품처|품목|제품|제품명|금액|거래금액|매출액|비중|비율|점유율|거래연수|결제조건|명칭|발명의명칭|등록번호|등록일|등록일자|출원번호|출원일|권리|구분|종류|인증명|인증|발급기관|인증기관|취득일|인증일|유효기간|연도|국가|수출국|수출액|학교|학교명|전공|학위|졸업|자격증|자격|취득기관|비고|내용|순번|번호)$/;
+    const sqz = s => String(s || '').replace(/\s+/g, '');
+    const labelish = c => /^[가-힣()·/\s]{1,14}$/.test(c);
+    const GUIDE = /기재(하|함|해|요|바람|합니다|할\s*것)|작성(하|함|요령|방법|예시|할)|표시하|해당\s*시|※|예\s*\)|예시|일치하여야|구분\s*(하여\s*)?기재|입력(하|해)|기입|적어\s*주|절사하여|에\s*대한\s*내용\)?$|^\s*[-·]\s*.+\s-\s/;
+    // 작성 안내문·자리표시(글자보다 기호가 많음)·괄호로만 된 설명·자간 띄운 머리말('기 간 근 무 처')은 값이 아님
+    const looksGuide = v => { const t = String(v || '').trim(); if (!t) return true; const core = t.replace(/[^가-힣A-Za-z0-9*]/g, '');   // * 는 가린 번호
+      return GUIDE.test(t) || core.length < t.replace(/\s/g, '').length * 0.5 || /^\([^()]*\)$/.test(t) || /^(?:[가-힣]\s){2,}[가-힣]/.test(t); };
+    const tables = [], tableLines = new Set();
+    const rawCells = raw.split('\n');
+    const cellsOf = i => (rawCells[i] || '').split('\t').map(c => c.replace(/ /g, ' ').trim());   // 앞 칸이 빈 줄(세로로 합친 칸)도 자리 유지
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].includes('\t')) continue;
+      const H = cellsOf(i), hs = H.filter(Boolean);
+      if (hs.length < 3 || !hs.every(labelish) || hs.filter(c => HEADW.test(sqz(c))).length < 2) continue;
+      // 구역 이름: 머리줄 첫 칸이 머리말이 아니면 그 칸(세로로 합친 칸), 아니면 바로 위 글줄
+      let section = !HEADW.test(sqz(hs[0])) ? hs[0] : '';
+      for (let k = i - 1; !section && k >= Math.max(0, i - 2); k--) if (lines[k]) section = lines[k].split('\t').filter(Boolean)[0] || '';
+      const recs = [];
+      let j = i + 1;
+      for (; j < lines.length && lines[j].includes('\t'); j++) {
+        const R = cellsOf(j), rs = R.filter(Boolean);
+        if (rs.length >= 3 && rs.every(labelish) && rs.filter(c => HEADW.test(sqz(c))).length >= 2) break;   // 다음 표 머리
+        if (H[0] && !HEADW.test(sqz(H[0])) && R[0] && labelish(R[0])) break;   // 첫 칸에 새 항목 이름('주요 매출처') → 표 끝
+        const rec = {};
+        H.forEach((h, k) => { if (h && HEADW.test(sqz(h)) && R[k] && !looksGuide(R[k]) && !NOTE_SECRET.test(R[k])) rec[sqz(h)] = R[k]; });
+        if (Object.keys(rec).length >= 2) recs.push(rec);
+      }
+      for (let k = i; k < j; k++) tableLines.add(k);
+      tables.push({ section: sqz(section), head: hs.map(sqz).join(' '), recs });
+      i = j - 1;
+    }
     const pairs = [];
-    for (const l of lines) {
+    for (const [li, l] of lines.entries()) {
+      if (tableLines.has(li)) continue;
       // 빈 서식의 표 머리줄('주소<탭>면적<탭>용도')은 라벨만 늘어선 줄 — 값으로 읽지 않는다(L-163)
       const cells = l.split(/\t+/).map(c => c.trim()).filter(Boolean);
       if (cells.length >= 3 && cells.every(c => /^[가-힣()·\s]{1,8}$/.test(c))) continue;
@@ -1749,7 +1786,7 @@
     }
     // 비밀 줄은 처음부터 뺀다: 라벨·값에 비번·아이디·계좌 등이 있거나, 값이 비밀번호처럼 생긴 것(특수문자 섞인 한 덩어리)
     const looksSecret = v => /^\S{6,}$/.test(v) && /[!@#$%^&]/.test(v) && !/@[\w-]+\.[a-z]{2,}$/i.test(v);   // '*' 는 뺌(주민번호 가림 표시)
-    const safe = pairs.filter(([k, v]) => !NOTE_SECRET.test(k) && !NOTE_SECRET.test(v) && !looksSecret(v) && !v.split(/\s*\/\s*/).some(looksSecret));
+    const safe = pairs.filter(([k, v]) => !NOTE_SECRET.test(k) && !NOTE_SECRET.test(v) && !looksSecret(v) && !v.split(/\s*\/\s*/).some(looksSecret) && !looksGuide(v));
     const get = re => { const p = safe.find(([k, v]) => re.test(k) && v); return p ? p[1] : ''; };
     const put = (id, v, conf, note) => { if (v === '' || v === null || v === undefined) return; f[id] = v; meta[id] = Object.assign({ conf: conf ?? 0.8 }, note ? { note } : {}); };
     // 첫 줄: '상호 123-45-67890'
@@ -1892,6 +1929,30 @@
         const key = regNo || title; if (seen.has(key)) continue; seen.add(key);
         ipItems.push({ kind, title: title.slice(0, 80), appNo: '', appDate, applicant: '', inventor: '', regNo, regDate });
       }
+    }
+    // 표 기록(L-170) → 칸: 구역 이름·머리말로 무슨 표인지 판단. 줄마다 '기간 근무처(업종) 담당업무 직위' 처럼 풀어 쓴다
+    for (const t of tables) {
+      if (!t.recs.length) continue;
+      const sec = t.section + ' ' + t.head;
+      const g = (r, ...ks) => ks.map(k => r[k]).find(Boolean) || '';
+      const amt = r => [g(r, '금액', '거래금액', '매출액'), g(r, '비중', '비율', '점유율')].filter(Boolean).join(', ');
+      const name = r => g(r, '거래처', '거래처명', '매출처', '매입처', '납품처', '업체명', '회사명');
+      const add = (id, list, note) => { list = list.filter(Boolean); if (!list.length) return; put(id, [f[id], ...list].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(id === 'corp_ceo_career' ? ' / ' : ', ').slice(0, 300), 0.75, note); };
+      if (/경력|약력|이력|근무처/.test(sec))
+        add('corp_ceo_career', t.recs.map(r => [g(r, '기간', '근무기간', '재직기간'), g(r, '근무처', '회사명', '업체명', '기관명') + (g(r, '업종') ? `(${g(r, '업종')})` : ''), g(r, '담당업무', '업무'), g(r, '최종직위', '직위', '직책')].filter(Boolean).join(' ')), '문서의 경력 표 — 줄마다 기간·근무처·업무·직위');
+      else if (/학력|학교|자격/.test(sec))
+        add('corp_ceo_career', t.recs.map(r => [g(r, '학교', '학교명'), g(r, '전공'), g(r, '학위', '졸업'), g(r, '자격증', '자격'), g(r, '취득일')].filter(Boolean).join(' ')), '문서의 학력·자격 표');
+      else if (/매입|구매|협력/.test(sec))
+        add('corp_vendors', t.recs.map(r => name(r) + (amt(r) ? ` (${amt(r)})` : '') + (g(r, '품목', '제품', '제품명') ? ` · ${g(r, '품목', '제품', '제품명')}` : '')), '문서의 매입처 표');
+      else if (/매출|거래처|납품|고객/.test(sec))
+        add('corp_clients', t.recs.map(r => name(r) + (amt(r) ? ` (${amt(r)})` : '') + (g(r, '품목', '제품', '제품명') ? ` · ${g(r, '품목', '제품', '제품명')}` : '')), '문서의 매출처 표');
+      else if (/특허|지식재산|지재권|산업재산|발명/.test(sec))
+        t.recs.forEach(r => { const it = { kind: (g(r, '권리', '구분', '종류').match(/특허|실용신안|디자인|상표/) || ['특허'])[0], title: g(r, '명칭', '발명의명칭'), appNo: g(r, '출원번호'), appDate: day(g(r, '출원일')), applicant: '', inventor: '', regNo: (g(r, '등록번호').match(/\d{2}-\d{4,7}(-\d{7})?/) || [''])[0], regDate: day(g(r, '등록일', '등록일자')) };
+          if ((it.title || it.regNo) && !ipItems.some(x => (x.regNo && x.regNo === it.regNo) || (x.title && x.title === it.title))) ipItems.push(it); });
+      else if (/인증/.test(sec))
+        add('corp_certs', t.recs.map(r => g(r, '인증명', '인증', '명칭', '구분', '종류') + (g(r, '취득일', '인증일') ? `(${g(r, '취득일', '인증일')})` : '')), '문서의 인증 표 — 실제 인증서와 대조');
+      else if (/수출/.test(sec))
+        extraRows.push(['수출 실적', t.recs.map(r => Object.values(r).join(' ')).join(' / ').slice(0, 200)]);
     }
     // 칸이 없는 정보 → 기타 항목 줄 후보(메일·홈페이지·세무대리인·자금 계획·증자·관계사 등). 비밀 줄은 위에서 이미 빠짐
     const EXTRA_KEY = /메일|e-?mail|홈페이지|웹사이트|세무|기장|회계사무소|자택|거주지|부동산|자금\s*(니즈|계획|용도|필요|수요)|필요\s*자금|증자|관계사|계열사|자회사|사업자\s*등록일|공장\s*(면적|규모)|매출\s*목표|수출|특이\s*사항|비고|애로|요청\s*사항|희망/i;

@@ -554,6 +554,21 @@ ok('워드·한글 글: 경력·역량·신용점수·면허·실질자본금·�
   const ex = Object.fromEntries(r.extraRows);
   assert.strictEqual(ex['실질자본금'], '3억 2천 (충족)'); assert.strictEqual(ex['세무대리인'], '가나다 세무회계'); assert.strictEqual(ex['자금 니즈'], '운전자금 7~8억');
 });
+ok('사업계획서 서식(표): 빈 서식·작성 안내문은 버리고, 채운 표는 줄마다 풀어서', () => {
+  const T = String.fromCharCode(9), N = String.fromCharCode(10);
+  const head = ['대표자 경력', '기 간', '근 무 처', '업 종', '담당업무', '최종직위'].join(T);
+  const guide = ['주요 매출처' + T + '( - - ) - -, 。 거래금액이 큰 순서대로 기재하되 거래처수가 기재란을 초과할 때에는 기타로 표시하며, 합계액은 당기 손익계산서의 순매출액과 일치함',
+    '주요 매입처' + T + '( - - ) - -, 。 거래금액이 큰 순서대로 기재하되 합계액은 당기원재료매입액과 일치하여야 함',
+    '도입 또는 개발희망기술' + T + '(향후 품질향상, 제품개발 등의 필요에 따라 개발이 필요할 것으로 판단되는 기술에 대한 내용)',
+    '수출액' + T + '- 결산기준 수출액 작성 - 신고기준 - 연간환산 - 예상 수출액 작성'];
+  const empty = P.parseOfficeText(['1. 기업 현황', head, T + T + T + T + T, ...guide].join(N), '사업계획서.docx', '워드 문서');
+  assert.strictEqual(empty.status, 'skip', JSON.stringify(empty.fields || {}) + JSON.stringify(empty.extraRows || []));
+  const filled = P.parseOfficeText(['1. 기업 현황', head, [' ', '2010~2018', '가나건설', '토목', '현장관리', '소장'].join(T), [' ', '2018~현재', '가나기초이엔씨', '건설', '경영총괄', '대표'].join(T),
+    ['주요 매출처', '거래처명', '금액', '비중'].join(T), ['', '다라건설', '5억', '40%'].join(T), ['', '마바토건', '3억', '25%'].join(T), ...guide.slice(1)].join(N), '사업계획서.docx', '워드 문서');
+  assert.strictEqual(filled.fields.corp_ceo_career, '2010~2018 가나건설(토목) 현장관리 소장 / 2018~현재 가나기초이엔씨(건설) 경영총괄 대표');
+  assert.strictEqual(filled.fields.corp_clients, '다라건설 (5억, 40%), 마바토건 (3억, 25%)');
+  assert.ok(!filled.fields.corp_vendors && !(filled.extraRows || []).length, '안내문은 값이 아님');
+});
 ok('워드 글이 사업자등록증이면 서류로 읽고 빈 칸만 메모 규칙으로', () => {
   const N = String.fromCharCode(10);
   const t = ['사업자등록증', '(법인사업자)', '등록번호 : 220-81-62517', '법인명(단체명) : 가나기초이엔씨 주식회사', '대표자 : 홍길동', '개업연월일 : 2019 년 11 월 01 일', '사업장 소재지 : 서울특별시 중구 세종대로 1', '업태 건설업 종목 보링,그라우팅', '이메일: a@b.co'].join(N);
