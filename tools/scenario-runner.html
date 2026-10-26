@@ -37,7 +37,7 @@
       });
     }
     function stub(w) {
-      w.alert = () => {}; w.print = () => {}; w.confirm = () => true;
+      w.alert = () => {}; w.print = () => {}; w.confirm = () => true; w.__askStub = o => (o.options ? o.options[0].value : true);   // 화면 안 확인 창(adminAsk): 첫 선택지·[확인]
       w.HTMLAnchorElement.prototype.click = function () {};
     }
 
@@ -60,7 +60,7 @@
         val: id => (el(id) ? el(id).value : ''),
         text: id => (el(id) ? el(id).innerText : ''),
         call: (fn, ...args) => w[fn](...args),
-        demo() { w.loadDemoData(); },
+        demo() { return w.loadDemoData(); },
         fresh() {
           doc.querySelectorAll('#section_smb_input input[type=text], #section_smb_input input[type=number]').forEach(n => { n.value = ''; });
           // 앞 실행이 남긴 임시저장(대출 3건 등)이 섞이지 않게 대출표도 비움

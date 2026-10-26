@@ -3757,7 +3757,7 @@
     }
     window.bpContext = bpContext;
 
-    function autoGenerateBusinessPlan() {
+    async function autoGenerateBusinessPlan() {
       setTimeout(() => { if (typeof fitAllTextareas === 'function') fitAllTextareas(); }, 0);
       const lib = bpLib(), P = window.MSCDocParsers;
       if (!lib || !P || !P.bpCompose) { alert('사업계획 문장 세트를 불러오지 못했어요. 새로고침 후 다시 눌러 주세요.'); return; }
@@ -3765,11 +3765,9 @@
       const filled = bpIds.filter(id => (document.getElementById(id)?.value || '').trim() !== '');
       let onlyEmpty = false;
       if (filled.length) {
-        if (confirm(`사업계획 ${filled.length}칸에 이미 내용이 있습니다.\n\n[확인] 비어 있는 칸만 자동으로 채웁니다 (작성한 내용 유지)\n[취소] 다른 방법을 고릅니다`)) {
-          onlyEmpty = true;
-        } else if (!confirm('작성한 내용을 모두 지우고 6칸 전체를 새로 작성할까요?\n\n[확인] 전체 새로 작성 (기존 내용 사라짐)\n[취소] 아무것도 바꾸지 않음')) {
-          return;
-        }
+        const how = await adminAsk({ title: `사업계획 ${filled.length}칸에 이미 내용이 있어요`, text: '어떻게 채울까요?', options: [{ value: 'empty', label: '비어 있는 칸만 채우기 (작성한 내용 유지)' }, { value: 'all', label: '6칸 전체 새로 작성 (기존 내용 사라짐)' }], okLabel: '채우기' });
+        if (!how) return;
+        onlyEmpty = how === 'empty';
       }
       const pick = id => {
         const el = document.getElementById(id);
@@ -6759,9 +6757,9 @@
     window.renderRadarAnnouncements = renderRadarAnnouncements;
 
     // Demo Data Auto-Filler
-    function loadDemoData() {
+    async function loadDemoData() {
       const typed = (document.getElementById('corp_name')?.value || '').trim();
-      if (typed && !confirm('작성 중인 내용을 작성 예시로 덮어씁니다. 계속할까요?\n(필요하면 먼저 [저장]을 눌러 주세요)')) return;
+      if (typed && !(await adminAsk({ title: '작성 예시로 덮어쓸까요?', text: '작성 중인 내용이 예시로 바뀝니다. 필요하면 먼저 [저장]을 눌러 주세요.', okLabel: '덮어쓰기', danger: true }))) return;
       document.getElementById('corp_name').value = '주식회사 대성정밀기계';
       const elForm = document.getElementById('corp_form'); if (elForm) elForm.value = '법인 · 일반과세';
       document.getElementById('corp_biz_no').value = '123-86-78901';
@@ -6843,6 +6841,7 @@
       syncCompanyData();
       renderRadarAnnouncements();
       syncCertIpViews();
+      renderActiveReport();   // 미리보기도 바로 새 값으로(L-154 — 전에는 다른 칸을 건드려야 바뀜)
       alert('견본 데이터(사업체 제원, 금융부채 3건, 공모 사업계획서 문답)가 1초 만에 기입되었습니다. [맞춤 보고서 및 낱개 서식] 탭으로 이동하여 확인해 보세요!');
     }
     window.loadDemoData = loadDemoData;
@@ -7647,10 +7646,10 @@
       renderDebtTable(); calcSmbMetrics(); syncCompanyData(); syncCertIpViews();
     }
 
-    function newClient() {
+    async function newClient() {
       const hasInput = (document.getElementById('corp_name')?.value || '').trim() !== '';
       if (cloudOn()) {
-        if (hasInput && !confirm('새 고객을 시작할까요?\n(지금 화면은 서버에 저장해 두고 비웁니다)')) return;
+        if (hasInput && !(await adminAsk({ title: '새 고객을 시작할까요?', text: '지금 화면은 서버에 저장해 두고 비웁니다.', okLabel: '새 고객' }))) return;
         (cloud.dirty ? cloudSaveNow() : Promise.resolve()).then(() => {
           cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false;
           resetFormToDefaults(); refreshClientSelect(); cloudPref({ last_assessment_id: null });
@@ -7659,7 +7658,7 @@
         });
         return;
       }
-      if (hasInput && !confirm('지금 작성 중인 내용을 비우고 새 고객을 시작할까요?\n(저장하지 않은 내용은 사라집니다)')) return;
+      if (hasInput && !(await adminAsk({ title: '새 고객을 시작할까요?', text: '지금 작성 중인 내용을 비웁니다. 저장하지 않은 내용은 사라집니다.', okLabel: '비우고 시작', danger: true }))) return;
       currentClientId = '';
       resetFormToDefaults();
       autosaveDraft();
@@ -7668,11 +7667,11 @@
     }
     window.newClient = newClient;
 
-    function deleteClient() {
+    async function deleteClient() {
       if (cloudOn()) {
         const a = cloud.list.find(x => x.id === cloud.aid);
         if (!a) { alert('삭제할 고객을 먼저 목록에서 불러와 주세요.'); return; }
-        if (!confirm(`'${a.title}' 을(를) 휴지통으로 옮길까요? (화면의 내용은 그대로 남습니다)`)) return;
+        if (!(await adminAsk({ title: '휴지통으로 옮길까요?', text: `'${a.title}' — 화면의 내용은 그대로 남습니다.`, okLabel: '휴지통으로', danger: true }))) return;
         clearTimeout(cloud.timer);
         sb.from('assessments').update({ deleted_at: new Date().toISOString() }).eq('id', a.id).then(({ error }) => {
           if (error) { alert('삭제하지 못했습니다: ' + error.message); return; }
@@ -7685,7 +7684,7 @@
       const store = readClientStore();
       const c = store.clients[currentClientId];
       if (!c) { alert('삭제할 고객을 먼저 목록에서 불러와 주세요.'); return; }
-      if (!confirm(`'${c.name}' 저장본을 이 PC에서 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      if (!(await adminAsk({ title: '저장본을 삭제할까요?', text: `'${c.name}' — 이 PC에서 지우며 되돌릴 수 없습니다.`, okLabel: '삭제', danger: true }))) return;
       delete store.clients[currentClientId];
       writeClientStore(store);
       currentClientId = '';
@@ -7908,7 +7907,8 @@
         cloud.aid = r.id; cloud.ver = r.version; cloud.dirty = false; cloudListSoon();
         setClientStatus('다른 곳에서 지운 고객이라 새로 저장했습니다'); return;
       }
-      const mine = confirm('다른 PC(또는 다른 창)에서 이 고객을 먼저 고쳤습니다 · ' + timeLabel(srv.updated_at) + '\n\n[확인] 지금 이 화면 내용으로 저장(서버 내용 덮어쓰기)\n[취소] 서버의 최신 내용 불러오기');
+      // 고르지 않고 닫으면(Esc) 안전하게 서버 최신 내용을 불러온다(덮어쓰지 않음)
+      const mine = !!(await adminAsk({ title: '다른 곳에서 먼저 고친 고객이에요', text: '다른 PC(또는 다른 창)에서 ' + timeLabel(srv.updated_at) + '에 고쳤습니다.\n지금 화면 내용으로 저장하면 서버 내용을 덮어씁니다.', okLabel: '지금 화면으로 저장', noLabel: '서버 내용 불러오기', danger: true }));
       if (mine) {
         const { data: r, error } = await sb.from('assessments').update(row).eq('id', cloud.aid).select('version').single();
         if (error) throw error;
@@ -8175,16 +8175,18 @@
 
     // 관리 화면용 확인·선택 창(화면 안에 그림) — 브라우저 기본 prompt()·confirm() 은 앱 안 브라우저 등에서 막혀
     // 눌러도 아무 일이 없었음(L-153: 운영자가 소속 없는 대기자를 승인 못 함)
-    function adminAsk({ title, text, options, okLabel, danger }) {
+    function adminAsk({ title, text, options, okLabel, danger, noLabel }) {
+      // 점검 도구(시나리오)용: 창을 띄우지 않고 정해진 답을 돌려줌
+      if (typeof window.__askStub === 'function') return Promise.resolve(window.__askStub({ title, text, options, okLabel }));
       return new Promise(resolve => {
         const wrap = document.createElement('div');
         wrap.className = 'fixed inset-0 z-[120] bg-slate-900/40 flex items-center justify-center p-4';
         wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
         wrap.innerHTML = `<div class="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-200 p-5 space-y-3 text-xs">
           <h4 class="text-sm font-black text-slate-900">${escapeHtml(title || '')}</h4>
-          ${text ? `<p class="text-slate-600 leading-relaxed">${escapeHtml(text)}</p>` : ''}
+          ${text ? `<p class="text-slate-600 leading-relaxed whitespace-pre-line">${escapeHtml(text)}</p>` : ''}
           ${options ? `<select class="form-input-control" data-ask-pick aria-label="${escapeHtml(title || '선택')}">${options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')}</select>` : ''}
-          <div class="flex justify-end gap-2 pt-1"><button type="button" data-ask-no class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold cursor-pointer">취소</button>
+          <div class="flex justify-end gap-2 pt-1"><button type="button" data-ask-no class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold cursor-pointer">${escapeHtml(noLabel || '취소')}</button>
           <button type="button" data-ask-ok class="px-3 py-1.5 rounded-lg font-bold text-white cursor-pointer ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-[#169aa8] hover:bg-[#138491]'}">${escapeHtml(okLabel || '확인')}</button></div></div>`;
         const done = v => { wrap.remove(); document.removeEventListener('keydown', key, true); resolve(v); };
         const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };

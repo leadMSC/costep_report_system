@@ -8,7 +8,7 @@ window.SCENARIOS = [
   {
     id: '0-0', name: '작성 예시 전수 렌더 (3규모 × 6분야 × 4서식 × 3업종)',
     async run(api) {
-      api.demo();
+      await api.demo();
       const issues = api.sweep(['smb', 'small', 'sme'], ['mfg', 'logis', 'service']);
       return { verdict: issues.length ? 'FAIL' : 'PASS', evidence: issues.length ? issues : ['넘침·잔여 토큰 없음 (216장)'] };
     }
@@ -16,7 +16,7 @@ window.SCENARIOS = [
   {
     id: '1-1', name: '사업자 구분별 시행문 수신 표기',
     async run(api) {
-      api.demo(); api.set('corp_form', '개인 · 일반과세');
+      await api.demo(); api.set('corp_form', '개인 · 일반과세');
       const indiv = api.line(api.render('smb', null).official, '귀하');
       api.set('corp_form', '법인 · 일반과세');
       const corp = api.line(api.render('smb', null).official, '귀하');
@@ -55,7 +55,7 @@ window.SCENARIOS = [
       ev.push(`매출 "1억" → "${sales}" ${salesMsg ? '(안내 표시)' : '(안내 없음)'}`);
       ev.push(`관리비 12.5 포함 고정비 합계 "${fixedTxt}"`);
       if (fixedTxt.startsWith('-') || rent.startsWith('-') || sales === '1' || !salesMsg) verdict = 'FAIL';
-      api.demo(); api.call('setBizTrack', 'sme'); api.set('sme_profit', '-120');
+      await api.demo(); api.call('setBizTrack', 'sme'); api.set('sme_profit', '-120');
       ev.push(`영업이익 "-120"(손실) → "${api.val('sme_profit')}" (음수 허용 칸)`);
       if (api.val('sme_profit') !== '-120') verdict = 'FAIL';
       return { verdict, evidence: ev };
@@ -65,16 +65,16 @@ window.SCENARIOS = [
     id: '1-4', name: '대출 0건 / 10건 / 금리 7.0% / 0%',
     async run(api) {
       const ev = []; let verdict = 'PASS';
-      api.demo(); api.setDebts([]);
+      await api.demo(); api.setDebts([]);
       const zero = api.render('smb', 'debt');
       ev.push('0건 → ' + api.line(zero.report, '금융차입금'));
       ev.push(`0건일 때 월 차입이자 칸 "${api.val('smb_cost_interest')}" (작성 예시 65 유지 여부)`);
       const ten = Array.from({ length: 10 }, (_, i) => ({ institution: '은행' + (i + 1), type: '운전자금', balance: 1000, rate: 4, monthlyInterest: 3, payback: '만기일시' }));
-      api.demo(); api.setDebts(ten);
+      await api.demo(); api.setDebts(ten);
       const t = api.render('sme', 'finance');
       ev.push(`10건 → 결과보고서 넘침 ${t.overflow.length ? t.overflow.join(', ') : '없음'}`);
       if (t.overflow.length) verdict = 'FAIL';
-      api.demo(); api.setDebts([{ institution: 'A', type: '운전자금', balance: 1000, rate: 7.0, monthlyInterest: 6, payback: '-' }]);
+      await api.demo(); api.setDebts([{ institution: 'A', type: '운전자금', balance: 1000, rate: 7.0, monthlyInterest: 6, payback: '-' }]);
       const alertShown = !api.doc.getElementById('debt_high_rate_alert').classList.contains('hidden');
       ev.push(`금리 7.0% → 고금리 경고 ${alertShown ? '표시' : '미표시'}`);
       if (!alertShown) verdict = 'FAIL';
@@ -86,7 +86,7 @@ window.SCENARIOS = [
   {
     id: '1-5', name: '긴 상호·주소·사업계획(각 500자)',
     async run(api) {
-      api.demo();
+      await api.demo();
       api.set('corp_name', '주식회사 대한민국정밀기계부품제조및첨단소재연구개발센터글로벌');
       api.set('corp_address', '경기도 화성시 동탄첨단산업1로 27 동탄테크노밸리 지식산업센터 A동 15층 1501호 1502호 1503호 (영천동, 금강펜테리움 IX타워)');
       ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome'].forEach(id => api.set(id, LONG_PLAN));
@@ -97,7 +97,7 @@ window.SCENARIOS = [
   {
     id: '1-6', name: '특수문자 상호 <b>&"',
     async run(api) {
-      api.demo(); api.set('corp_name', '<b>굵게</b> & "따옴표" 상사');
+      await api.demo(); api.set('corp_name', '<b>굵게</b> & "따옴표" 상사');
       const s = api.render('smb', null);
       const bolded = [...api.doc.querySelectorAll('#print_target_report b')].some(b => b.textContent === '굵게');
       const literal = s.report.includes('<b>굵게</b>');
@@ -111,8 +111,8 @@ window.SCENARIOS = [
       const y = new Date().getFullYear();
       const cases = [['미래(2030-01-01)', '2030-01-01', '설립 예정'], [`올해(${y}-01-02)`, `${y}-01-02`, '올해 설립'], ['비움', '', ''], ['5년 전', `${y - 5}-03-01`, '설립 5년차']];
       for (const [label, val, expect] of cases) {
-        api.demo(); ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome'].forEach(id => api.set(id, ''));
-        api.set('corp_est_date', val); api.call('autoGenerateBusinessPlan');
+        await api.demo(); ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome'].forEach(id => api.set(id, ''));
+        api.set('corp_est_date', val); await api.call('autoGenerateBusinessPlan');
         const team = api.val('bp_team').split(/\r?\n/)[0];
         const ok = (expect ? team.includes(expect) : !/년차|올해 설립|설립 예정/.test(team)) && !team.includes('다년간');
         if (!ok) verdict = 'FAIL';
@@ -125,7 +125,7 @@ window.SCENARIOS = [
   {
     id: '1-8', name: '규모 전환 후 숨은 칸 값 섞임',
     async run(api) {
-      api.demo(); api.call('setBizTrack', 'sme'); api.call('setBizTrack', 'smb');
+      await api.demo(); api.call('setBizTrack', 'sme'); api.call('setBizTrack', 'smb');
       const s = api.render('smb', null);
       const leak = /NICE|KCB|가지급금|Y-3/.test(s.report);
       return { verdict: leak ? 'FAIL' : 'PASS', evidence: [leak ? '소상공인 보고서에 중소기업 재무 항목이 섞임' : '소상공인 보고서에 중소기업 항목 없음'] };
@@ -136,18 +136,18 @@ window.SCENARIOS = [
     async run(api) {
       const ev = []; let verdict = 'PASS';
       const mine = '우리 회사가 직접 쓴 문제 인식 문장';
-      api.demo(); api.set('bp_problem', mine); api.set('bp_budget', '');
-      api.w.confirm = () => true;                      // [확인] 빈 칸만 채우기
-      api.call('autoGenerateBusinessPlan');
+      await api.demo(); api.set('bp_problem', mine); api.set('bp_budget', '');
+      api.w.__askStub = () => 'empty';                 // 빈 칸만 채우기
+      await api.call('autoGenerateBusinessPlan');
       const kept = api.val('bp_problem') === mine, budgetFilled = api.val('bp_budget') !== '';
       ev.push(`빈 칸만 채우기 → 직접 쓴 문장 ${kept ? '유지' : '사라짐'}, 빈 자금계획 칸 ${budgetFilled ? '채워짐' : '빈칸'}`);
       if (!kept || !budgetFilled) verdict = 'FAIL';
-      let n = 0; api.w.confirm = () => (++n === 2);     // [취소] → [확인] 전체 새로 작성
-      api.set('bp_problem', mine); api.call('autoGenerateBusinessPlan');
+      api.w.__askStub = () => 'all';                   // 전체 새로 작성
+      api.set('bp_problem', mine); await api.call('autoGenerateBusinessPlan');
       const replaced = api.val('bp_problem') !== mine;
       ev.push(`전체 새로 작성 선택 → ${replaced ? '새 문장으로 바뀜' : '그대로'}`);
-      api.w.confirm = () => false;                     // 둘 다 [취소] → 변화 없음
-      api.set('bp_problem', mine); api.call('autoGenerateBusinessPlan');
+      api.w.__askStub = () => null;                    // 취소 → 변화 없음
+      api.set('bp_problem', mine); await api.call('autoGenerateBusinessPlan');
       const untouched = api.val('bp_problem') === mine;
       ev.push(`두 번 모두 취소 → ${untouched ? '변화 없음' : '바뀜'}`);
       if (!replaced || !untouched) verdict = 'FAIL';
@@ -158,7 +158,7 @@ window.SCENARIOS = [
     id: '1-10', name: '일괄 인쇄 영역·.doc 생성 내용',
     async run(api) {
       const ev = []; let verdict = 'PASS';
-      api.demo(); api.render('smb', null);
+      await api.demo(); api.render('smb', null);
       api.call('printAllReportsBatch');
       const area = api.doc.getElementById('active_report_render_area');
       const cards = area.querySelectorAll('.a4-page-card').length;
@@ -172,7 +172,7 @@ window.SCENARIOS = [
   {
     id: '1-11', name: '새로고침 후 입력 보존',
     async run(api) {
-      api.demo(); api.set('corp_name', '새로고침시험상사');
+      await api.demo(); api.set('corp_name', '새로고침시험상사');
       await new Promise(r => setTimeout(r, 900));   // 자동 저장 대기
       await api.reload();
       const kept = api.val('corp_name'), debts = api.w.appState.debtItems.length;
@@ -184,9 +184,9 @@ window.SCENARIOS = [
     id: '2-1', name: '고객 저장·불러오기·파일 주고받기',
     async run(api) {
       const ev = []; let verdict = 'PASS';
-      api.demo(); api.call('setBizTrack', 'sme'); api.set('corp_name', '갑상사'); api.set('sme_sales', '1,234');
+      await api.demo(); api.call('setBizTrack', 'sme'); api.set('corp_name', '갑상사'); api.set('sme_sales', '1,234');
       api.call('saveClient');
-      api.call('newClient');
+      await api.call('newClient');
       const cleared = api.val('corp_name') === '' && api.w.appState.bizTrack === 'smb';
       ev.push('새 고객 → 입력 비움 ' + (cleared ? '예' : '아니오'));
       api.set('corp_name', '을상사'); api.set('smb_monthly_sales', '500'); api.call('saveClient');
@@ -198,7 +198,7 @@ window.SCENARIOS = [
       const backA = api.val('corp_name') === '갑상사' && api.val('sme_sales') === '1,234' && api.w.appState.bizTrack === 'sme';
       ev.push('갑상사 다시 불러오기 → 상호·매출·규모 ' + (backA ? '일치' : '불일치'));
       const { text } = api.call('clientExportText');
-      api.call('newClient');
+      await api.call('newClient');
       api.call('importClientText', text);
       const backFile = api.val('corp_name') === '갑상사' && api.val('sme_sales') === '1,234';
       ev.push('파일로 내보낸 뒤 가져오기 → ' + (backFile ? '일치' : '불일치'));
