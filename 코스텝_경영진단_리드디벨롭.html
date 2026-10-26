@@ -1122,7 +1122,7 @@
           <div><span>가중평균 금리</span><strong id="debt_avg_rate">연 0.00%</strong></div>
           <div><span>월 이자 합계</span><strong id="debt_total_monthly_interest">0천원</strong></div>
         </div>
-        <div id="debt_fs_gap" class="hidden rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-900"></div>
+        <div id="debt_fs_gap" class="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"></div>
         <div id="debt_high_rate_alert" class="hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <b>연 7% 이상 고금리 대출 있음</b> · <span id="debt_alert_text"></span>
         </div>
@@ -1726,6 +1726,10 @@
             </label>
             <p class="text-[11px] text-slate-400">본 자금/지원사업 투입 후 1~2년 내 예상되는 신규 고용 인원과 매출 증대 목표치는 얼마입니까?</p>
             <textarea id="bp_outcome" rows="3" oninput="syncCompanyData()" class="form-input-control bg-slate-900 text-white border-slate-600" placeholder="예: 1년 내 청년 기술인력 3명 신규 채용 / 연매출 28억원에서 42억원으로 50% 성장 달성, 공정 수율 향상에 따른 제조원가 18% 절감 기대" placeholder="고용 창출 계획 및 연차별 매출 증대 목표를 입력하세요."></textarea>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <label class="text-[11px] text-slate-300 font-bold">1년 뒤 목표 연매출 <span class="font-normal text-slate-400">백만원 · 선택</span><input type="text" id="bp_target_sales" value="" inputmode="numeric" placeholder="예: 4,200" oninput="formatNumberInput(this); syncCompanyData()" class="form-input-control bg-slate-900 text-white border-slate-600 mt-1"></label>
+              <label class="text-[11px] text-slate-300 font-bold">신규 채용 목표 <span class="font-normal text-slate-400">명 · 선택</span><input type="text" id="bp_target_hire" value="" inputmode="numeric" placeholder="예: 3" oninput="formatNumberInput(this); syncCompanyData()" class="form-input-control bg-slate-900 text-white border-slate-600 mt-1"></label>
+            </div>
           </div>
         </div>
       </div>
@@ -3615,14 +3619,16 @@
       const elAlertText = document.getElementById('debt_alert_text');
 
       if (elTotBal) elTotBal.innerText = fmtChun(totalBal);
-      // 재무제표 차입금(단기+장기, 백만원)과 대출표 잔액 합계 비교 — 10% 넘게 다르면 알림(빠진 대출·상환 확인용)
+      // 재무제표 차입금(단기+장기, 백만원 — 전년도 결산 기준)과 지금 대출표 합계 비교: 결산 뒤 상환·신규 대출로 달라지는 게 보통이라
+      // 오류·경고가 아니라 '얼마나 달라졌는지' 참고 정보로만 보여 준다(L-156 보완, 사용자 의견)
       const gapEl = document.getElementById('debt_fs_gap');
       if (gapEl) {
         const n = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.-]/g, '')); return isFinite(v) ? v : 0; };
         const fsMan = (n('sme_st_loan') + n('sme_lt_loan')) * 100;
-        const show = window.appState.bizTrack !== 'smb' && fsMan > 0 && totalBal > 0 && Math.abs(fsMan - totalBal) / Math.max(fsMan, totalBal) > 0.1;
+        const diff = totalBal - fsMan;
+        const show = window.appState.bizTrack !== 'smb' && fsMan > 0 && totalBal > 0 && Math.abs(diff) >= 0.5;
         if (show) gapEl.classList.remove('hidden'); else gapEl.classList.add('hidden');
-        if (show) gapEl.innerHTML = `<b>재무제표 차입금과 대출표 합계가 달라요</b> · 재무제표(단기+장기) ${fmtChun(fsMan)} / 대출표 ${fmtChun(totalBal)} — 빠진 대출이나 결산 뒤 상환·신규 대출이 있는지 확인해 주세요.`;
+        if (show) gapEl.innerHTML = `<span class="font-bold text-slate-700">참고 · 결산 대비 차입 변화</span> 결산(전년도) 차입금 ${fmtChun(fsMan)} → 지금 대출표 ${fmtChun(totalBal)} <b class="text-slate-800">(${diff > 0 ? '+' : '−'}${fmtChun(Math.abs(diff))}, ${diff > 0 ? '늘어남' : '줄어듦'})</b> — 결산 뒤 상환·신규 대출이 반영된 차이입니다.`;
       }
       // 억 단위 읽기 보조: 1억 이상일 때만 실제 합계로 표시 (예: 58,500만원 → (5억 8,500만원))
       const elTotBalKr = document.getElementById('debt_total_balance_kr');
@@ -5389,7 +5395,12 @@
       try {
         if ((window.appState.bizTrack || 'smb') !== 'smb' && typeof faDiagnose === 'function') {
           const fd = faData();
-          if (fd.Y.some(y => y.S !== null || y.A !== null)) faDiagReport = `<div class="fa-dg-rep border border-slate-300 rounded-lg p-2 space-y-1">${(dg => `<div class="flex justify-between items-baseline gap-2 border-b border-slate-200 pb-1"><span class="font-extrabold text-slate-900 text-[10px]">【 재무진단 — 5개 영역 판정 】</span><span class="text-[8px] text-slate-500">비교 기준: ${dg.basis}</span></div>${faDiagHtml(dg, true)}`)(faDiagnose(fd))}</div>`;
+          if (fd.Y.some(y => y.S !== null || y.A !== null)) {
+            const dg = faDiagnose(fd), cls = { good: 'g', mid: 'm', bad: 'b', none: 'n' };
+            faDiagReport = `<div class="fa-dg-rep fa-dg-line border border-slate-300 rounded-lg px-2 py-1.5"><span class="ttl">재무진단</span>`
+              + dg.areas.map(a => `<span class="chip ${cls[a.grade]}">${a.name} <b>${a.gradeName}</b></span>`).join('')
+              + `<span class="ref">비교 기준 ${dg.basis} · 근거 문장은 별첨 재무 분석</span></div>`;
+          }
         }
       } catch (e) { faDiagReport = ''; }
       const area = document.getElementById('active_report_render_area');
@@ -5488,7 +5499,7 @@
             <td class="px-1 py-1 border border-slate-300 font-bold"><div class="rp-clamp1" title="${escapeHtml(d.institution)}">${escapeHtml(d.institution) || '-'}</div></td>
             <td class="px-1 py-1 border border-slate-300"><div class="rp-clamp1">${escapeHtml(d.type) || '-'}</div></td>
             <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num font-bold">${fmtChun(d.balance)}</td>
-            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num text-[#0f766e] font-bold">연 ${Math.round(Number(d.rate || 0) * 100) / 100}%</td>
+            <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num text-[#0f766e] font-bold">연 ${Math.round(Number(d.rate || 0) * 100) / 100}%${Number(d.rate) > 0 ? `<span class="rate-bar"><i class="${Number(d.rate) >= 7 ? 'hi' : ''}" style="width:${Math.min(100, Number(d.rate) / 15 * 100).toFixed(0)}%"></i></span>` : ''}</td>
             <td class="px-1 py-1 border border-slate-300 whitespace-nowrap debt-num text-amber-700">${fmtChun(d.monthlyInterest)}</td>
             <td class="px-1 py-1 border border-slate-300"><div class="rp-clamp1">${escapeHtml(d.payback) || '-'}</div></td>
           </tr>
@@ -5799,7 +5810,12 @@
             <div class="border border-slate-300 rounded-lg p-2 bg-slate-50/40 space-y-1 text-[10px]">
               <div class="flex justify-between items-center border-b border-slate-200 pb-1">
                 <span class="font-extrabold text-slate-900">【 금융기관별 차입금 및 여신 세부 거래 현황 】</span>
-                <span class="text-[9.5px] text-slate-600 font-bold">총 차입잔액: <strong class="text-amber-700 debt-num">${totalDebt}</strong> | 평균금리: <strong class="text-[#0f766e] debt-num">${avgRate}</strong> (월차입이자: ${monthlyInterest})</span>
+                <span class="text-[9.5px] text-slate-600 font-bold">총 차입잔액: <strong class="text-amber-700 debt-num">${totalDebt}</strong> | 평균금리: <strong class="text-[#0f766e] debt-num">${avgRate}</strong> (월차입이자: ${monthlyInterest})${(() => {
+                  const hi = (window.appState.debtItems || []).filter(d => Number(d.rate) >= 7 && Number(d.balance) > 0);
+                  if (!hi.length) return '';
+                  const bal = hi.reduce((a, d) => a + Number(d.balance), 0);
+                  return ` <span class="text-amber-700" title="연 7% 이상 대출 ${hi.length}건 — 금리를 1%p 낮추면 월 이자가 이만큼 줄어듭니다">· 7%↑ ${hi.length}건, 1%p↓ 월 −${fmtChun(bal * 0.01 / 12)}</span>`;
+                })()}</span>
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-[9.5px] border-collapse border border-slate-300 bg-white">
@@ -5840,6 +5856,11 @@
                 <div class="bg-white p-1 rounded border border-slate-200">
                   <span class="text-[9px] text-slate-500 block">손익분기 필요매출</span>
                   <strong class="font-mono text-amber-700">${fixedEntered ? `하루 ${dailyReq} / 월 ${monthlyReq}` : '산정 불가 (고정비 미기재)'}</strong>
+                  ${(() => {   // 채움 = 월평균 매출, 세로 선 = 손익분기 매출(L-158 D-4)
+                    if (!fixedEntered || !salesEntered || !(monthlyReqNum > 0) || !(monthlySales > 0)) return '';
+                    const mx = Math.max(monthlySales, monthlyReqNum) * 1.08, pct = Math.round(monthlySales / monthlyReqNum * 100), ok = monthlySales >= monthlyReqNum;
+                    return `<span class="bep-mini" title="월평균 매출 ${monthlySales.toLocaleString()}만원 / 손익분기 ${monthlyReqNum.toLocaleString()}만원 — 손익분기 대비 ${pct}%"><i class="${ok ? 'ok' : 'low'}" style="width:${(monthlySales / mx * 100).toFixed(1)}%"></i><em style="left:${(monthlyReqNum / mx * 100).toFixed(1)}%"></em></span>`;
+                  })()}
                 </div>
                 <div class="bg-white p-1 rounded border border-slate-200">
                   <span class="text-[9px] text-slate-500 block">환경 및 노무 점검</span>
@@ -5858,8 +5879,13 @@
                 <span class="font-extrabold text-slate-900">【 중소·소기업 표준재무제표 및 경영건전성 종합 지표 】</span>
                 <span class="text-[9.5px] text-slate-600">NICE ${niceScore !== '-' ? niceScore + '점' : '-'} / KCB ${kcbScore !== '-' ? kcbScore + '점' : '-'} | 가지급금: <strong class="text-red-600">${loanToCeo !== '-' ? loanToCeo + '백만원' : '-'}</strong> | 상시근로자: ${employees !== '-' ? employees + '명' : '-'}</span>
               </div>
-              <!-- 3-Year Comparative Financial Table in Report -->
-              <div class="overflow-x-auto bg-white rounded border border-slate-300">
+              <!-- 3-Year Comparative Financial Table in Report — 별첨 표준재무제표가 있으면 한 줄 요약(L-158) -->
+              ${(() => { let att = false; try { att = typeof fsView === 'function' && fsHasData(fsView()); } catch (e) { att = false; }
+                if (!att) return '';
+                const mil = v => { const n = Number(String(v || '').replace(/[^0-9.-]/g, '')); return v === '-' || !isFinite(n) || String(v).trim() === '' ? '-' : Math.round(n / 1e6).toLocaleString(); };
+                const yl = finYears ? finYears[2] + '년' : '당기';
+                return `<div class="bg-white rounded border border-slate-300 px-2 py-1 text-[9.5px] text-slate-800"><b>${yl} 결산(백만원)</b> 매출 <b class="text-[#169aa8]">${mil(salesSme)}</b> · 영업이익 <b>${mil(profitSme)}</b> · 부채 <b>${mil(debtSme)}</b> · 자본 <b>${mil(equitySme)}</b> <span class="text-slate-500">(전기 매출 ${mil(salesSme2024)} · 전전기 ${mil(salesSme2023)}) · 3개년 표준재무제표는 별첨</span></div>`; })()}
+              <div class="overflow-x-auto bg-white rounded border border-slate-300" ${(() => { try { return typeof fsView === 'function' && fsHasData(fsView()) ? 'hidden' : ''; } catch (e) { return ''; } })()}>
                 <table class="w-full text-[9.5px] border-collapse text-center">
                   <thead>
                     <tr class="bg-slate-100 font-bold text-slate-800">
@@ -6069,6 +6095,7 @@
                   <span class="text-[9px] text-[#0f766e] bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 font-bold">예산</span>
                 </div>
                 <p class="text-slate-800 pl-2 font-medium whitespace-pre-line text-[10px]">${bpBudget}</p>
+                ${bpBudgetChartHtml()}
               </div>
 
               <div class="p-2 rounded border border-slate-300 bg-slate-50/50 space-y-0.5">
@@ -6085,6 +6112,7 @@
                   <span class="text-[9px] text-[#0f766e] bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 font-bold">성과</span>
                 </div>
                 <p class="text-slate-800 pl-2 font-medium whitespace-pre-line text-[10px]">${bpEffect}</p>
+                ${bpGoalChartHtml()}
               </div>
             </div>
           </div>
@@ -6125,6 +6153,7 @@
       }
 
       area.innerHTML = finalHtml;
+      compactEmptyRows(area);
       fitSheetsToA4(area);
       if (window.mscHeadingLevels) mscHeadingLevels();
     }
@@ -6133,7 +6162,7 @@
     // 넘치면 본문을 조금씩 축소하고(최대 88%), 그래도 넘치면 원래 크기로 2쪽에 이어 인쇄한다
     // (작게 줄인 채 2쪽이 되면 2쪽에 서명만 남는 문제가 생김). 화면이 숨겨져 높이를 잴 수 없으면 건너뜀.
     // 입력이 늘어 서식이 길어지면 한 장에 맞출 때까지 단계적으로 줄인다(84% 아래로는 글씨가 작아 2쪽으로 넘김)
-    const A4_FIT_STEPS = [1, 0.96, 0.92, 0.88, 0.84, 0.82, 0.8];   // 0.8 아래는 글자가 너무 작아 2쪽으로
+    const A4_FIT_STEPS = [1, 0.96, 0.92, 0.88];   // 0.88 아래는 인쇄 글자가 6pt 수준이라 2쪽으로(L-158, 예전 0.8)
     const A4_PRINT_LIMIT_PX = 277 * 96 / 25.4 - 6;
     function a4PrintHeight(card) {
       card.classList.add('a4-measure');
@@ -6144,6 +6173,60 @@
     }
     window.a4PrintHeight = a4PrintHeight;
     window.A4_PRINT_LIMIT_PX = A4_PRINT_LIMIT_PX;
+
+    // 서식4 그림(L-158 D-1·D-2): 입력에 실제 숫자가 있을 때만 그린다(빈 [○○]·글자만이면 그리지 않음)
+    function bpManFrom(t) {
+      const m = String(t || '').match(/(\d[\d,]*)\s*억(?:\s*(\d[\d,]*)\s*만)?|(\d[\d,]*)\s*만/);
+      if (!m) return null;
+      const n = x => Number(String(x || '0').replace(/,/g, ''));
+      return m[3] ? n(m[3]) : n(m[1]) * 10000 + (m[2] ? n(m[2]) : 0);
+    }
+    function bpBudgetChartHtml() {
+      const t = String(document.getElementById('bp_budget')?.value || '');
+      const parts = [['시설자금', '#0f766e'], ['운전자금', '#38bdf8'], ['대환자금', '#f59e0b']].map(([k, c]) => {
+        const seg = t.match(new RegExp(k + '[^0-9○\\n]{0,12}(\\d[\\d,]*\\s*억(?:\\s*\\d[\\d,]*\\s*만)?|\\d[\\d,]*\\s*만)'));
+        return { k, c, v: seg ? bpManFrom(seg[1]) : null };
+      }).filter(x => x.v > 0);
+      if (!parts.length) return '';
+      const sum = parts.reduce((a, x) => a + x.v, 0), won = v => (v >= 10000 ? (Math.floor(v / 10000) + '억' + (v % 10000 ? ' ' + (v % 10000).toLocaleString() + '만' : '')) : v.toLocaleString() + '만') + '원';
+      return `<div class="bp-fig"><div class="bp-bar">${parts.map(x => `<i style="width:${(x.v / sum * 100).toFixed(1)}%;background:${x.c}"></i>`).join('')}</div>`
+        + `<div class="bp-leg">${parts.map(x => `<span><i style="background:${x.c}"></i>${x.k} <b>${won(x.v)}</b> (${Math.round(x.v / sum * 100)}%)</span>`).join('')}<span class="tot">합계 <b>${won(sum)}</b></span></div></div>`;
+    }
+    function bpGoalChartHtml() {
+      const num = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.]/g, '')); return v > 0 ? v : null; };
+      const tSales = num('bp_target_sales'), hire = num('bp_target_hire');
+      if (!tSales && !hire) return '';
+      const cur = (window.appState.bizTrack === 'smb' ? null : num('sme_sales')) || (num('smb_monthly_sales') ? num('smb_monthly_sales') * 12 / 100 : null);   // 백만원(소상공인은 월평균×12)
+      const emp = num('sme_employees') || 0;
+      let html = '<div class="bp-fig bp-goal">';
+      if (tSales) {
+        const mx = Math.max(tSales, cur || 0);
+        const row = (lab, v, cls) => `<div class="g-row"><span class="g-l">${lab}</span><span class="g-t"><i class="${cls}" style="width:${(v / mx * 100).toFixed(1)}%"></i></span><b>${Math.round(v).toLocaleString()}백만원</b></div>`;
+        html += (cur ? row('현재 연매출', cur, 'cur') : '') + row('1년 뒤 목표', tSales, 'tgt') + (cur ? `<div class="g-note">증가 ${Math.round((tSales / cur - 1) * 100)}%</div>` : '');
+      }
+      if (hire) html += `<div class="g-row"><span class="g-l">고용</span><span class="g-hire">현재 ${emp}명 → <b>${emp + hire}명</b> (신규 ${hire}명)</span></div>`;
+      return html + '</div>';
+    }
+    // 서식2 기업 개요·거래처 표: 값이 모두 비어 있는 줄은 숨기고 표 아래 '미확인: …' 한 줄로(L-158 C-2)
+    function compactEmptyRows(root) {
+      const sheet = root && root.querySelector && root.querySelector('#print_target_report'); if (!sheet) return;
+      const isEmpty = td => { const t = (td.textContent || '').trim(); const ph = [...td.querySelectorAll('.rp-empty')].map(e => e.textContent.trim()).join(''); return !t || t === '-' || (ph && t === ph); };
+      [...sheet.querySelectorAll('.overflow-x-auto > table')].slice(0, 2).forEach(tb => {
+        const missing = [];
+        tb.querySelectorAll('tr').forEach(tr => {
+          const tds = [...tr.children];
+          const pairs = []; tds.forEach((td, i) => { if (/bg-slate-100/.test(td.className) && tds[i + 1]) pairs.push([td, tds[i + 1]]); });
+          if (!pairs.length) return;
+          if (pairs.every(([, v]) => isEmpty(v))) { tr.style.display = 'none'; pairs.forEach(([l]) => missing.push(l.textContent.trim())); }
+        });
+        if (missing.length) {
+          const note = document.createElement('div');
+          note.className = 'text-[9px] text-slate-500 px-1 pt-0.5';
+          note.textContent = '미확인 ' + missing.length + '항목: ' + missing.join(', ');
+          tb.parentElement.appendChild(note);
+        }
+      });
+    }
     function fitSheetsToA4(root) {
       if (!root || typeof root.querySelectorAll !== 'function') return;
       root.querySelectorAll('.a4-page-card').forEach(card => {
@@ -8866,7 +8949,7 @@
     .bp-guide-btn[aria-expanded="true"] { color: #e2e8f0; border-color: #e2e8f0; }
     .bp-guide-hidden { display: none; }
     /* B-6 단계 진행 */
-    #l3_steps li .pg { margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.45); }
+    #l3_steps li .pg { white-space: nowrap; margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.45); }
     #l3_steps li .pg.full { color: #5eead4; }
     #l3.folded #l3_steps li .pg { display: none; }
     .ind-auto:empty { display: none; }
@@ -8944,6 +9027,41 @@
     .fa-dg-t td { padding: 5px 6px; line-height: 1.55; border-top: 1px solid #e3e8ec; color: #334155; }
     .fa-dg-t th.g { color: #085041; } .fa-dg-t th.m { color: #854f0b; } .fa-dg-t th.b { color: #a32d2d; } .fa-dg-t th.n { color: #6b7280; }
     .fa-dg-rep { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rate-bar { display: inline-block; vertical-align: middle; width: 24px; height: 4px; margin-left: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rate-bar i { display: block; height: 100%; background: #14b8a6; } .rate-bar i.hi { background: #f59e0b; }
+    /* 손익분기 칸 아래 가장자리 얇은 막대(칸 높이를 늘리지 않음): 채움 = 월평균 매출, 세로 선 = 손익분기 */
+    div:has(> .bep-mini) { position: relative; }
+    .bep-mini { position: absolute; left: 4px; right: 4px; bottom: 1px; height: 3px; background: #f1f5f9; border-radius: 2px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bep-mini i { display: block; height: 100%; border-radius: 2px; } .bep-mini i.ok { background: #0f766e; } .bep-mini i.low { background: #f59e0b; }
+    .bep-mini em { position: absolute; top: -2px; bottom: -1px; width: 2px; background: #334155; }
+    .bep-fig { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 9.5px; color: #334155; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bep-fig .b-t { position: relative; height: 8px; background: #f1f5f9; border-radius: 3px; }
+    .bep-fig .b-t i { display: block; height: 100%; border-radius: 3px; }
+    .bep-fig .b-t em { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #334155; }
+    .bep-fig i.ok { background: #0f766e; } .bep-fig i.low { background: #f59e0b; }
+    .bep-fig b.ok { color: #0f766e; } .bep-fig b.low { color: #b45309; }
+    .bp-fig { margin: 4px 0 2px 8px; display: grid; gap: 4px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bp-bar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; background: #e2e8f0; }
+    .bp-bar i { display: block; height: 100%; }
+    .bp-leg { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 9.5px; color: #334155; }
+    .bp-leg span { display: inline-flex; align-items: center; gap: 4px; }
+    .bp-leg i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+    .bp-leg .tot { margin-left: auto; }
+    .bp-goal .g-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 9.5px; color: #334155; }
+    .bp-goal .g-t { height: 9px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+    .bp-goal .g-t i { display: block; height: 100%; }
+    .bp-goal .g-t i.cur { background: #94a3b8; } .bp-goal .g-t i.tgt { background: #0f766e; }
+    .bp-goal .g-hire { grid-column: 2 / 4; }
+    .bp-goal .g-note { font-size: 9px; color: #0f766e; font-weight: 700; padding-left: 72px; }
+    .fa-dg-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 5px; font-size: 9.5px; }
+    .fa-dg-line .ttl { font-weight: 900; color: #0f172a; margin-right: 2px; }
+    .fa-dg-line .chip { padding: 1px 7px; border-radius: 999px; border: 1px solid; font-weight: 600; white-space: nowrap; }
+    .fa-dg-line .chip b { font-weight: 900; }
+    .fa-dg-line .chip.g { color: #0f766e; border-color: #5eead4; background: #f0fdfa; }
+    .fa-dg-line .chip.m { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
+    .fa-dg-line .chip.b { color: #b91c1c; border-color: #fca5a5; background: #fef2f2; }
+    .fa-dg-line .chip.n { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
+    .fa-dg-line .ref { margin-left: auto; font-size: 8.5px; color: #64748b; }
     .fa-dg-rep .fa-dg { margin: 0; }
     .fa-dg-rep .fa-dg-chips .c { padding: 3px 2px; } .fa-dg-rep .fa-dg-chips .c span { font-size: 8.5px; } .fa-dg-rep .fa-dg-chips .c b { font-size: 10.5px; }
     .fa-dg-rep .fa-dg-basis { font-size: 8px; margin: 2px 0; }
@@ -11790,7 +11908,7 @@
     #l3 .l3-zoom .fitb { font-size: 11px; }
     #l3 .l3-zoom .fitb.on { background: var(--t-surface, #fff); color: var(--t-accent-text, #00A898); }
     #l3_paper { width: 210mm; transform-origin: top left; }
-    @media (max-width: 1180px) { #l3:not(.sized) { grid-template-columns: 64px minmax(0, 1fr) minmax(320px, 42%); } #l3_steps .t { display: none; } }
+    @media (max-width: 1180px) { #l3:not(.sized) { grid-template-columns: 64px minmax(0, 1fr) minmax(320px, 42%); } #l3_steps .t, #l3_steps li .pg { display: none; } }
     @media print {
       body.l3-on { overflow: visible !important; }
       #l3 { position: static !important; display: block !important; background: #fff !important; }
