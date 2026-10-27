@@ -482,7 +482,19 @@
     #xp_toast { position: fixed; left: 50%; bottom: 26px; z-index: 96; display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 32px); padding: 11px 18px; border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       background: rgba(15,23,42,.88); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: #fff; font-size: 12.5px; font-weight: 800;
       box-shadow: 0 0 0 .5px rgba(255,255,255,.12) inset, 0 16px 36px -14px rgba(15,23,42,.6); transform: translate(-50%, 14px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .42s cubic-bezier(.16,1,.3,1); }
-    #xp_toast.on { opacity: 1; transform: translate(-50%, 0); }
+    #xp_toast.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    body.l3-on #xp_toast { bottom: 72px; }
+    #xp_toast .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #xp_toast.multi { white-space: normal; border-radius: 16px; align-items: flex-start; max-width: min(560px, calc(100vw - 32px)); padding: 12px 14px 12px 18px; }
+    #xp_toast.multi .tx { white-space: pre-line; line-height: 1.55; font-weight: 700; }
+    #xp_toast.err::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: #F87171; align-self: center; }
+    #xp_toast.multi.err::before { margin-top: 6px; align-self: flex-start; }
+    #xp_toast button { flex: none; height: 26px; padding: 0 10px; border-radius: 999px; border: 0; background: rgba(255,255,255,.12); color: #5EEAD4; font: inherit; font-weight: 800; cursor: pointer; transition: background-color .15s; }
+    #xp_toast button:hover { background: rgba(255,255,255,.22); }
+    #xp_toast button:focus-visible { outline: 2px solid #5EEAD4; outline-offset: 2px; }
+    #xp_toast button.cl { width: 26px; padding: 0; background: none; color: rgba(255,255,255,.6); font-size: 16px; line-height: 1; }
+    #xp_toast button.cl:hover { color: #fff; background: rgba(255,255,255,.12); }
+    @media (prefers-reduced-motion: reduce) { #xp_toast { transition: opacity .15s; transform: translate(-50%, 0); } }
     .xp-pno { position: absolute; left: 0; right: 0; bottom: 5mm; text-align: center; font-size: 9pt; color: #64748b; }
     @media print { #xp_modal, #xp_toast { display: none !important; } .xp-blank { border: 0 !important; box-shadow: none !important; } }
   </style>
@@ -3776,7 +3788,7 @@
     async function autoGenerateBusinessPlan() {
       setTimeout(() => { if (typeof fitAllTextareas === 'function') fitAllTextareas(); }, 0);
       const lib = bpLib(), P = window.MSCDocParsers;
-      if (!lib || !P || !P.bpCompose) { alert('사업계획 문장 세트를 불러오지 못했어요. 새로고침 후 다시 눌러 주세요.'); return; }
+      if (!lib || !P || !P.bpCompose) { window.appToast('사업계획 문장 세트를 불러오지 못했어요. 새로고침 후 다시 눌러 주세요.', { tone: 'err' }); return; }
       const bpIds = ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome'];
       const filled = bpIds.filter(id => (document.getElementById(id)?.value || '').trim() !== '');
       let onlyEmpty = false;
@@ -3789,6 +3801,7 @@
         const el = document.getElementById(id);
         return el && (!onlyEmpty || el.value.trim() === '') ? el : null;
       };
+      const bpBefore = bpIds.map(id => document.getElementById(id)?.value || '');
       const ctx = bpContext();
       const r = P.bpCompose(ctx, lib);
       const map = { bp_problem: 'problem', bp_solution: 'solution', bp_market: 'market', bp_budget: 'budget', bp_team: 'team', bp_outcome: 'outcome' };
@@ -3798,7 +3811,12 @@
       renderActiveReport();
       const secName = ((lib.sections || {})[ctx.section] || {}).name || ctx.section;
       const subName = r.sub ? ((lib.subs || {})[r.sub] || {}).name : '';
-      alert(`사업계획 개요서 초안을 채웠어요.\n\n업종 기준: ${subName ? subName + ' (' + secName + ')' : secName}${ctx.ksicGuessed ? ' — 표준산업분류 추천 1순위로 판단, 고객사 정보에서 확정해 주세요' : ''}\n규모: ${({ smb: '소상공인', small: '소기업', sme: '중기업' })[ctx.size] || ctx.size}\n반영한 상황: ${r.flags.length ? r.flags.length + '가지' : '없음'}\n\n[○○] 칸(금액·비율·인원)은 실제 값으로 채워 주세요.`);
+      window.appToast(`사업계획 개요서 초안을 채웠어요.\n\n업종 기준: ${subName ? subName + ' (' + secName + ')' : secName}${ctx.ksicGuessed ? ' — 표준산업분류 추천 1순위로 판단, 고객사 정보에서 확정해 주세요' : ''}\n규모: ${({ smb: '소상공인', small: '소기업', sme: '중기업' })[ctx.size] || ctx.size}\n반영한 상황: ${r.flags.length ? r.flags.length + '가지' : '없음'}\n\n[○○] 칸(금액·비율·인원)은 실제 값으로 채워 주세요.`, { ms: 12000, action: '되돌리기', onAction: () => {
+        bpIds.forEach((id, k) => { const el = document.getElementById(id); if (el) el.value = bpBefore[k]; });
+        syncCompanyData(); renderActiveReport(); if (typeof fitAllTextareas === 'function') fitAllTextareas();
+        document.getElementById('screen_input')?.dispatchEvent(new Event('change', { bubbles: true }));
+        window.appToast('사업계획 칸을 채우기 전으로 되돌렸어요');
+      } });
     }
     window.autoGenerateBusinessPlan = autoGenerateBusinessPlan;
 
@@ -4300,7 +4318,7 @@
 
     function downloadAsDoc(elementId, tail) {
       const el = document.getElementById(elementId);
-      if (!el) { alert('다운로드할 서식 영역을 찾을 수 없습니다.'); return; }
+      if (!el) { window.appToast('다운로드할 서식 영역을 찾지 못했어요.', { tone: 'err' }); return; }
       saveDocx(sheetEls(elementId), docxFileName(tail));
     }
     window.downloadAsDoc = downloadAsDoc;
@@ -4321,7 +4339,7 @@
       let swapped = false;
       if (ids.some(id => !document.getElementById(id))) { window.appState.activeSheet = 'all'; renderActiveReport(); swapped = true; }
       const els = ids.flatMap(id => sheetEls(id));
-      if (!els.length) { alert('다운로드할 서식이 없습니다. 먼저 서식을 열람해 주세요.'); return; }
+      if (!els.length) { window.appToast('다운로드할 서식이 없어요. 먼저 서식을 열어 주세요.', { tone: 'err' }); return; }
       try { saveDocx(els, docxFileName(repLabel())); }
       finally { if (swapped) { window.appState.activeSheet = saved; renderActiveReport(); } }
     }
@@ -6482,11 +6500,30 @@
       setTimeout(() => { m.hidden = true; m.classList.remove('out'); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200);
       if (xpPrev && xpPrev.focus) xpPrev.focus({ preventScroll: true });
     }
-    function xpToast(msg, ms) {
-      const t = document.getElementById('xp_toast');
-      t.textContent = msg; t.classList.add('on');
-      clearTimeout(xpToast.t); xpToast.t = setTimeout(() => t.classList.remove('on'), ms || 3200);
+    function xpToast(msg, ms) { appToast(msg, { ms }); }
+    // 화면 아래 알림(경고창 대신). o: { tone: 'err', ms, action: '되돌리기', onAction } — 단추가 있으면 7초, 마우스를 올리면 멈춤
+    function appToast(msg, o) {
+      o = o || {};
+      const t = document.getElementById('xp_toast'); if (!t) return;
+      const text = String(msg || ''), multi = /\n/.test(text) || text.length > 64;
+      t.innerHTML = '';
+      const tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = text; t.appendChild(tx);
+      const hide = () => { clearTimeout(appToast.t); t.classList.remove('on'); };
+      if (o.action && o.onAction) {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = o.action;
+        b.onclick = () => { hide(); o.onAction(); }; t.appendChild(b);
+      }
+      if (multi || o.action) { const c = document.createElement('button'); c.type = 'button'; c.className = 'cl'; c.setAttribute('aria-label', '알림 닫기'); c.textContent = '×'; c.onclick = hide; t.appendChild(c); }
+      t.classList.toggle('multi', multi); t.classList.toggle('err', o.tone === 'err');
+      t.setAttribute('aria-live', o.tone === 'err' ? 'assertive' : 'polite');
+      t.classList.add('on');
+      const ms = o.ms || (o.action ? 7000 : multi ? 8000 : 3200);
+      const arm = d => { clearTimeout(appToast.t); appToast.t = setTimeout(hide, d); };
+      t.onmouseenter = t.onfocusin = () => clearTimeout(appToast.t);
+      t.onmouseleave = t.onfocusout = () => { if (t.classList.contains('on')) arm(2500); };
+      arm(ms);
     }
+    window.appToast = appToast;
     // 고른 분야 × 서식을 미리보기 자리에 차례로 그린다(복사본). 끝나면 restore() 로 원래 화면
     function xpCompose(f, s, o) {
       const area = document.getElementById('active_report_render_area');
@@ -6535,7 +6572,7 @@
       xpClose();
       const mode = xpMode, tail = xpTail(f, s);
       const job = xpCompose(f, s, o);
-      if (!job.pages.length) { job.restore(); alert('내보낼 서식이 없습니다.'); return; }
+      if (!job.pages.length) { job.restore(); window.appToast('내보낼 서식이 없어요.', { tone: 'err' }); return; }
       if (mode === 'doc') {
         try {
           if (o.split === 1) job.pages.forEach((p, i) => setTimeout(() => saveDocx([p], docxFileName(p.dataset.xpName)), i * 400));
@@ -6904,6 +6941,7 @@
     // Demo Data Auto-Filler
     async function loadDemoData() {
       const typed = (document.getElementById('corp_name')?.value || '').trim();
+      const demoBefore = collectFormData();
       if (typed && !(await adminAsk({ title: '작성 예시로 덮어쓸까요?', text: '작성 중인 내용이 예시로 바뀝니다. 필요하면 먼저 [저장]을 눌러 주세요.', okLabel: '덮어쓰기', danger: true }))) return;
       document.getElementById('corp_name').value = '주식회사 대성정밀기계';
       const elForm = document.getElementById('corp_form'); if (elForm) elForm.value = '법인 · 일반과세';
@@ -6987,7 +7025,7 @@
       renderRadarAnnouncements();
       syncCertIpViews();
       renderActiveReport();   // 미리보기도 바로 새 값으로(L-154 — 전에는 다른 칸을 건드려야 바뀜)
-      alert('견본 데이터(사업체 제원, 금융부채 3건, 공모 사업계획서 문답)가 1초 만에 기입되었습니다. [맞춤 보고서 및 낱개 서식] 탭으로 이동하여 확인해 보세요!');
+      window.appToast('작성 예시를 채웠어요 — 오른쪽 미리보기에서 서식을 확인해 보세요', { action: '되돌리기', onAction: () => { applyFormData(demoBefore); if (window.histReset) histReset(); renderActiveReport(); window.appToast('예시를 넣기 전으로 되돌렸어요'); } });
     }
     window.loadDemoData = loadDemoData;
 
@@ -7611,6 +7649,26 @@
       () => ['__debt'],
       () => ['bp_problem', 'bp_solution', 'bp_market', 'bp_budget', 'bp_team', 'bp_outcome']
     ];
+    const STEP_NAME = { corp_name: '상호', corp_biz_no: '사업자등록번호', corp_ceo: '대표자', corp_biz_item: '종목', corp_address: '소재지', corp_est_date: '개업일', corp_ksic: '표준산업분류',
+      __report: '보고서 종류', corp_sales_channel: '판매 방식', corp_clients: '주요 매출처', corp_vendors: '주요 매입처',
+      smb_monthly_sales: '월 매출', smb_cost_rent: '월 임차료', smb_cost_labor: '인건비', smb_cost_util: '제세공과금·관리비',
+      sme_sales: '매출액', sme_profit: '영업이익', sme_assets: '자산총계', sme_debt: '부채총계', sme_equity: '자본총계', sme_employees: '상시 근로자 수',
+      bp_problem: '문제 인식', bp_solution: '해결 방안', bp_market: '목표 시장', bp_budget: '사업비', bp_team: '추진 역량', bp_outcome: '기대 성과' };
+    // 빠진 칸으로: 입력 칸만 굴려(바깥 화면은 그대로) 화면 1/3 높이에 두고 잠깐 테두리로 알려 준다
+    function stepJumpMissing(id) {
+      let el = id === '__report' ? document.getElementById('case_card') : document.getElementById(id);
+      if (!el) return;
+      el.closest('.cust-sec.closed')?.classList.remove('closed');
+      if (id === 'corp_ksic') el = document.querySelector('#ksic_box .ksic-search') || document.getElementById('ksic_box') || el;
+      let tg = el; while (tg && !tg.getClientRects().length) tg = tg.parentElement;
+      if (!tg) return;
+      const box = document.getElementById('l3_input'), calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (box && box.contains(tg)) { const r = tg.getBoundingClientRect(), b = box.getBoundingClientRect(); box.scrollTo({ top: box.scrollTop + r.top - b.top - b.height / 3, behavior: calm ? 'auto' : 'smooth' }); }
+      else tg.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.type !== 'hidden') el.focus({ preventScroll: true });
+      tg.classList.remove('need-flash'); void tg.offsetWidth; tg.classList.add('need-flash');
+      setTimeout(() => tg.classList.remove('need-flash'), 1800);
+    }
     function renderStepProgress() {
       const lis = document.querySelectorAll('#l3_steps li[data-i]'); if (!lis.length) return;
       lis.forEach(li => {
@@ -7618,15 +7676,32 @@
         const ok = k => k === '__report' ? !!window.appState.activeReportKey : k === '__debt' ? (window.appState.debtItems || []).length > 0
           : k === 'corp_ksic' ? (() => { try { return !!((JSON.parse(document.getElementById(k)?.value || '[]') || [])[0] || {}).code; } catch (e) { return false; } })()
           : String(document.getElementById(k)?.value || '').trim() !== '';
-        const done = keys.filter(ok).length;
-        let pg = li.querySelector('.pg'); if (!pg) { pg = document.createElement('span'); pg.className = 'pg'; li.appendChild(pg); }
-        pg.textContent = keys[0] === '__debt' ? ((window.appState.debtItems || []).length ? (window.appState.debtItems.length + '건') : '') : `${done}/${keys.length}`;
+        const done = keys.filter(ok).length, miss = keys.filter(k => !ok(k)), debt = keys[0] === '__debt';
+        let pg = li.querySelector('.pg');
+        if (!pg) { pg = document.createElement('button'); pg.type = 'button'; pg.className = 'pg'; li.appendChild(pg); pg.addEventListener('click', e => { e.stopPropagation(); if (pg.dataset.miss) stepJumpMissing(pg.dataset.miss); }); }
+        let bar = li.querySelector('.sb'); if (!bar && !debt) { bar = document.createElement('i'); bar.className = 'sb'; bar.setAttribute('aria-hidden', 'true'); bar.innerHTML = '<b></b>'; li.appendChild(bar); }
+        const name = li.querySelector('.t')?.textContent || '';
+        if (debt) {
+          const n = (window.appState.debtItems || []).length;
+          pg.textContent = n ? n + '건' : ''; pg.title = '등록된 대출'; pg.disabled = true; pg.dataset.miss = '';
+          return;
+        }
+        pg.textContent = `${done}/${keys.length}`;
         pg.classList.toggle('full', done >= keys.length);
-        pg.title = keys[0] === '__debt' ? '등록된 대출' : '핵심 입력 칸 중 채운 수';
+        pg.classList.toggle('part', done > 0 && done < keys.length);
+        li.classList.toggle('part', done > 0 && done < keys.length);
+        pg.dataset.miss = miss[0] || '';
+        pg.disabled = !miss.length;
+        pg.title = miss.length ? '빠진 칸: ' + miss.map(k => STEP_NAME[k] || k).join(', ') + ' — 누르면 첫 빈칸으로' : '핵심 칸을 다 채웠어요';
+        pg.setAttribute('aria-label', `${name} 핵심 칸 ${keys.length}개 중 ${done}개 채움` + (miss.length ? ` · 빠진 칸 ${miss.length}개, 누르면 첫 빈칸 ${STEP_NAME[miss[0]] || ''}(으)로` : ''));
+        if (bar) bar.firstChild.style.width = Math.round(done / keys.length * 100) + '%';
       });
     }
     window.renderStepProgress = renderStepProgress;
-    if (typeof window.addEventListener === 'function') window.addEventListener('load', () => setTimeout(() => { try { setupCustSections(); setupJumpBars(); setupBpGuides(); renderStepProgress(); } catch (e) { /* 화면 없음 */ } }, 600));
+    if (typeof window.addEventListener === 'function') window.addEventListener('load', () => setTimeout(() => { try { setupCustSections(); setupJumpBars(); setupBpGuides(); renderStepProgress();
+      // 칸을 채우는 대로(칸을 떠나기 전에도) 단계 진행을 고친다
+      let spT = null; document.getElementById('screen_input')?.addEventListener('input', () => { clearTimeout(spT); spT = setTimeout(renderStepProgress, 150); });
+    } catch (e) { /* 화면 없음 */ } }, 600));
     function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); renderSizeNote(); if (typeof calcDebtTotals === 'function') calcDebtTotals(); syncIndShared(); renderKsicQa(); renderIndAuto(); renderBpReady(); renderCustSecSums(); renderStepProgress(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
@@ -7881,9 +7956,9 @@
     }
 
     function saveClient() {
-      if (cloudOn()) { setClientStatus('서버에 저장하는 중…'); cloudSaveNow(); return; }
+      if (cloudOn()) { setClientStatus('서버에 저장하는 중…'); Promise.resolve(cloudSaveNow()).then(() => window.appToast(cloud.dirty ? '서버에 저장하지 못했어요 — 인터넷 연결을 확인해 주세요' : '서버에 저장했어요', cloud.dirty ? { tone: 'err' } : {})); return; }
       const name = (document.getElementById('corp_name')?.value || '').trim();
-      if (!name) { alert('상호(법인명)를 먼저 입력해 주세요. 상호 이름으로 저장됩니다.'); document.getElementById('corp_name')?.focus(); return; }
+      if (!name) { window.appToast('상호(법인명)를 먼저 입력해 주세요. 상호 이름으로 저장돼요.', { tone: 'err' }); document.getElementById('corp_name')?.focus(); return; }
       const store = readClientStore();
       if (!currentClientId) {
         const same = Object.entries(store.clients).find(([, c]) => c.name === name);
@@ -7895,6 +7970,7 @@
       autosaveDraft();
       refreshClientSelect();
       setClientStatus(`'${name}' 저장됨 · ${timeLabel(data.savedAt)}`);
+      window.appToast(`'${name}' 저장했어요`);
     }
     window.saveClient = saveClient;
 
@@ -7930,6 +8006,8 @@
       if (cloudOn()) {
         if (hasInput && !(await adminAsk({ title: '새 고객을 시작할까요?', text: '지금 화면은 서버에 저장해 두고 비웁니다.', okLabel: '새 고객' }))) return;
         (cloud.dirty ? cloudSaveNow() : Promise.resolve()).then(() => {
+          const prevAid = cloud.aid;
+          if (prevAid) window.appToast('새 고객 작성을 시작했어요 · 앞 고객은 서버에 저장됨', { action: '되돌리기', onAction: () => cloudLoad(prevAid) });
           cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false;
           resetFormToDefaults(); refreshClientSelect(); cloudPref({ last_assessment_id: null });
           setClientStatus('새 고객 작성 중 · 입력하면 서버에 자동 저장됩니다');
@@ -7938,6 +8016,8 @@
         return;
       }
       if (hasInput && !(await adminAsk({ title: '새 고객을 시작할까요?', text: '지금 작성 중인 내용을 비웁니다. 저장하지 않은 내용은 사라집니다.', okLabel: '비우고 시작', danger: true }))) return;
+      if (hasInput) { const before = collectFormData(), beforeId = currentClientId;
+        window.appToast('화면을 비우고 새 고객 작성을 시작했어요', { action: '되돌리기', onAction: () => { currentClientId = beforeId; applyFormData(before); autosaveDraft(); refreshClientSelect(); setClientStatus('비우기 전 화면으로 되돌림'); } }); }
       currentClientId = '';
       resetFormToDefaults();
       autosaveDraft();
@@ -7949,20 +8029,24 @@
     async function deleteClient() {
       if (cloudOn()) {
         const a = cloud.list.find(x => x.id === cloud.aid);
-        if (!a) { alert('삭제할 고객을 먼저 목록에서 불러와 주세요.'); return; }
+        if (!a) { window.appToast('삭제할 고객을 먼저 목록에서 불러와 주세요.', { tone: 'err' }); return; }
         if (!(await adminAsk({ title: '휴지통으로 옮길까요?', text: `'${a.title}' — 화면의 내용은 그대로 남습니다.`, okLabel: '휴지통으로', danger: true }))) return;
         clearTimeout(cloud.timer);
         sb.from('assessments').update({ deleted_at: new Date().toISOString() }).eq('id', a.id).then(({ error }) => {
-          if (error) { alert('삭제하지 못했습니다: ' + error.message); return; }
+          if (error) { window.appToast('삭제하지 못했어요: ' + error.message, { tone: 'err' }); return; }
           cloud.aid = null; cloud.ver = 0; cloud.cid = null; cloud.dirty = false;
           cloudPref({ last_assessment_id: null }); cloudList().catch(() => {});
           setClientStatus(`'${a.title}' 휴지통으로 옮김 · 다시 고치면 새 고객으로 저장됩니다`);
+          window.appToast(`'${a.title}' 휴지통으로 옮겼어요`, { action: '되돌리기', onAction: () => sb.from('assessments').update({ deleted_at: null }).eq('id', a.id).then(({ error: e2 }) => {
+            if (e2) { window.appToast('되돌리지 못했어요: ' + e2.message, { tone: 'err' }); return; }
+            cloudLoad(a.id); cloudList().catch(() => {}); window.appToast(`'${a.title}' 휴지통에서 꺼냈어요`);
+          }) });
         });
         return;
       }
       const store = readClientStore();
       const c = store.clients[currentClientId];
-      if (!c) { alert('삭제할 고객을 먼저 목록에서 불러와 주세요.'); return; }
+      if (!c) { window.appToast('삭제할 고객을 먼저 목록에서 불러와 주세요.', { tone: 'err' }); return; }
       if (!(await adminAsk({ title: '저장본을 삭제할까요?', text: `'${c.name}' — 이 PC에서 지우며 되돌릴 수 없습니다.`, okLabel: '삭제', danger: true }))) return;
       delete store.clients[currentClientId];
       writeClientStore(store);
@@ -8014,7 +8098,7 @@
       const reader = new FileReader();
       reader.onload = () => {
         try { importClientText(String(reader.result)); }
-        catch (e) { alert('파일을 불러오지 못했습니다: ' + e.message); }
+        catch (e) { window.appToast('파일을 불러오지 못했어요: ' + e.message, { tone: 'err' }); }
         input.value = '';
       };
       reader.readAsText(file, 'utf-8');
@@ -8200,7 +8284,7 @@
     async function cloudLoad(id) {
       if (cloud.dirty) await cloudSaveNow();
       const { data: a, error } = await sb.from('assessments').select('id,version,client_id,form_data,title,updated_at').eq('id', id).single();
-      if (error) { alert('불러오지 못했습니다: ' + error.message); return; }
+      if (error) { window.appToast('불러오지 못했어요: ' + error.message, { tone: 'err' }); return; }
       cloud.aid = a.id; cloud.ver = a.version; cloud.cid = a.client_id;
       applyFormData(a.form_data);
       clearTimeout(cloud.timer); cloud.dirty = false;
@@ -8696,7 +8780,7 @@
       }));
     }
     function adminFileMsg(t) {
-      const m = document.getElementById('admin_msg'); if (!m) { alert(t); return; }
+      const m = document.getElementById('admin_msg'); if (!m) { window.appToast(t, { tone: 'err' }); return; }
       m.textContent = t; m.className = 'mb-3 px-3 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-800 border border-red-200';
     }
     // 출력·문서 저장·고객 저장을 접속 기록에 남긴다 (기존 함수를 감싸기만 하고 동작은 그대로)
@@ -8794,6 +8878,18 @@
     #docs_modal .ft { display: flex; align-items: center; gap: 8px; padding: 12px 22px; border-top: 1px solid #EEECE6; }
     #docs_modal .ft .cnt { margin-right: auto; font-size: 12px; color: #66635C; }
     #docs_modal #docs_prog { margin-top: 12px; }
+    /* V-1 읽는 동안: 파일마다 진행 막대 · 후보 표 자리(뼈대) */
+    #docs_modal .files > div.wait .nm { color: #9A978F; }
+    #docs_modal .files .rd { display: inline-flex; align-items: center; gap: 8px; }
+    #docs_modal .files .mb { display: block; width: 72px; height: 4px; border-radius: 2px; background: #EEECE6; overflow: hidden; }
+    #docs_modal .files .mb b { display: block; height: 100%; width: 0; background: #00A898; border-radius: 2px; transition: width .2s; }
+    #docs_modal .files .rt { font-variant-numeric: tabular-nums; }
+    #docs_modal tr.sk td { border-bottom-color: #F3F2EE; }
+    #docs_modal tr.sk td i { display: block; height: 10px; margin: 3px 0; border-radius: 5px; background: linear-gradient(90deg, #EEECE6 30%, #F8F7F3 50%, #EEECE6 70%); background-size: 300% 100%; animation: docsSk 1.4s ease-in-out infinite; }
+    #docs_modal tr.sk td:first-child i { width: 14px; height: 14px; margin: 1px 0; border-radius: 4px; }
+    #docs_modal .sk-cap { margin-top: 8px; font-size: 11.5px; color: #66635C; }
+    @keyframes docsSk { from { background-position: 100% 0; } to { background-position: 0 0; } }
+    @media (prefers-reduced-motion: reduce) { #docs_modal tr.sk td i { animation: none; } #docs_modal .files .mb b { transition: none; } }
     #docs_modal .pt { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #33363D; margin-bottom: 5px; }
     #docs_modal .pb { height: 8px; border-radius: 4px; background: #EEECE6; overflow: hidden; }
     #docs_modal .pb i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00A898, #00E0C6); border-radius: 4px; transition: width .2s; }
@@ -9015,9 +9111,23 @@
     .bp-guide-btn[aria-expanded="true"] { color: #e2e8f0; border-color: #e2e8f0; }
     .bp-guide-hidden { display: none; }
     /* B-6 단계 진행 */
-    #l3_steps li .pg { white-space: nowrap; margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.45); }
+    #l3_steps li .pg { white-space: nowrap; margin-left: auto; margin-right: -4px; padding: 2px 6px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.45); cursor: pointer; transition: background-color .15s, color .15s; }
+    #l3_steps li .pg:disabled { cursor: default; }
+    #l3_steps li .pg:not(:disabled):hover { background: rgba(255,255,255,.12); color: #fff; }
+    #l3_steps li .pg:focus-visible { outline: 2px solid #5eead4; outline-offset: 1px; }
     #l3_steps li .pg.full { color: #5eead4; }
-    #l3.folded #l3_steps li .pg { display: none; }
+    #l3_steps li .pg.part { color: #FCD34D; }
+    /* V-6 단계별 채움 막대(이름 아래 가는 줄) · 접었을 땐 덜 채운 단계에 점 */
+    #l3_steps li .sb { position: absolute; left: 42px; right: 10px; bottom: 3px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.08); overflow: hidden; pointer-events: none; }
+    #l3_steps li .sb b { display: block; height: 100%; width: 0; background: rgba(255,255,255,.35); border-radius: 1px; transition: width .3s cubic-bezier(.16,1,.3,1); }
+    #l3_steps li.part .sb b { background: #FCD34D; }
+    #l3_steps li:has(.pg.full) .sb b { background: #5eead4; }
+    #l3.folded #l3_steps li .pg, #l3.folded #l3_steps li .sb { display: none; }
+    #l3.folded #l3_steps li.part::after { content: ''; position: absolute; top: 6px; right: 12px; z-index: 2; width: 7px; height: 7px; border-radius: 50%; background: #FCD34D; box-shadow: 0 0 0 2px var(--t-panel, #0A1F44); }
+    @media (max-width: 1180px) { #l3_steps li .sb { display: none; } }
+    .need-flash { outline: 2px solid #F59E0B !important; outline-offset: 3px; border-radius: 8px; animation: needFlash 1.8s ease-out forwards; }
+    @keyframes needFlash { 0%, 60% { outline-color: #F59E0B; } 100% { outline-color: transparent; } }
+    @media (prefers-reduced-motion: reduce) { #l3_steps li .sb b { transition: none; } .need-flash { animation: none; } }
     .ind-auto:empty { display: none; }
     .ind-auto { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid rgba(94,234,212,.35); border-radius: 10px; background: rgba(15,23,42,.45); color: #cbd5e1; font-size: 12px; line-height: 1.5; }
     .ind-auto .code { font-variant-numeric: tabular-nums; font-weight: 800; color: #5eead4; }
@@ -11852,17 +11962,23 @@
         document.getElementById('docs_files').innerHTML = files.map((f, i) => {
           const r = f.res;
           const fmtNo = n => n.slice(0, 3) + '-' + n.slice(3, 5) + '-' + n.slice(5);
-          const st = !r ? '<span class="st">읽는 중…</span>' : f.other ? `<span class="st warn">다른 회사 서류(${f.other.name ? '상호 ' + esc(f.other.name) : '사업자번호 ' + fmtNo(f.other.no)}) — ${f.other.byInput ? (f.other.name ? '지금 입력된 상호와 달라요' : '지금 입력된 사업자번호와 달라요') : '다른 서류들과 달라요'} · 값은 기본으로 체크하지 않아요</span>`
+          const st = f.wait ? '<span class="st" style="font-weight:400">차례 기다리는 중</span>'
+            : !r ? `<span class="st rd" data-rd><i class="mb" aria-hidden="true"><b style="width:${Math.round((f.pct || 0) * 100)}%"></b></i><span class="rt">${esc(f.stage || '읽는 중…')}</span></span>` : f.other ? `<span class="st warn">다른 회사 서류(${f.other.name ? '상호 ' + esc(f.other.name) : '사업자번호 ' + fmtNo(f.other.no)}) — ${f.other.byInput ? (f.other.name ? '지금 입력된 상호와 달라요' : '지금 입력된 사업자번호와 달라요') : '다른 서류들과 달라요'} · 값은 기본으로 체크하지 않아요</span>`
             : r.status === 'ok' ? `<span class="st ok">읽음${r.notes && r.notes.length ? ' · ' + esc(r.notes.join(' · ')) : ''}</span>`
             : r.status === 'scan' ? '<span class="st warn">글자층 없는 PDF</span>' : `<span class="st">${esc((r.notes || [])[0] || '읽지 못했어요')}</span>`;
           const sel = `<select data-i="${i}" aria-label="서류 종류">${kinds.map(([k, t]) => `<option value="${k}" ${r && r.kind === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="unknown" ${!r || r.kind === 'unknown' ? 'selected' : ''}>어떤 서류인지 골라 주세요</option></select>`;
           const cut = f.split ? '<span class="st" style="font-weight:400">합본에서 나눔</span>' : '';
           const src = f.src || f.name, kp = keepState[src], first = files.findIndex(x => (x.src || x.name) === src) === i;
           const keep = !kp || !first ? '' : kp === 'ok' ? '<span class="st ok" style="font-weight:400">원본 서버 보관</span>' : kp === 'saving' ? '<span class="st" style="font-weight:400">원본 보관 중…</span>' : `<span class="st warn" style="font-weight:400" title="${esc(keepErr[src] || '')}">원본 보관 실패</span>`;
-          return `<div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${cut}${f.pages || f.text !== undefined ? sel : ''}${st}${keep}</div>`;
+          return `<div${f.wait ? ' class="wait"' : ''}><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${cut}${f.pages || f.text !== undefined ? sel : ''}${st}${keep}</div>`;
         }).join('');
         const t = document.getElementById('docs_table');
-        if (!rows.length) {
+        const reading = files.some(f => !f.res);
+        const skRows = k => Array.from({ length: k }, (_, i) => `<tr class="sk" aria-hidden="true"><td><i></i></td><td><i style="width:${[64, 48, 72, 56][i % 4]}%"></i></td><td><i style="width:${[40, 55, 30, 45][i % 4]}%"></i></td><td><i style="width:${[78, 60, 70, 52][i % 4]}%"></i></td><td><i style="width:28px"></i></td></tr>`).join('');
+        if (!rows.length && reading && files.length) {
+          t.innerHTML = `<table><thead><tr><th style="width:26px"></th><th>항목</th><th>지금 값</th><th>읽은 값</th><th>정확도</th></tr></thead><tbody>${skRows(4)}</tbody></table><div class="sk-cap">읽은 값이 여기에 줄지어 나와요 — 다 읽기 전에도 먼저 읽은 서류부터 고를 수 있어요</div>`;
+        }
+        else if (!rows.length) {
           const allOther = files.some(f => f.other) && files.every(f => f.other || !f.res || f.res.status !== 'ok');
           t.innerHTML = !files.length || !files.every(f => f.res) ? ''
             : allOther ? '<div class="sup">올린 서류가 모두 지금 고객과 다른 회사 것이에요. 다른 고객의 서류라면 \'새 고객 작성\'을 누른 뒤 올려 주세요.</div>'
@@ -11877,7 +11993,7 @@
             const label = g.id.startsWith('_ip') ? '지식재산권 표에 추가' : g.id.startsWith('_debt') ? '대출표에 추가' : g.id.startsWith('_extra') ? '기타 항목에 추가' : g.id === '_industry' ? '② 주업종 (버튼 자동 선택)' : g.id === '_track' ? '① 기업 규모 (버튼 자동 선택)' : labelOf(g.id, o.year);
             return `<tr><td><input type="checkbox" data-chk="${i}" ${g.checked ? 'checked' : ''}></td><td>${esc(label)}</td><td class="cur">${esc(g.cur || '—')}</td>
               <td class="val">${val}${v.raw ? `<small>${esc(v.raw)}</small>` : ''}${o.note && !g.why.includes(o.note) ? `<small>${esc(o.note)}</small>` : ''}${g.why ? `<span class="why">${esc(g.why)}</span>` : ''}</td><td>${cfTag(o.conf)}</td></tr>`;
-          }).join('')}</tbody></table>`;
+          }).join('')}${reading ? skRows(2) : ''}</tbody></table>`;
         }
         const n = rows.filter(g => g.checked).length;
         document.getElementById('docs_cnt').textContent = `${n}개 선택`;
@@ -11885,12 +12001,18 @@
       }
 
       // 진행: 받은 파일 전체 중 몇 번째, 그 파일의 몇 쪽째
-      let queued = 0, finished = 0;
+      let queued = 0, finished = 0, curF = null;
       function progress(name, page, pages, ocrPart) {
         const box = document.getElementById('docs_prog');
         if (finished >= queued) { box.hidden = true; return; }
         box.hidden = false;
         const part = ocrPart !== undefined ? ocrPart : pages ? (page - 1) / pages : 0;
+        const tg = curF && files.includes(curF) && !curF.res ? curF : files.find(e => !e.res && !e.wait);
+        if (tg) {
+          tg.pct = part; tg.stage = ocrPart !== undefined ? (/다시 읽기/.test(name) ? '다시 읽는 중 ' : '글자 인식 ') + Math.round(ocrPart * 100) + '%' : pages ? `${page}/${pages}쪽 읽는 중` : '읽는 중…';
+          const row = document.getElementById('docs_files').children[files.indexOf(tg)], rd = row && row.querySelector('[data-rd]');
+          if (rd) { rd.querySelector('.mb b').style.width = Math.round(part * 100) + '%'; rd.querySelector('.rt').textContent = tg.stage; }
+        }
         document.getElementById('docs_prog_t').textContent = (ocrPart !== undefined ? '글자 인식 중 · ' + name + ` (${Math.round(ocrPart * 100)}%)` : '읽는 중 · ' + name + (pages ? ` (${page}/${pages}쪽)` : ''));
         document.getElementById('docs_prog_n').textContent = `${finished}/${queued}`;
         document.getElementById('docs_prog_bar').style.width = Math.round((finished + part) / queued * 100) + '%';
@@ -11943,10 +12065,13 @@
       async function addFiles(list) {
         const todo = [...list].slice(0, 30);
         queued += todo.length;
-        for (const file of todo) {
-          const f = { name: file.name, pages: null, res: null };
+        const ents = todo.map(file => ({ name: file.name, pages: null, res: null, wait: true }));
+        files.push(...ents);
+        for (let q = 0; q < todo.length; q++) {
+          const file = todo[q], f = ents[q];
+          f.wait = false; curF = f;
           rawRrn = [];
-          files.push(f); render(); progress(file.name, 0, 0);
+          render(); progress(file.name, 0, 0);
           try {
             const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
             const isImg = /^image\/(jpeg|png|webp)$/.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
@@ -12124,8 +12249,9 @@
         if (typeof foldFit === 'function') foldFit(document.getElementById('fs_fold'));
         const done = files.filter(f => f.res && f.res.status === 'ok').length;
         if (window.histRecord) { const nm = files.filter(f => f.res && f.res.status === 'ok').map(f => f.name); const ids = new Set(sel.map(g => g.id.startsWith('_ip') ? 'corp_ip_json' : g.id.startsWith('_extra') ? 'corp_extra_json' : g.id.startsWith('_debt') ? '_debt' : g.id));
-          histRecord('doc', '서류 자동 채우기 · ' + (nm.length > 2 ? nm.slice(0, 2).join(', ') + ` 외 ${nm.length - 2}개` : nm.join(', ')),
-            id => ids.has(id) || (ids.has('_fsfull') && /^sme_/.test(id)) || (ids.has('_vathalf') && /^(sme_vat_half|smb_sales_)/.test(id))); }
+          const ent = histRecord('doc', '서류 자동 채우기 · ' + (nm.length > 2 ? nm.slice(0, 2).join(', ') + ` 외 ${nm.length - 2}개` : nm.join(', ')),
+            id => ids.has(id) || (ids.has('_fsfull') && /^sme_/.test(id)) || (ids.has('_vathalf') && /^(sme_vat_half|smb_sales_)/.test(id)));
+          if (n) window.appToast(`서류 ${done}건에서 ${n}칸을 채웠어요 · 노란 칸`, ent && window.histUndoEntry ? { action: '되돌리기', onAction: () => histUndoEntry(ent).then(ok => ok && window.appToast('서류로 채운 칸을 되돌렸어요')) } : {}); }
         const s = document.getElementById('docs_last');
         if (s) s.textContent = `서류 ${done}건에서 ${n}칸을 넣었어요(노란 칸).`;
         close();
@@ -12588,7 +12714,7 @@
         async function meCreateOrg() {
           const m = Object.assign({}, readMeLocal(), meCache || {});
           const firm = (meCard.querySelector('[data-me="firm"]').value || '').trim();
-          if (!firm) { alert('상호를 먼저 적어 주세요.'); meCard.querySelector('[data-me="firm"]').focus(); return; }
+          if (!firm) { window.appToast('상호를 먼저 적어 주세요.', { tone: 'err' }); meCard.querySelector('[data-me="firm"]').focus(); return; }
           const btn = document.getElementById('l3_me_org_btn'); btn.disabled = true; meSyncMsg('펌을 등록하는 중…');
           try {
             const { data: orgId, error } = await sb.rpc('create_my_org', { p_name: firm, p_prefix: m.prefix || meCard.querySelector('[data-me="prefix"]').value || 'MSC' });
@@ -12742,7 +12868,7 @@
           // 이미지 형식 모두·10MB 이하 — 저장은 긴 변 800px 로 줄여서(SVG 는 그대로)
           imageFileToDataUrl(f, 800)
             .then(url => { const m = readMe(); m.logo = url; writeMe(m); fillMe(); renderBrand(); renderAcct(); live(); })
-            .catch(err => alert(err.message));
+            .catch(err => window.appToast(err.message, { tone: 'err' }));
         });
         document.getElementById('l3_me_logo_del').addEventListener('click', () => { const m = readMe(); m.logo = ''; writeMe(m); fillMe(); renderBrand(); renderAcct(); live(); });
         // 서식 발신란: 내 정보에 적은 펌 정보가 있으면 그것을 쓴다
@@ -13454,11 +13580,13 @@
         } else hist.unshift({ k: ++seq, at: Date.now(), src, title: title || '직접 입력', changes });
         if (hist.length > MAX) hist.length = MAX;
         paint();
+        return hist[0];
       }
       const recEdit = () => { const ids = new Set(touched); touched.clear(); record('edit', '', ids.size ? (id => ids.has(id) || (id === '_debt' && ids.has('_debt'))) : null); };
       const later = ms => { clearTimeout(timer); timer = setTimeout(recEdit, ms); };
       window.histFlush = () => { if (timer) recEdit(); };
       window.histRecord = (src, title, primary) => record(src, title, primary);
+      window.histUndoEntry = ent => { histFlush(); if (!hist.includes(ent)) return Promise.resolve(false); return undo(ent, ent.changes.slice()).then(() => !hist.includes(ent)); };
       window.histReset = () => { if (busy) return; hist = []; last = null; setTimeout(() => { last = snap(); paint(); }, 0); };
 
       async function undo(ent, list) {
