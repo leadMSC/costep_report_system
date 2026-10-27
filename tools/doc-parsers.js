@@ -1291,6 +1291,8 @@
     if (['bizcert', 'bizreg'].includes(c.kind)) fillByLines(r, text);
     if (c.kind === 'vat') { const lf = lineFields(text); if (!lf.corp_biz_no) lf.corp_biz_no = soleBizNo(text); r.meta = r.meta || {}; ['corp_biz_no', 'corp_ceo', 'corp_name'].forEach(k => { if (lf[k] && !r.fields[k]) { r.fields[k] = lf[k]; r.meta[k] = { conf: 0.6 }; } }); }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || []; if (r.corpName) out.corpName = r.corpName;
+    // 글자 인식이 띄어쓰기를 붙여 읽으면('업태:건설업종목:…') 값 앞에 ':' 가 남는다 — 앞뒤 쌍점·괄호 속 쌍점 걷기(L-171)
+    Object.keys(out.fields).forEach(k => { if (typeof out.fields[k] === 'string') out.fields[k] = out.fields[k].replace(/^[\s:：]+/, '').replace(/\(\s*[:：]\s*/g, '(').trim(); });
     // 사진 인식은 한 단계 낮은 정확도로
     Object.keys(out.fields).forEach(k => { const m = out.meta[k] = out.meta[k] || {}; m.conf = Math.min(m.conf ?? 0.9, 0.75); });
     return out;

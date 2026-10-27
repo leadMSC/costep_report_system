@@ -1,0 +1,24 @@
+[Unit]
+Description=MSC report OCR (PaddleOCR models via RapidOCR)
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/msc-ocr
+ExecStart=/opt/msc-ocr/venv/bin/python /opt/msc-ocr/server.py
+Restart=on-failure
+RestartSec=5
+# 같은 서버의 운영 서비스(모아워크·경영일지)를 보호: 낮은 우선순위·CPU 80%·메모리 1.2GB 상한
+Nice=10
+CPUQuota=80%
+MemoryMax=1200M
+Environment=OMP_NUM_THREADS=1
+DynamicUser=yes
+CacheDirectory=msc-ocr
+Environment=HOME=/var/cache/msc-ocr
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

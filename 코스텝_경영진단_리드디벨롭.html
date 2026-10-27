@@ -9183,7 +9183,7 @@
     <div class="panel">
       <div class="hd"><h4 id="docs_modal_t">업로드로 자동채우기</h4><button type="button" data-x aria-label="닫기">×</button></div>
       <div class="bd">
-        <div class="lock">파일은 이 기기 안에서만 읽고 저장하지 않아요. 읽은 값은 아래 표에서 고른 칸만 들어갑니다.</div>
+        <div class="lock">PDF·워드·한글·엑셀은 이 기기 안에서 읽어요. 사진·스캔은 글자 인식 서버에서 읽고 바로 지워요(저장하지 않음). 읽은 값은 아래 표에서 고른 칸만 들어갑니다.</div>
         <div class="dz" id="docs_mdrop">아래 서류를 여기에 끌어놓거나<br><button type="button" class="btn" id="docs_mpick_btn">파일 고르기</button><input type="file" id="docs_mpick" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv,text/csv,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.hwp,.hwpx,.txt,text/plain" multiple hidden><br>PDF · 사진(JPG·PNG·WebP) · 워드(docx) · 한글(hwp·hwpx) · 엑셀(xlsx·csv) · 50MB 이하 · 여러 개 한꺼번에 · 스캔 PDF 는 30쪽까지 글자 인식</div>
         <div class="sup" id="docs_sup">
           <details class="docs-kinds"><summary><b>읽을 수 있는 서류 11종</b> <span>사업자등록증·증명 · 재무제표 · 부가세 · 4대보험 · 주주 · 대출 · 지식재산 · 신분증 · 임대차</span></summary>
@@ -9198,7 +9198,7 @@
           <b>신분증(주민등록증·운전면허증) 사진</b> <span>— 대표자 이름 · 생년월일 (번호 뒷자리·주소는 읽자마자 지움)</span><br>
           <b>임대차계약서 사진·스캔</b> <span>— 주거용이면 대표자 주택 형태, 사업장이면 월 임차료 · 보증금·면적은 참고</span><br>
           </details>
-          <span>사진은 이 기기 안에서 글자 인식으로 읽어요(한 장 몇 초~십여 초). 처음 한 번은 인식 도구(약 12MB)를 받아요.</span>
+          <span>사진·스캔은 글자 인식 서버(PaddleOCR)에서 한 장 몇 초에 읽어요. 서버가 바쁘거나 연결이 안 되면 이 기기 안 인식으로 바꿔 읽어요(처음 한 번 약 12MB).</span>
         </div>
         <div id="docs_prog" hidden><div class="pt"><span id="docs_prog_t"></span><span id="docs_prog_n"></span></div><div class="pb"><i id="docs_prog_bar"></i></div></div>
         <div class="files" id="docs_files"></div>
@@ -10502,6 +10502,8 @@
     if (['bizcert', 'bizreg'].includes(c.kind)) fillByLines(r, text);
     if (c.kind === 'vat') { const lf = lineFields(text); if (!lf.corp_biz_no) lf.corp_biz_no = soleBizNo(text); r.meta = r.meta || {}; ['corp_biz_no', 'corp_ceo', 'corp_name'].forEach(k => { if (lf[k] && !r.fields[k]) { r.fields[k] = lf[k]; r.meta[k] = { conf: 0.6 }; } }); }
     out.fields = r.fields; out.meta = r.meta || {}; out.notes = r.notes || []; if (r.corpName) out.corpName = r.corpName;
+    // 글자 인식이 띄어쓰기를 붙여 읽으면('업태:건설업종목:…') 값 앞에 ':' 가 남는다 — 앞뒤 쌍점·괄호 속 쌍점 걷기(L-171)
+    Object.keys(out.fields).forEach(k => { if (typeof out.fields[k] === 'string') out.fields[k] = out.fields[k].replace(/^[\s:：]+/, '').replace(/\(\s*[:：]\s*/g, '(').trim(); });
     // 사진 인식은 한 단계 낮은 정확도로
     Object.keys(out.fields).forEach(k => { const m = out.meta[k] = out.meta[k] || {}; m.conf = Math.min(m.conf ?? 0.9, 0.75); });
     return out;
@@ -11430,7 +11432,30 @@
         return korWorker;
       }
       // 한 쪽 글자 인식 + (등록증이면) 명칭 줄 다시 읽기 → 번호 뒷자리 지운 글
+      // 서버 글자 인식(L-171): PaddleOCR 모델(한글·숫자 정확도 높음). 로그인한 운영 화면에서만, 실패하면 아래 브라우저 인식으로
+      async function serverOcr(canvas, onProg) {
+        if (window.__OCR_LOCAL_ONLY) return null;
+        let token = '';
+        try { token = typeof sb !== 'undefined' && sb ? ((await sb.auth.getSession()).data.session || {}).access_token || '' : ''; } catch (e) { token = ''; }
+        if (!token) return null;
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+        if (!blob) return null;
+        const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 90000);
+        try {
+          if (onProg) onProg(0.3);
+          const r = await fetch('/ocr/api', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'image/jpeg' }, body: blob, signal: ctl.signal });
+          if (!r.ok) return null;
+          const j = await r.json();
+          if (onProg) onProg(1);
+          return j && typeof j.text === 'string' && j.text.replace(/\s/g, '').length >= 4 ? j.text : null;
+        } catch (e) { return null; } finally { clearTimeout(tm); }
+      }
       async function ocrPage(canvas, onProg) {
+        const st = await serverOcr(canvas, onProg);
+        if (st) {
+          const rr = P().rrnFrom(st); if (rr) rawRrn.push(rr);   // 신분증 주민번호(가리기 전) — 신분증 결과에만 씀
+          return P().redact(st);
+        }
         const w = await getWorker('kor+eng');
         ocrProg = onProg;
         let data;
