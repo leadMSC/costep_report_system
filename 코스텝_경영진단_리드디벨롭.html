@@ -831,7 +831,7 @@
             <div id="ind_auto_box" class="ind-auto" aria-live="polite"></div>
             <div id="ind_btn_grid" class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
               <button type="button" id="ind_btn_mfg" onclick="setIndustryTrack('mfg')" class="py-2 px-1 rounded-md text-[11px] font-bold text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-indigo-400 bg-indigo-600 text-white shadow-xs cursor-pointer">
-                 제조업 (기계·금형·부품)
+                 제조업
               </button>
               <button type="button" id="ind_btn_it" onclick="setIndustryTrack('it')" class="py-2 px-1 rounded-md text-[11px] font-bold text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-slate-600 bg-slate-700/60 text-slate-300 hover:bg-slate-700 cursor-pointer">
                  정보통신·SW·플랫폼
@@ -858,7 +858,7 @@
                  환경·신재생에너지·재활용
               </button>
               <button type="button" id="ind_btn_service" onclick="setIndustryTrack('service')" class="py-2 px-1 rounded-md text-[11px] font-bold text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-slate-600 bg-slate-700/60 text-slate-300 hover:bg-slate-700 cursor-pointer">
-                 전문·기술·연구개발서비스
+                 서비스업 (전문·교육·생활)
               </button>
             </div>
           </div>
@@ -1160,6 +1160,7 @@
             <div class="flex items-center space-x-1.5">
               <input type="text" id="smb_monthly_sales" value="" placeholder="월평균 매출액 기재" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-3 font-mono text-blue-900">
               <span class="text-xs font-extrabold text-slate-700">만원</span>
+              <span id="smb_monthly_auto_note" class="text-[10.5px] font-bold text-[#0f766e] whitespace-nowrap"></span>
             </div>
             <p class="text-[11px] text-slate-500">※ 부가가치세 과세표준증명원 또는 사업용 계좌 최근 월평균 입금액을 기재합니다.</p>
             <!-- 연 매출: 해당연도(누적)와 직전 3개년, 단위 만원 — 보고서 경영수지 표에 추이로 나온다 -->
@@ -3509,7 +3510,7 @@
         logis: '운수·창고·물류서비스업 특화 진단 항목 (운송사업허가·직영차량·물류센터)',
         content: '출판·영상·방송·디자인 특화 진단 항목 (IP보유·자체스튜디오·플랫폼유통)',
         esg: '환경·신재생에너지 특화 진단 항목 (환경인허가·녹색인증·감축설비)',
-        service: '전문·기술·연구개발서비스 특화 진단 항목 (전문자격인력·B2G실적·품질인증)'
+        service: '서비스업 특화 진단 항목 (전문인력·거래형태·품질인증)'
       };
       const hdr = document.getElementById('ind_spec_header_text');
       if (hdr) hdr.innerText = headerText[ind] || headerText.mfg;
@@ -5268,7 +5269,7 @@
       esg: [['esg_cert', ['need'], '환경 인증 준비 단계 — 녹색인증·환경표지 취득 시 공공 녹색구매 시장 진입']],
       service: []
     };
-    const INDUSTRY_NAMES = { mfg: '제조업', it: '정보통신·SW', bio: '바이오·의료', const: '건설·설비', dist: '도소매·유통', food: '식품·외식', logis: '물류·운송', content: '콘텐츠', esg: '환경·에너지', service: '전문서비스' };
+    const INDUSTRY_NAMES = { mfg: '제조업', it: '정보통신·SW', bio: '바이오·의료', const: '건설·설비', dist: '도소매·유통', food: '식품·외식', logis: '물류·운송', content: '콘텐츠', esg: '환경·에너지', service: '서비스업' };
     function industryGapItems(ind) {
       return (INDUSTRY_GAPS[ind] || []).filter(([id, bad]) => bad.includes(document.getElementById(id)?.value)).map(x => x[2]);
     }
@@ -7345,6 +7346,40 @@
       });
     }
     window.renderSizeNote = renderSizeNote;
+    // 규모 자동 판정(L-178): 매출·근로자 수로 법정 규모가 분명하면 그 규모로 바꾼다. 같은 값으로는 한 번만(손으로 고른 규모를 계속 덮지 않게).
+    // 근로자 수를 모르면 소상공인·소기업을 가를 수 없으므로, 그 둘 사이는 바꾸지 않는다
+    function sizeAutoKey(c) { return c ? [c.code, c.tier, c.salesEok, c.emp].join('|') : ''; }
+    function autoSizeTier() {
+      if (window.__applyingForm) return;
+      const c = sizeContext ? sizeContext() : null;
+      if (!c || !c.rule || !c.tier || c.tier === 'over' || c.salesEok == null) return;
+      const key = sizeAutoKey(c); if (key === window.__autoTierKey) return;
+      window.__autoTierKey = key;
+      const cur = window.appState.bizTrack;
+      if (c.tier === cur) return;
+      if (c.emp == null && ['smb', 'small'].includes(c.tier) && ['smb', 'small'].includes(cur)) return;
+      const name = { smb: '소상공인', small: '소기업', sme: '중기업' };
+      setBizTrack(c.tier);
+      if (window.appToast) window.appToast(`매출${c.emp != null ? '·근로자 수' : ''}로 보면 법정 기준 ${name[c.tier]}이라 규모를 바꿨어요`, { action: '되돌리기', onAction: () => setBizTrack(cur) });
+    }
+    window.autoSizeTier = autoSizeTier;
+    // 소상공인 월평균 매출 자동(L-178): 작년 연매출 ÷ 12, 작년이 없으면 올해 누적 ÷ 지난 달 수. 직접 적은 값은 그대로 둔다
+    function autoSmbMonthly() {
+      const el = document.getElementById('smb_monthly_sales'); if (!el) return;
+      const n = id => parseNumber(document.getElementById(id)?.value || 0);
+      const y1 = n('smb_sales_y1'), cur = n('smb_sales_cur'), months = new Date().getMonth();
+      const val = y1 > 0 ? Math.round(y1 / 12) : (cur > 0 && months > 0 ? Math.round(cur / months) : 0);
+      const how = y1 > 0 ? '작년 연매출 ÷ 12' : val ? `올해 누적 ÷ ${months}개월` : '';
+      const auto = el.value.trim() === '' || el.value === window.__smbMonAuto;
+      const note = document.getElementById('smb_monthly_auto_note') || {};
+      if (!auto) { note.textContent = ''; return; }
+      const next = val ? val.toLocaleString('ko-KR') : '';
+      note.textContent = val ? '자동 · ' + how : '';
+      if (el.value === next) { window.__smbMonAuto = next || undefined; return; }
+      el.value = next; window.__smbMonAuto = next || undefined;
+      calcSmbMetrics();
+    }
+    window.autoSmbMonthly = autoSmbMonthly;
     // 조사 '으로/로': 받침 있으면 '으로'(ㄹ 받침은 '로')
     function josaRo(w) { const c = String(w || '').slice(-1).charCodeAt(0) - 0xAC00; if (c < 0 || c > 11171) return '로'; const j = c % 28; return j === 0 || j === 8 ? '로' : '으로'; }
     window.josaRo = josaRo;
@@ -7517,30 +7552,30 @@
     window.ksicQaText = ksicQaText;
 
     // ===== 진단 대상의 주업종(업종 묶음)은 고객사 정보의 표준산업분류에서 자동 — 같은 사실을 두 곳에서 고르지 않게 =====
-    // 코드를 골랐으면 버튼 10개는 접고 한 줄로 보여 주고(직접 바꾸기로 펼침), 아직 안 골랐으면 버튼을 그대로 보여 준다
-    let indGridOpen = false;
+    // 묶음 단추 10개는 쓰지 않는다(L-177) — 코드를 골랐으면 한 줄, 아직이면 고르러 가는 단추만. 예전 자료가 코드와 다른 묶음이면 맞추기 단추
     function renderIndAuto() {
       const box = document.getElementById('ind_auto_box'), grid = document.getElementById('ind_btn_grid'); if (!box || !grid) return;
       let main = null; try { main = (JSON.parse(document.getElementById('corp_ksic')?.value || '[]') || [])[0] || null; } catch (e) { main = null; }
       const cur = window.appState.industryTrack;
       const nameOf = k => (document.getElementById('ind_btn_' + k)?.textContent || '').trim();
       if (!main || !main.code) {
-        box.innerHTML = `<span>고객사 정보에서 종목의 표준산업분류를 고르면 주업종이 자동으로 정해져요. 아직 안 골랐으면 아래에서 고르세요.</span><span class="acts"><button type="button" data-go-ksic>표준산업분류 고르러 가기</button></span>`;
-        if (grid.style) grid.style.display = ''; return;
+        if (grid.style) grid.style.display = 'none';
+        box.innerHTML = `<span>고객사 정보에서 종목의 표준산업분류를 고르면 주업종이 자동으로 정해져요. 사업자등록증을 올려도 돼요.</span><span class="acts"><button type="button" data-go-ksic>표준산업분류 고르러 가기</button></span>`;
+        return;
       }
       const auto = typeof ksicTrack === 'function' ? ksicTrack(main.code) : '';
-      if (grid.style) grid.style.display = indGridOpen ? '' : 'none';
+      if (grid.style) grid.style.display = 'none';
       box.innerHTML = `<span>주업종</span><span class="code">${escapeHtml(main.code)}</span><span class="nm">${escapeHtml(main.name || '')}</span><span>→</span><span class="tr">${escapeHtml(nameOf(cur))}</span>`
-        + `<span class="acts"><button type="button" data-go-ksic>고객사 정보에서 수정</button><button type="button" data-ind-toggle aria-expanded="${indGridOpen}">${indGridOpen ? '접기' : '묶음 직접 바꾸기'}</button></span>`
-        + (auto && auto !== cur ? `<span class="warn">표준산업분류로는 '${escapeHtml(nameOf(auto))}'인데 직접 바꿔 두었어요. <button type="button" data-ind-auto="${auto}" style="border:0;background:none;color:#5eead4;font-weight:800;cursor:pointer;text-decoration:underline">되돌리기</button></span>` : '');
+        + `<span class="acts"><button type="button" data-go-ksic>고객사 정보에서 수정</button></span>`
+        + (auto && auto !== cur ? `<span class="warn">표준산업분류로는 '${escapeHtml(nameOf(auto))}'인데 예전 자료에 다른 묶음이 저장돼 있어요. <button type="button" data-ind-auto="${auto}" style="border:0;background:none;color:#5eead4;font-weight:800;cursor:pointer;text-decoration:underline">코드에 맞추기</button></span>` : '');
     }
     window.renderIndAuto = renderIndAuto;
     document.addEventListener('click', ev => {
-      const t = ev.target.closest && ev.target.closest('[data-go-ksic],[data-ind-toggle],[data-ind-auto]'); if (!t || !t.closest('#ind_auto_box')) return;
+      const t = ev.target.closest && ev.target.closest('[data-go-ksic],[data-ind-auto]'); if (!t || !t.closest('#ind_auto_box')) return;
       if (t.hasAttribute('data-go-ksic')) {
         const k = document.getElementById('ksic_box') || document.getElementById('corp_biz_item');
         if (k) { k.scrollIntoView({ block: 'center', behavior: 'smooth' }); document.getElementById('corp_biz_item')?.focus({ preventScroll: true }); }
-      } else if (t.hasAttribute('data-ind-toggle')) { indGridOpen = !indGridOpen; renderIndAuto(); }
+      }
       else if (t.dataset.indAuto) { setIndustryTrack(t.dataset.indAuto); }
     });
     // 전화번호: 숫자만 받아 하이픈 자동(010-1234-5678 · 02-123-4567 · 031-123-4567 · 1588-1234 · 0505-123-4567)
@@ -7703,7 +7738,7 @@
       // 칸을 채우는 대로(칸을 떠나기 전에도) 단계 진행을 고친다
       let spT = null; document.getElementById('screen_input')?.addEventListener('input', () => { clearTimeout(spT); spT = setTimeout(renderStepProgress, 150); });
     } catch (e) { /* 화면 없음 */ } }, 600));
-    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); renderSizeRule(); renderSizeNote(); if (typeof calcDebtTotals === 'function') calcDebtTotals(); syncIndShared(); renderKsicQa(); renderIndAuto(); renderBpReady(); renderCustSecSums(); renderStepProgress(); } catch (e) { /* 화면 없음 */ } }
+    function syncCustExtras() { try { const ph = document.getElementById('corp_ceo_phone'); if (ph && ph.value && ph !== document.activeElement) ph.value = fmtPhone(ph.value); syncBizType(); renderKsic(); renderSegs(); renderRows(); renderExtraHints(); renderCredit(); renderRrn(); autoSmbMonthly(); renderSizeRule(); renderSizeNote(); autoSizeTier(); if (typeof calcDebtTotals === 'function') calcDebtTotals(); syncIndShared(); renderKsicQa(); renderIndAuto(); renderBpReady(); renderCustSecSums(); renderStepProgress(); } catch (e) { /* 화면 없음 */ } }
     window.syncCustExtras = syncCustExtras;
     (function custExtInit() {
       const ext = elv('cust_ext'), kb = elv('ksic_box');
@@ -7910,6 +7945,8 @@
 
     function applyFormData(data) {
       if (!data || typeof data !== 'object' || !data.fields) throw new Error('고객 자료 형식이 아닙니다.');
+      window.__applyingForm = true;   // 불러온 자료의 규모는 그대로 — 자동 판정은 값이 바뀔 때부터
+      try {
       setBizTrack(data.bizTrack || 'smb');
       setIndustryTrack(data.industryTrack || 'mfg');
       if (data.reportKey) { window.appState.activeReportKey = data.reportKey; renderReportButtons(); renderReportKeyChips(); }
@@ -7927,6 +7964,8 @@
       syncCompanyData();
       syncCertIpViews();
       renderActiveReport();
+      } finally { window.__applyingForm = false; }
+      try { window.__autoTierKey = sizeAutoKey(sizeContext()); } catch (e) { /* 규모 기준 없음 */ }
       if (window.histReset) histReset();   // 불러오기·복원은 기록을 비우고 지금 화면을 출발점으로(되돌리기 중이면 그대로)
     }
     window.applyFormData = applyFormData;
@@ -11860,7 +11899,7 @@
         ['dist', /도매|소매|유통|전자상거래|쇼핑몰|판매/],
         ['service', /전문|기술|연구|컨설팅|서비스|교육/]
       ];
-      const IND_NAME = { mfg: '제조업 (기계·금형·부품)', it: '정보통신·SW·플랫폼', bio: '바이오·의료기기·보건', const: '건설·전기·설비공사업', dist: '도매·소매·전자상거래', food: '음식점·식품제조가공업', logis: '운수·창고·물류서비스업', content: '출판·영상·방송·디자인', esg: '환경·신재생에너지·재활용', service: '전문·기술·연구개발서비스' };
+      const IND_NAME = { mfg: '제조업', it: '정보통신·SW·플랫폼', bio: '바이오·의료기기·보건', const: '건설·전기·설비공사업', dist: '도매·소매·전자상거래', food: '음식점·식품제조가공업', logis: '운수·창고·물류서비스업', content: '출판·영상·방송·디자인', esg: '환경·신재생에너지·재활용', service: '서비스업 (전문·교육·생활)' };
       const TIER_NAME = { smb: '소상공인', small: '소기업', sme: '중기업' };
       // 소상공인 상시근로자 기준(제조·건설·운수 10인 미만, 그 밖 5인 미만) · 소기업 매출 상한(억원, 업종 대표값 — 단순 판정)
       const SMB_EMP = { mfg: 10, const: 10, logis: 10, food: 5, it: 5, bio: 10, dist: 5, content: 5, esg: 10, service: 5 };
