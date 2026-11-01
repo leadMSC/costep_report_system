@@ -7303,7 +7303,8 @@
 
     // 법정 규모 기준(표준산업분류 코드로): 진단 대상 단계에 '이 업종은 소상공인 ○명 미만 · 소기업 ○억 이하 · 중소기업 ○억 이하 → 지금 값이면 ○○' 표시
     var SMB_SALES_EOK = 20;
-    var SIZE_WHY = { nofs: '재무제표가 없어 코스텝 기준 소상공인', le20: `재무제표 연매출이 ${SMB_SALES_EOK}억 이하라 코스텝 기준 소상공인` };
+    var SMALL_EMP = 5;
+    var SIZE_WHY = { nofs: '재무제표가 없어 코스텝 기준 소상공인', le20: `재무제표 연매출이 ${SMB_SALES_EOK}억 이하라 코스텝 기준 소상공인`, emp5: `4대보험 가입자가 ${SMALL_EMP}명 이상이라 코스텝 기준 소기업` };
     function sizeContext() {
       const PP = window.MSCDocParsers; if (!PP || !PP.sizeRule) return null;
       let code = '', basis = '확정';
@@ -7319,9 +7320,11 @@
       const fsMil = num('sme_sales'), mon = num('smb_monthly_sales');
       const salesEok = fsMil ? fsMil / 100 : mon ? mon * 12 / 10000 : null;
       // 코스텝 기준(L-179): 재무제표가 없거나, 있어도 연매출 20억 이하면 소상공인. 그 밖에는 법정 기준
+      // (L-180) 단, 4대보험 가입자 5명 이상이면 소상공인 대신 소기업
       const hasFs = ['sme_sales', 'sme_sales_2024', 'sme_sales_2023', 'sme_assets', 'sme_equity', 'sme_debt'].some(num);
-      const why = !hasFs ? 'nofs' : fsMil && fsMil / 100 <= SMB_SALES_EOK ? 'le20' : '';
-      const tier = why ? 'smb' : rule ? PP.sizeTier(rule, emp, salesEok) : null;
+      let why = !hasFs ? 'nofs' : fsMil && fsMil / 100 <= SMB_SALES_EOK ? 'le20' : '';
+      let tier = why ? 'smb' : rule ? PP.sizeTier(rule, emp, salesEok) : null;
+      if (tier === 'smb' && emp != null && emp >= SMALL_EMP) { tier = 'small'; why = 'emp5'; }
       return { code, basis, rule, emp, salesEok, tier, why, hasFs };
     }
     window.sizeContext = sizeContext;
@@ -7329,7 +7332,7 @@
       const box = document.getElementById('size_rule_box'); if (!box) return;
       const c = sizeContext();
       const name = { smb: '소상공인', small: '소기업', sme: '중기업', over: '중소기업 기준 초과' };
-      const why = c && c.why ? `<b>${SIZE_WHY[c.why]}</b>으로 봐요` + (c.why === 'nofs' ? ' — 재무제표를 올리면 다시 판정해요' : '') + (window.appState.bizTrack === 'smb' ? ' <span class="ok">· 지금 선택과 같아요</span>' : `<button type="button" class="go" onclick="setBizTrack('smb')">소상공인으로 바꾸기</button>`) : '';
+      const why = c && c.why ? `<b>${SIZE_WHY[c.why]}</b>으로 봐요` + (c.why === 'nofs' ? ' — 재무제표를 올리면 다시 판정해요' : '') + (window.appState.bizTrack === c.tier ? ' <span class="ok">· 지금 선택과 같아요</span>' : `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`) : '';
       if (!c || !c.rule) { box.innerHTML = why || '고객사 정보의 종목(표준산업분류)을 정하면 업종별 법정 기준으로 규모를 판정해 줘요.'; return; }
       if (why) { box.innerHTML = why; return; }
       const r = c.rule;
@@ -7350,14 +7353,14 @@
         if (!n) { n = document.createElement('div'); n.className = 'size-note hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center gap-2'; sec.insertBefore(n, sec.firstChild); }
         const diff = c && c.tier && c.tier !== 'over' && c.tier !== cur && (c.why || (c.rule && c.salesEok != null));
         n.classList.toggle('hidden', !diff);
-        if (diff && c.why) n.innerHTML = `<span class="mr-auto">${SIZE_WHY[c.why]}입니다. 지금은 ${name[cur] || cur}${josaRo(name[cur] || cur)} 작성 중이에요.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer" onclick="setBizTrack('smb')">소상공인으로 바꾸기</button>`;
+        if (diff && c.why) n.innerHTML = `<span class="mr-auto">${SIZE_WHY[c.why]}입니다. 지금은 ${name[cur] || cur}${josaRo(name[cur] || cur)} 작성 중이에요.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`;
         else if (diff) n.innerHTML = `<span class="mr-auto">넣은 값(연매출 약 ${c.salesEok.toFixed(1)}억${c.emp != null ? ' · 근로자 ' + c.emp + '명' : ''})으로 보면 법정 기준 <b>${name[c.tier]}</b>입니다. 지금은 ${name[cur] || cur}${josaRo(name[cur] || cur)} 작성 중이에요.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`;
       });
     }
     window.renderSizeNote = renderSizeNote;
     // 규모 자동 판정(L-178): 매출·근로자 수로 법정 규모가 분명하면 그 규모로 바꾼다. 같은 값으로는 한 번만(손으로 고른 규모를 계속 덮지 않게).
     // 근로자 수를 모르면 소상공인·소기업을 가를 수 없으므로, 그 둘 사이는 바꾸지 않는다
-    function sizeAutoKey(c) { return !c ? '' : c.why === 'nofs' ? 'nofs' : [c.code, c.tier, c.salesEok, c.emp].join('|'); }
+    function sizeAutoKey(c) { return !c ? '' : !c.hasFs && c.why ? 'nofs|' + c.tier : [c.code, c.tier, c.salesEok, c.emp].join('|'); }
     function autoSizeTier() {
       if (window.__applyingForm) return;
       const c = sizeContext ? sizeContext() : null;
