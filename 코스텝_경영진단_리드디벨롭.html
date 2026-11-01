@@ -638,7 +638,7 @@
   </div>
 
   <!-- ================= TOP HEADER (NO-PRINT) ================= -->
-  <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
+  <header id="app_header" class="no-print bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
       <!-- Brand & Title -->
       <div class="flex items-center space-x-3 cursor-pointer shrink-0" onclick="switchMainScreen('input')">
@@ -656,21 +656,21 @@
       <div class="flex items-center space-x-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200 shrink-0">
         <button type="button" id="tab_btn_screen_input" onclick="switchMainScreen('input')" class="tab-nav-btn active px-3.5 py-2 rounded-lg text-xs font-bold transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-          <span>1. 기업 실태 기초조사서</span>
+          <span class="tab-long">1. 기업 실태 기초조사서</span><span class="tab-short">입력</span>
         </button>
         <button type="button" id="tab_btn_screen_reports" onclick="switchMainScreen('reports')" class="tab-nav-btn px-3.5 py-2 rounded-lg text-slate-700 hover:bg-slate-200 text-xs font-bold transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          <span>2. 행정시행문 및 진단서</span>
+          <span class="tab-long">2. 행정시행문 및 진단서</span><span class="tab-short">서식</span>
         </button>
         <button type="button" id="tab_btn_screen_radar" onclick="switchMainScreen('radar')" class="tab-nav-btn px-3.5 py-2 rounded-lg text-slate-700 hover:bg-slate-200 text-xs font-bold transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap">
           <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-          <span>3. 공공 지원사업 연계</span>
+          <span class="tab-long">3. 공공 지원사업 연계</span><span class="tab-short">지원사업</span>
         </button>
       </div>
 
       <!-- Right Actions & Profile -->
       <div class="flex items-center space-x-2 shrink-0">
-        <button type="button" onclick="loadDemoData()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shadow-2xs">
+        <button type="button" onclick="loadDemoData()" aria-label="작성 예시 불러오기" class="demo-btn px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shadow-2xs">
           <svg class="w-4 h-4 text-[#169aa8] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           <span>작성 예시 불러오기</span>
         </button>
@@ -13633,6 +13633,34 @@
     #hist_pop .ch .x:hover, #hist_pop .ch .x:focus-visible { border-color: var(--t-red-text, #A32D2D); color: var(--t-red-text, #A32D2D); background: var(--t-red-soft, #FCEBEB); }
     @media print { #l3_bar, #hist_pop { display: none !important; } }
     @media (max-width: 640px) { #l3_bar .st { display: none; } }
+    /* 휴대폰(예전 화면) 머리글: 로고·화면 탭이 화면보다 넓어 페이지 전체가 축소되던 것(L-183) */
+    #app_header .tab-short { display: none; }
+    @media (max-width: 640px) {
+      #app_header > div { padding: 8px 12px; gap: 8px; }
+      #app_header h1, #app_header h1 + span { display: none; }
+      #app_header .brand-logo-dark, #app_header .brand-logo-light { height: 28px; }
+      #app_header .tab-nav-btn { flex: 1 1 0; justify-content: center; padding: 8px 6px; }
+      #app_header .tab-nav-btn .tab-long { display: none; }
+      #app_header .tab-nav-btn .tab-short { display: inline; }
+      #app_header > div > div:nth-child(2) { order: 3; flex: 1 1 100%; }
+      #app_header .demo-btn { padding: 8px 10px; }
+      #app_header .demo-btn > span { display: none; }
+      #app_header .tab-nav-btn { padding-top: 6px; padding-bottom: 6px; }
+      #app_header > div > div:nth-child(2) { padding: 4px; }
+    }
+    /* 휴대폰(예전 화면) 입력 카드: 바깥 여백 + 카드 안쪽 + 안쪽 상자 여백이 겹쳐 글자 폭이 300px 남짓이던 것(L-183) */
+    @media (max-width: 640px) {
+      #screen_input { margin-top: 0; }
+      #screen_input.space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px; }
+      .max-w-7xl:has(> #screen_input) { padding-left: 8px; padding-right: 8px; margin-top: 10px; }
+      #screen_input > .rounded-2xl.p-5, #screen_input > .rounded-2xl.p-4 { padding: 14px 12px; }
+      #screen_input > * .rounded-xl.p-4, #screen_input > * .rounded-xl.p-5, #screen_input > * .rounded-2xl.p-4, #screen_input > * .rounded-2xl.p-5 { padding: 12px 10px; }
+      #screen_input .space-y-4 > :not([hidden]) ~ :not([hidden]), #screen_input .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px; }
+      /* 숫자·날짜·고르기 한 칸짜리는 두 개씩 나란히(긴 글 칸은 한 줄 전체) */
+      #screen_input .grid.grid-cols-1:is(.sm\:grid-cols-2, .md\:grid-cols-2) { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; }
+      #screen_input .grid.grid-cols-1:is(.sm\:grid-cols-2, .md\:grid-cols-2) > * { grid-column: 1 / -1; }
+      #screen_input .grid.grid-cols-1:is(.sm\:grid-cols-2, .md\:grid-cols-2) > :is(div, label):has(:is(input[inputmode=numeric], input[type=number], input[type=date], select)):not(:has(textarea, button, .grid, input[type=checkbox], input[type=radio])):not(:has(:is(input, select) ~ :is(input, select))):not(:has(input:not([inputmode=numeric]):not([type=number]):not([type=date]):not([type=hidden]))) { grid-column: auto; }
+    }
   </style>
   <script>
     (function () {
