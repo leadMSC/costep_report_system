@@ -670,7 +670,7 @@
 
       <!-- Right Actions & Profile -->
       <div class="flex items-center space-x-2 shrink-0">
-        <button type="button" onclick="loadDemoData()" aria-label="작성 예시 불러오기" class="demo-btn px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shadow-2xs">
+        <button type="button" id="demo_btn" onclick="loadDemoData()" aria-label="작성 예시 불러오기" class="hidden demo-btn px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-[color,background-color,border-color,box-shadow,transform,opacity] cursor-pointer flex items-center space-x-1.5 whitespace-nowrap shadow-2xs">
           <svg class="w-4 h-4 text-[#169aa8] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           <span>작성 예시 불러오기</span>
         </button>
@@ -704,7 +704,7 @@
         <div class="dz">
           <div class="flex-1 min-w-0">
             <div class="text-sm font-extrabold text-slate-900">서류가 있으면 여기에 끌어다 놓으세요</div>
-            <div class="text-xs text-slate-500 truncate">사업자등록증명 · 재무제표 · 부가세 · 4대보험 · 주주명부 · 차입금 원장 · 채권자변동 · 지식재산권 등록증 · 신분증 · 임대차계약서 — PDF·사진, 한꺼번에</div>
+            <div class="docs-kinds-line text-xs text-slate-500 truncate">사업자등록증명 · 재무제표 · 부가세 · 4대보험 · 주주명부 · 차입금 원장 · 채권자변동 · 지식재산권 등록증 · 신분증 · 임대차계약서 — PDF·사진, 한꺼번에</div>
             <div id="docs_last" class="text-xs font-bold text-[#8A6200] mt-1"></div>
           </div>
           <button type="button" onclick="openDocsModal()" class="shrink-0 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold cursor-pointer">업로드로 자동채우기</button>
@@ -791,30 +791,25 @@
       <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-700 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div class="flex items-center space-x-3">
-            <span class="px-2.5 py-1 rounded-md text-xs font-black bg-blue-500 text-white shadow-xs">진단 대상 구분</span>
-            <h2 class="text-sm sm:text-base font-extrabold text-white tracking-tight">기업 규모 및 한국표준산업분류(KSIC) 주업종 지정</h2>
+            <h2 class="text-sm sm:text-base font-extrabold text-white tracking-tight">기업 규모 · 주업종</h2>
           </div>
-          <p class="text-xs text-slate-300">지정된 기업 규모와 주업종에 따라 소관 법령상 기준 및 해당 항목이 자동 반영되어 개별 시행문과 진단보고서가 생성됩니다.</p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Tier Selector (4 cols) -->
           <div class="lg:col-span-4 bg-slate-800/80 rounded-xl p-3.5 border border-slate-700 space-y-2">
             <label class="text-xs font-extrabold text-blue-300 flex items-center space-x-1.5">
-              <span>① 기업 규모 구분 (관계 법령 기준)</span>
+              <span>① 기업 규모</span>
             </label>
             <div class="grid grid-cols-3 gap-2">
               <button type="button" id="tier_btn_smb" onclick="setBizTrack('smb')" class="py-2.5 px-2 rounded-lg text-xs font-bold text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-blue-400 bg-[#169aa8] text-white shadow-xs cursor-pointer">
                 <span class="block font-black">소상공인</span>
-                <span class="text-[10px] opacity-80 font-normal">소상공인기본법 제2조 (10인 미만)</span>
               </button>
               <button type="button" id="tier_btn_small" onclick="setBizTrack('small')" class="py-2.5 px-2 rounded-lg text-xs font-bold text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-slate-600 bg-slate-700/60 text-slate-300 hover:bg-slate-700 cursor-pointer">
                 <span class="block font-black">소기업</span>
-                <span class="text-[10px] opacity-80 font-normal">중소기업기본법 시행령 제8조</span>
               </button>
               <button type="button" id="tier_btn_sme" onclick="setBizTrack('sme')" class="py-2.5 px-2 rounded-lg text-xs font-bold text-center transition-[color,background-color,border-color,box-shadow,transform,opacity] border border-slate-600 bg-slate-700/60 text-slate-300 hover:bg-slate-700 cursor-pointer">
                 <span class="block font-black">중기업</span>
-                <span class="text-[10px] opacity-80 font-normal">중소기업기본법 제2조 (50인 이상)</span>
               </button>
             </div>
             <div id="size_rule_box" class="size-rule" aria-live="polite"></div>
@@ -824,9 +819,8 @@
           <div class="lg:col-span-8 bg-slate-800/80 rounded-xl p-3.5 border border-slate-700 space-y-2">
             <div class="flex items-center justify-between">
               <label class="text-xs font-extrabold text-indigo-300 flex items-center space-x-1.5">
-                <span>② 한국표준산업분류 주업종 구분</span>
+                <span>② 주업종</span>
               </label>
-              <span class="text-[11px] text-slate-400">고객사 정보의 표준산업분류로 정해지고, 소관 인허가 요건·지원사업 공고가 연계됩니다.</span>
             </div>
             <div id="ind_auto_box" class="ind-auto" aria-live="polite"></div>
             <div id="ind_btn_grid" class="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
@@ -870,9 +864,8 @@
         <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
           <h3 class="text-sm font-extrabold text-slate-900 flex items-center space-x-2">
             <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
-            <span>수진기업 기본 정보 및 대표자·주주 인적사항 (필수 기초 제원)</span>
+            <span>기업 기본 정보 · 대표자</span>
           </h3>
-          <span class="text-[11px] text-slate-500 font-medium">※ 법인등록번호, 주주 지분율, 주거래은행 등 공공 심사 필수 항목 완비</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div>
@@ -978,7 +971,7 @@
                 <label for="sme_kcb" class="font-bold text-slate-700 block mb-1">KCB 개인신용평점</label>
                 <input type="text" id="sme_kcb" value="" placeholder="예: 880" inputmode="numeric" oninput="formatNumberInput(this); syncCompanyData(); syncCustExtras();" class="form-input-control text-right font-bold font-mono">
               </div>
-              <div>
+              <div id="credit_grade_cell">
                 <span class="font-bold text-slate-700 block mb-1">신용 평가 (참고 구간)</span>
                 <div id="credit_grade" class="credit-grade">점수 입력 대기</div>
               </div>
@@ -1051,7 +1044,7 @@
       <div class="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
         <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 flex items-center space-x-2">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-          <span>거래처 구조, 지식재산권(특허) 및 기업인증 현황 (공공 평가 가점 지표)</span>
+          <span>거래처 · 특허 · 인증</span>
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
           <div>
@@ -1079,8 +1072,8 @@
           <div class="sm:col-span-2 lg:col-span-3" id="ip_cell">
             <div class="flex items-center gap-2 mb-1">
               <label class="font-bold text-slate-700 mr-auto">지식재산권 (특허·실용신안·디자인·상표)</label>
-              <button type="button" onclick="openDocsModal && openDocsModal()" class="no-print px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-[11px] font-bold cursor-pointer">업로드로 자동채우기</button>
-              <button type="button" id="ip_add" class="no-print px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold cursor-pointer">+ 추가</button>
+              <button type="button" onclick="openDocsModal && openDocsModal()" class="docs-link no-print">서류로 채우기</button>
+              <button type="button" id="ip_add" class="no-print whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold cursor-pointer">+ 추가</button>
             </div>
             <input type="text" id="corp_patents" value="" placeholder="지식재산권 등록 현황" oninput="syncCompanyData()" class="form-input-control font-bold text-blue-900 hidden">
             <input type="text" id="corp_ip_json" value="" class="hidden" aria-hidden="true" tabindex="-1">
@@ -1104,7 +1097,7 @@
         <div class="flex flex-wrap items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
           <h3 class="text-sm font-extrabold text-slate-900 mr-auto">금융기관 대출 현황</h3>
-          <button type="button" onclick="openDocsModal && openDocsModal()" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold cursor-pointer">업로드로 자동채우기</button>
+          <button type="button" onclick="openDocsModal && openDocsModal()" class="docs-link no-print">서류로 채우기</button>
           <button type="button" onclick="addDebtRow()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer">+ 대출 추가</button>
         </div>
 
@@ -1145,7 +1138,7 @@
         <div class="flex items-center justify-between border-b border-blue-200 pb-3">
           <div class="flex items-center space-x-2">
             <span class="w-3 h-3 rounded-full bg-[#169aa8]"></span>
-            <h3 class="text-sm sm:text-base font-extrabold text-blue-950">소상공인 사업장 현황 실태조사서 (간이 확인식)</h3>
+            <h3 class="text-sm sm:text-base font-extrabold text-blue-950">소상공인 사업장 실태</h3>
           </div>
           <span class="flex items-center gap-2"><button type="button" id="smb_fs_open_btn" onclick="openSmbFs()" class="no-print text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-300 cursor-pointer">재무제표 있음 · 결산 입력 열기</button><span class="text-xs font-bold text-blue-700 bg-white px-3 py-1 rounded-full border border-blue-300">소상공인 기준 적용</span></span>
         </div>
@@ -1154,7 +1147,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold text-slate-900 block">1. 최근 월평균 매출액 (부가가치세 과표 또는 사업용 계좌 기준)</label>
+              <label class="text-xs font-bold text-slate-900 block">1. 최근 월평균 매출액</label>
               <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">매출 기재</span>
             </div>
             <div class="flex items-center space-x-1.5">
@@ -1162,7 +1155,7 @@
               <span class="text-xs font-extrabold text-slate-700">만원</span>
               <span id="smb_monthly_auto_note" class="text-[10.5px] font-bold text-[#0f766e] whitespace-nowrap"></span>
             </div>
-            <p class="text-[11px] text-slate-500">※ 부가가치세 과세표준증명원 또는 사업용 계좌 최근 월평균 입금액을 기재합니다.</p>
+            <p id="smb_monthly_hint" class="text-[11px] text-slate-500">※ 부가가치세 과세표준증명원 또는 사업용 계좌 최근 월평균 입금액을 기재합니다.</p>
             <!-- 연 매출: 해당연도(누적)와 직전 3개년, 단위 만원 — 보고서 경영수지 표에 추이로 나온다 -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1" id="smb_years_box">
               <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_cur_lb">올해 누적</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_cur" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">만원</span></div></div>
@@ -1298,7 +1291,7 @@
           <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-2.5 flex items-center space-x-2">
             <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
             <span>최근 3개년 표준재무제표 및 대표자 신용평점</span>
-            <button type="button" onclick="openDocsModal && openDocsModal()" class="no-print ml-auto px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer">업로드로 자동채우기</button>
+            <button type="button" onclick="openDocsModal && openDocsModal()" class="docs-link no-print ml-auto">서류로 채우기</button>
           </h3>
           <textarea id="sme_fs_full" hidden></textarea>
           <div class="fold-wrap">
@@ -1673,12 +1666,12 @@
       <div class="bg-gradient-to-r from-blue-950 to-slate-900 text-white rounded-2xl p-5 sm:p-6 border border-blue-800 shadow-md space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 pb-3">
           <div class="flex items-center space-x-2.5">
-            <h3 class="text-sm sm:text-base font-extrabold text-white">공공 지원사업 신청 대비 사업계획 개요서 (표준 서식)</h3>
+            <h3 class="text-sm sm:text-base font-extrabold text-white">사업계획 개요서</h3>
           </div>
           <div class="flex items-center space-x-2">
             <button type="button" onclick="autoGenerateBusinessPlan()" class="px-3.5 py-1.5 bg-[#169aa8] hover:bg-[#138491] text-white font-bold rounded-lg text-xs shadow-xs transition-[color,background-color,border-color,box-shadow,transform,opacity] flex items-center space-x-1.5 cursor-pointer border border-teal-400">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              <span>기재 제원 기반 맞춤 사업계획 개요 자동 생성</span>
+              <span>자동 작성</span>
             </button>
           </div>
         </div>
@@ -1751,7 +1744,7 @@
       </div>
 
       <!-- Action Button Bar -->
-      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div class="hidden bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>
           <span class="text-xs font-black text-slate-900 block">기초 실태조사서 작성 완료 후 공문서 자동 생성</span>
           
@@ -5001,7 +4994,9 @@
     function faRender() {
       const box = document.getElementById('fa_box'); if (!box) return;
       const d = faData();
-      const has = d.Y.some(y => y.S !== null || y.A !== null) || Object.keys(vhLoad()).length;
+      // 재무상태표(자산)가 없으면 지표 대부분이 '—'라 큰 격자 대신 한 줄 안내(L-184)
+      const has = d.Y.some(y => y.A !== null) || Object.keys(vhLoad()).length;
+      if (!has && d.Y.some(y => y.S !== null)) { box.innerHTML = '<p class="fa-wait">자산·부채·자본을 넣으면 부채비율·이자보상배수 같은 재무 분석이 여기에 계산돼요.</p>'; return; }
       box.innerHTML = has ? `<div class="fa-head"><b>재무 분석</b><span>은행·보증기관 심사와 지원사업 평가에서 보는 수치를 위 재무제표로 계산했어요</span></div>${faKpiHtml(d)}${faDiagHtml(faDiagnose(d))}${faSignalsHtml(d)}<div class="fa-grid">${faChartsHtml(d)}</div>` : '';
     }
     window.faRender = faRender;
@@ -7264,6 +7259,7 @@
       const sc = Math.max(n, k) && Math.min(...[n, k].filter(Boolean));
       el.className = 'credit-grade' + (!sc ? '' : sc >= 800 ? ' g' : sc >= 650 ? ' m' : ' b');
       el.textContent = !sc ? '점수 입력 대기' : sc >= 900 ? '최우량 (' + sc + '점)' : sc >= 800 ? '우량 (' + sc + '점)' : sc >= 650 ? '보통 (' + sc + '점)' : '주의 (' + sc + '점)';
+      { const cell = document.getElementById('credit_grade_cell'); if (cell && cell.style) cell.style.display = sc ? '' : 'none'; }
     }
     function fmtRrn(el) { const d = String(el.value).replace(/[^0-9]/g, '').slice(0, 13); el.value = d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d; }
     window.fmtRrn = fmtRrn;
@@ -7368,6 +7364,8 @@
       const how = y1 > 0 ? '작년 연매출 ÷ 12' : val ? `올해 누적 ÷ ${months}개월` : '';
       const auto = el.value.trim() === '' || el.value === window.__smbMonAuto;
       const note = document.getElementById('smb_monthly_auto_note') || {};
+      const hint = document.getElementById('smb_monthly_hint');
+      if (hint && hint.style) hint.style.display = auto && val ? 'none' : '';
       if (!auto) { note.textContent = ''; return; }
       const next = val ? val.toLocaleString('ko-KR') : '';
       note.textContent = val ? '자동 · ' + how : '';
@@ -7735,11 +7733,8 @@
       const btn = document.querySelector('button[onclick^="autoGenerateBusinessPlan"]'); if (!btn) return;
       const card = btn.closest('.rounded-2xl'); if (!card) return;
       card.querySelectorAll('label.font-extrabold').forEach(lab => {
-        const p = lab.nextElementSibling; if (!p || p.tagName !== 'P' || lab.querySelector('.bp-guide-btn')) return;
+        const p = lab.nextElementSibling; if (!p || p.tagName !== 'P') return;
         p.classList.add('bp-guide-hidden');
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'bp-guide-btn'; b.textContent = '작성 요령'; b.setAttribute('aria-expanded', 'false');
-        b.addEventListener('click', e => { e.preventDefault(); const open = p.classList.toggle('bp-guide-hidden') === false; b.setAttribute('aria-expanded', String(open)); });
-        lab.appendChild(b);
       });
     }
     // 단계별 핵심 입력 진행(n/m) — 왼쪽 단계 목록에 표시
@@ -8237,6 +8232,7 @@
         currentClientId = d.clientId && readClientStore().clients[d.clientId] ? d.clientId : '';
         applyFormData(d.data);
         setClientStatus('이전에 작성하던 내용을 불러왔습니다 · ' + timeLabel(d.data.savedAt));
+        { const msg = document.getElementById('client_status')?.textContent; setTimeout(() => { const el = document.getElementById('client_status'); if (el && el.textContent === msg) el.textContent = ''; }, 6000); }
         return true;
       } catch (e) { return false; }
     }
@@ -8548,6 +8544,7 @@
       document.getElementById('auth_user_name').innerText = profile.name || profile.email;
       document.getElementById('auth_user_role').innerText = (org ? org.name + ' · ' : '') + (ROLE_LABEL[profile.role] || profile.role);
       document.getElementById('auth_admin_btn').classList.toggle('hidden', !['org_admin', 'operator'].includes(profile.role));
+      document.getElementById('demo_btn')?.classList.toggle('hidden', !['org_admin', 'operator'].includes(profile.role));
       // 펌이 올린 로고가 있으면 좌측 상단 로고를 그 로고로 바꾼다 (다크·라이트 공통)
       // 머리글 로고는 서비스 로고(MSC report)로 고정. 펌 로고는 서식·내 정보에서만 쓴다
       // 담당 컨설턴트 칸이 비어 있으면 로그인한 사람 이름으로 채운다
@@ -13633,6 +13630,17 @@
     #hist_pop .ch .x:hover, #hist_pop .ch .x:focus-visible { border-color: var(--t-red-text, #A32D2D); color: var(--t-red-text, #A32D2D); background: var(--t-red-soft, #FCEBEB); }
     @media print { #l3_bar, #hist_pop { display: none !important; } }
     @media (max-width: 640px) { #l3_bar .st { display: none; } }
+    /* 카드 안 '서류로 채우기' — 주 입구는 맨 위 서류 카드, 여기는 작은 글 링크(L-184) */
+    .docs-link { padding: 2px 4px; border: 0; background: none; color: #0f766e; font-size: 11.5px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; }
+    .docs-link:hover { color: #115e59; }
+    .fa-wait { margin: 8px 0 0; padding: 8px 10px; border: 1px dashed #cbd5e1; border-radius: 10px; font-size: 11.5px; color: #475569; }
+    .docs-link:focus-visible { outline: 2px solid #169aa8; outline-offset: 2px; border-radius: 4px; }
+    @media (max-width: 640px) {
+      #docs_card .docs-kinds-line { display: none; }
+      #theme_toggle_btn { display: none; }
+      #report_key_chips button { padding: 4px 10px; font-size: 11.5px; }
+      .bp-ready .ok { display: none; }
+    }
     /* 휴대폰(예전 화면) 머리글: 로고·화면 탭이 화면보다 넓어 페이지 전체가 축소되던 것(L-183) */
     #app_header .tab-short { display: none; }
     @media (max-width: 640px) {
