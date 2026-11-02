@@ -431,6 +431,7 @@
   const signed = s => { const t = norm(s).replace(/[,\s]/g, ''); if (/^\(.*\)$/.test(t) || /^△/.test(t)) return -Number(t.replace(/[()△]/g, '')); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
   const won2baek = v => v === null ? null : Math.round(v / 1e5) / 10;   // 원 → 백만원(소수 1자리)
   const won2man = v => v === null ? null : Math.round(v / 1e4);         // 원 → 만원
+  const won2chun = v => v === null ? null : Math.round(v / 1e3);        // 원 → 천원(소상공인 실태 칸, L-187)
 
   const DOC_TYPES = [
     ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
@@ -700,7 +701,7 @@
     });
     const f = {};
     const meta = {};
-    if (m) { f.smb_monthly_sales = won2man(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
+    if (m) { f.smb_monthly_sales = won2chun(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
     const no = bizNoOf(labelValue(rows, /사업자등록번호$/) || ''); if (no) f.corp_biz_no = no;
     const ceo = labelValue(rows, /^성명\(대표자\)$/); if (ceo) f.corp_ceo = ceo.split(/\s*주민/)[0].trim();
     return { fields: f, meta, yearTotals, halfTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
@@ -1178,7 +1179,7 @@
       f.corp_house = monthlyLine && monthlyLine.v ? '임차 거주 (월세)' : '임차 거주 (전세)';
       meta.corp_house = { conf: 0.7, note: '주거용 계약 — 대표자 본인 계약인지 확인' };
     } else if (monthlyLine) {
-      f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e4));
+      f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e3));
       meta.smb_cost_rent = { conf: 0.7, src: monthlyLine.v, note: '부가세 별도 여부 확인' };
     }
     if (deposit) info.push('보증금 ' + Math.round(deposit.v / 1e4).toLocaleString('ko-KR') + '만원' + (sumOk ? '' : ' (확인 필요)'));
@@ -2133,7 +2134,7 @@
         ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
         ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
       if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
-      if (k === 0 && v.sales) { f._monthlyFromFs = won2man(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
+      if (k === 0 && v.sales) { f._monthlyFromFs = won2chun(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;
     return f;

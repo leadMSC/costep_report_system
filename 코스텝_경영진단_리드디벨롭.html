@@ -732,6 +732,7 @@
           <span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span>
           <span>진단 건 정보</span>
         </h3>
+        <div id="size_auto_line" class="size-auto" aria-live="polite"></div>
         <div>
           <label class="font-bold text-slate-700 block mb-1.5 text-xs">상담 분야 (만들 보고서)</label>
           <div id="report_key_chips" class="space-y-1.5 text-xs"></div>
@@ -787,8 +788,8 @@
         </div>
       </div>
 
-      <!-- Card 1: Target Tier & 10 Industries Selector -->
-      <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-700 space-y-4">
+      <!-- Card 1: 기업 규모·주업종 — L-188 자동 판정만(규모는 법정 기준, 주업종은 고객사 정보 종목) → 카드는 숨기고 진단 건 정보에 한 줄 -->
+      <div id="size_card" hidden class="hidden bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-700 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div class="flex items-center space-x-3">
             <h2 class="text-sm sm:text-base font-extrabold text-white tracking-tight">기업 규모 · 주업종</h2>
@@ -1163,16 +1164,16 @@
             </div>
             <div class="flex items-center space-x-1.5">
               <input type="text" id="smb_monthly_sales" value="" placeholder="월평균 매출액 기재" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-3 font-mono text-blue-900">
-              <span class="text-xs font-extrabold text-slate-700">만원</span>
+              <span class="text-xs font-extrabold text-slate-700">천원</span>
               <span id="smb_monthly_auto_note" class="text-[10.5px] font-bold text-[#0f766e] whitespace-nowrap"></span>
             </div>
             <p id="smb_monthly_hint" class="text-[11px] text-slate-500">※ 부가가치세 과세표준증명원 또는 사업용 계좌 최근 월평균 입금액을 기재합니다.</p>
-            <!-- 연 매출: 해당연도(누적)와 직전 3개년, 단위 만원 — 보고서 경영수지 표에 추이로 나온다 -->
+            <!-- 연 매출: 해당연도(누적)와 직전 3개년, 단위 천원(L-187) — 보고서 경영수지 표에 추이로 나온다 -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1" id="smb_years_box">
-              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_cur_lb">올해 누적</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_cur" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">만원</span></div></div>
-              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_y1_lb">작년</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_y1" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">만원</span></div></div>
-              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_y2_lb">2년 전</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_y2" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">만원</span></div></div>
-              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_y3_lb">3년 전</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_y3" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">만원</span></div></div>
+              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_cur_lb">올해 누적</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_cur" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">천원</span></div></div>
+              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_y1_lb">작년</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_y1" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">천원</span></div></div>
+              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_y2_lb">2년 전</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_y2" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">천원</span></div></div>
+              <div><label class="text-[11px] font-bold text-slate-600 block mb-0.5" id="smb_sales_y3_lb">3년 전</label><div class="flex items-center gap-1"><input type="text" id="smb_sales_y3" value="" placeholder="0" oninput="formatNumberInput(this); syncCompanyData();" class="form-input-control text-xs text-right font-mono"><span class="text-[11px] text-slate-600 shrink-0">천원</span></div></div>
             </div>
           </div>
 
@@ -1214,35 +1215,35 @@
               <label class="text-[11px] font-bold text-slate-700 block mb-1">① 사업장 월 임차료</label>
               <div class="flex items-center">
                 <input type="text" id="smb_cost_rent" value="" placeholder="0" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-2 font-mono">
-                <span class="text-xs text-slate-500 ml-1">만원</span>
+                <span class="text-xs text-slate-500 ml-1">천원</span>
               </div>
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-700 block mb-1">② 제세공과금 및 관리비</label>
               <div class="flex items-center">
                 <input type="text" id="smb_cost_util" value="" placeholder="0" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-2 font-mono">
-                <span class="text-xs text-slate-500 ml-1">만원</span>
+                <span class="text-xs text-slate-500 ml-1">천원</span>
               </div>
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-700 block mb-1">③ 인건비 (급여·상여 등)</label>
               <div class="flex items-center">
                 <input type="text" id="smb_cost_labor" value="" placeholder="0" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-2 font-mono">
-                <span class="text-xs text-slate-500 ml-1">만원</span>
+                <span class="text-xs text-slate-500 ml-1">천원</span>
               </div>
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-700 block mb-1">④ 지급수수료·통신·렌탈비</label>
               <div class="flex items-center">
                 <input type="text" id="smb_cost_rental" value="" placeholder="0" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-2 font-mono">
-                <span class="text-xs text-slate-500 ml-1">만원</span>
+                <span class="text-xs text-slate-500 ml-1">천원</span>
               </div>
             </div>
             <div>
               <label class="text-[11px] font-bold text-slate-700 block mb-1">⑤ 금융비용 (월 차입이자)</label>
               <div class="flex items-center">
                 <input type="text" id="smb_cost_interest" value="" placeholder="0" oninput="formatNumberInput(this); calcSmbMetrics();" class="form-input-control text-xs font-bold text-right pr-2 font-mono text-amber-700">
-                <span class="text-xs text-slate-500 ml-1">만원</span>
+                <span class="text-xs text-slate-500 ml-1">천원</span>
               </div>
             </div>
           </div>
@@ -1252,12 +1253,12 @@
             <div class="flex items-center space-x-2">
               <span class="px-2 py-0.5 rounded bg-blue-500 text-white text-[10px] font-black">실시간 자동산출</span>
               <span class="text-xs text-slate-200">월간 고정경비 합계:</span>
-              <span id="smb_disp_fixed_total" class="text-base font-black text-amber-300">720만원</span>
+              <span id="smb_disp_fixed_total" class="text-base font-black text-amber-300">0천원</span>
             </div>
             <div class="flex items-center space-x-3 text-xs text-white">
               <div>
                 <span>손익분기 매출 기준액:</span>
-                <span>하루 <strong id="smb_disp_daily_req" class="text-amber-300 font-black text-sm whitespace-nowrap">28.8만원</strong> / 한 달 <strong id="smb_disp_monthly_req" class="text-amber-300 font-black text-sm whitespace-nowrap">1,440만원</strong></span>
+                <span>하루 <strong id="smb_disp_daily_req" class="text-amber-300 font-black text-sm whitespace-nowrap">0천원</strong> / 한 달 <strong id="smb_disp_monthly_req" class="text-amber-300 font-black text-sm whitespace-nowrap">0천원</strong></span>
               </div>
               <div id="smb_disp_sales_stat" class="pl-2 border-l border-blue-400">
                 <!-- Injected via calcSmbMetrics() -->
@@ -3649,7 +3650,7 @@
       // (부채총계 sme_debt 는 결산서 값이므로 대출표로 덮어쓰지 않는다)
       const smbIntInput = document.getElementById('smb_cost_interest');
       if (smbIntInput && totalBal > 0) {
-        smbIntInput.value = Math.round(totalMonthlyInt).toLocaleString();
+        smbIntInput.value = Math.round(totalMonthlyInt * 10).toLocaleString();   // 대출표 저장 만원 → 실태 칸 천원
         window.__smbIntAuto = smbIntInput.value;
       } else if (smbIntInput && !items.length && window.__smbIntAuto !== undefined && smbIntInput.value === window.__smbIntAuto) {
         // 대출을 모두 지웠으면 대출표에서 채운 이자도 비움(직접 쓴 값은 둠)
@@ -3704,24 +3705,24 @@
 
       const fixedTotal = rent + util + labor + rental + interest;
       const monthlyReq = Math.round(fixedTotal * 2.0);
-      const dailyReq = (monthlyReq / 25).toFixed(1);
+      const dailyReq = Math.round(monthlyReq / 25);
 
       const dispTotal = document.getElementById('smb_disp_fixed_total');
       const dispMonthly = document.getElementById('smb_disp_monthly_req');
       const dispDaily = document.getElementById('smb_disp_daily_req');
       const dispSalesStat = document.getElementById('smb_disp_sales_stat');
 
-      if (dispTotal) dispTotal.innerText = fixedTotal.toLocaleString() + '만원';
-      if (dispMonthly) dispMonthly.innerText = monthlyReq.toLocaleString() + '만원';
-      if (dispDaily) dispDaily.innerText = Number(dailyReq).toLocaleString() + '만원';
+      if (dispTotal) dispTotal.innerText = fixedTotal.toLocaleString() + '천원';
+      if (dispMonthly) dispMonthly.innerText = monthlyReq.toLocaleString() + '천원';
+      if (dispDaily) dispDaily.innerText = Number(dailyReq).toLocaleString() + '천원';
 
       if (dispSalesStat) {
         if (monthlySales > 0) {
           const gap = monthlySales - monthlyReq;
           if (gap >= 0) {
-            dispSalesStat.innerHTML = `<span class="text-emerald-300 font-black">수지균형 초과 (+${gap.toLocaleString()}만원 안정)</span>`;
+            dispSalesStat.innerHTML = `<span class="text-emerald-300 font-black">수지균형 초과 (+${gap.toLocaleString()}천원 안정)</span>`;
           } else {
-            dispSalesStat.innerHTML = `<span class="text-rose-300 font-black">수지균형 부족 (${Math.abs(gap).toLocaleString()}만원 적자위험)</span>`;
+            dispSalesStat.innerHTML = `<span class="text-rose-300 font-black">수지균형 부족 (${Math.abs(gap).toLocaleString()}천원 적자위험)</span>`;
           }
         } else {
           dispSalesStat.innerHTML = `<span class="text-slate-300">매출액 기재 시 수지 자동대사</span>`;
@@ -3771,8 +3772,8 @@
       if (est) { const d = new Date(est + 'T00:00:00'), now = new Date(); if (!isNaN(d) && d > now) estFuture = true; if (!isNaN(d) && d <= now) years = now.getFullYear() - d.getFullYear() - ((now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) ? 1 : 0); }
       // 매출
       const mon = num('smb_monthly_sales'), fs = num('sme_sales');
-      const salesText = size === 'smb' ? (mon ? `월평균 매출 ${mon.toLocaleString()}만원` : '') : (fs ? `연매출 ${fs.toLocaleString()}백만원` : (mon ? `월평균 매출 ${mon.toLocaleString()}만원` : ''));
-      const annualSales = fs ? fs * 100 : mon ? mon * 12 : null;   // 만원
+      const salesText = size === 'smb' ? (mon ? `월평균 매출 ${mon.toLocaleString()}천원` : '') : (fs ? `연매출 ${fs.toLocaleString()}백만원` : (mon ? `월평균 매출 ${mon.toLocaleString()}천원` : ''));
+      const annualSales = fs ? fs * 100 : mon ? mon * 12 / 10 : null;   // 만원(대출표 합계와 비교). 소상공인 월평균은 천원
       const y1 = num('smb_sales_y1'), y2 = num('smb_sales_y2');
       // 대표자 나이·성별(주민번호 → 생년월일 순)
       let ceoAge = null, ceoSex = '';
@@ -5302,7 +5303,7 @@
         const total = costs.reduce((a, c) => a + c[1], 0);
         if (total > 0) {
           const top = costs.sort((a, b) => b[1] - a[1])[0];
-          items.push(`고정비 구조: 월 ${total.toLocaleString()}만원 중 ${top[0]}가 ${fmtPct(top[1] / total * 100)}로 가장 큼 — 절감 협상 우선 대상`);
+          items.push(`고정비 구조: 월 ${total.toLocaleString()}천원 중 ${top[0]}가 ${fmtPct(top[1] / total * 100)}로 가장 큼 — 절감 협상 우선 대상`);
         }
         const t = triOf;   // 'yes' | 'no' | '' (미확인 — 결과물에 쓰지 않음)
         if (t('smb_chk_tax_ok') === 'no') items.push('세금 체납 확인 필요 — 체납은 대부분의 정책자금·지원사업 제외 사유이므로 완납·분납 승인이 선행 과제');
@@ -5617,17 +5618,17 @@
       const salesRaw = (document.getElementById('smb_monthly_sales')?.value || '').trim();
       const monthlySales = parseNumber(salesRaw);
       const salesEntered = salesRaw !== '';
-      const monthlySalesStr = salesEntered ? monthlySales.toLocaleString() + '만원' : '미기재';
-      // 연 매출 추이(만원): 적힌 해만 — 하나도 없으면 줄 자체를 넣지 않는다
+      const monthlySalesStr = salesEntered ? monthlySales.toLocaleString() + '천원' : '미기재';
+      // 연 매출 추이(천원): 적힌 해만 — 하나도 없으면 줄 자체를 넣지 않는다
       const yNowR = new Date().getFullYear();
       const smbYears = [['smb_sales_y3', yNowR - 3], ['smb_sales_y2', yNowR - 2], ['smb_sales_y1', yNowR - 1], ['smb_sales_cur', yNowR]]
         .map(([id, y]) => ({ y, v: (document.getElementById(id)?.value || '').trim() })).filter(x => x.v !== '');
-      const smbYearsHtml = smbYears.length ? `<div class="text-[9.5px] text-slate-700 py-0.5"><span class="font-bold text-[#0f766e]">· 연 매출 추이(만원):</span> ${smbYears.map(x => `${x.y}년${x.y === yNowR ? '(누적)' : ''} <strong class="font-mono">${escapeHtml(x.v)}</strong>`).join(' → ')}</div>` : '';
-      const fixedTotal = document.getElementById('smb_disp_fixed_total')?.innerText || '0만원';
+      const smbYearsHtml = smbYears.length ? `<div class="text-[9.5px] text-slate-700 py-0.5"><span class="font-bold text-[#0f766e]">· 연 매출 추이(천원):</span> ${smbYears.map(x => `${x.y}년${x.y === yNowR ? '(누적)' : ''} <strong class="font-mono">${escapeHtml(x.v)}</strong>`).join(' → ')}</div>` : '';
+      const fixedTotal = document.getElementById('smb_disp_fixed_total')?.innerText || '0천원';
       const fixedEntered = parseNumber(fixedTotal) > 0;
       // 고정비가 비어 있으면 손익분기를 0원으로 적지 않고 '산정 불가'로 표기
-      const dailyReq = fixedEntered ? (document.getElementById('smb_disp_daily_req')?.innerText || '0만원') : '산정 불가(고정비 미기재)';
-      const monthlyReq = fixedEntered ? (document.getElementById('smb_disp_monthly_req')?.innerText || '0만원') : '산정 불가(고정비 미기재)';
+      const dailyReq = fixedEntered ? (document.getElementById('smb_disp_daily_req')?.innerText || '0천원') : '산정 불가(고정비 미기재)';
+      const monthlyReq = fixedEntered ? (document.getElementById('smb_disp_monthly_req')?.innerText || '0천원') : '산정 불가(고정비 미기재)';
       const monthlyReqNum = fixedEntered ? parseNumber(monthlyReq) : 0;
       const isSurplus = monthlySales >= monthlyReqNum && monthlySales > 0;
       let statusStr;
@@ -5635,8 +5636,8 @@
       else if (monthlySales === 0) statusStr = '월 매출 0원 기재 (휴업·개업 준비 여부 확인 필요)';
       else if (!fixedEntered) statusStr = '월 고정비 미기재로 손익분기 판정 불가';
       else statusStr = isSurplus
-        ? `손익분기점 초과 달성 (월 기준액 대비 +${(monthlySales - monthlyReqNum).toLocaleString()}만원 흑자 운용)`
-        : `손익분기점 미달 (월 고정비 충당에 최소 ${(monthlyReqNum - monthlySales).toLocaleString()}만원 추가 확보 필요)`;
+        ? `손익분기점 초과 달성 (월 기준액 대비 +${(monthlySales - monthlyReqNum).toLocaleString()}천원 흑자 운용)`
+        : `손익분기점 미달 (월 고정비 충당에 최소 ${(monthlyReqNum - monthlySales).toLocaleString()}천원 추가 확보 필요)`;
 
       const rentVal = parseNumber(escapeHtml(document.getElementById('smb_cost_rent')?.value) || 0);
       const utilVal = parseNumber(escapeHtml(document.getElementById('smb_cost_util')?.value) || 0);
@@ -5921,7 +5922,7 @@
                   ${(() => {   // 채움 = 월평균 매출, 세로 선 = 손익분기 매출(L-158 D-4)
                     if (!fixedEntered || !salesEntered || !(monthlyReqNum > 0) || !(monthlySales > 0)) return '';
                     const mx = Math.max(monthlySales, monthlyReqNum) * 1.08, pct = Math.round(monthlySales / monthlyReqNum * 100), ok = monthlySales >= monthlyReqNum;
-                    return `<span class="bep-mini" title="월평균 매출 ${monthlySales.toLocaleString()}만원 / 손익분기 ${monthlyReqNum.toLocaleString()}만원 — 손익분기 대비 ${pct}%"><i class="${ok ? 'ok' : 'low'}" style="width:${(monthlySales / mx * 100).toFixed(1)}%"></i><em style="left:${(monthlyReqNum / mx * 100).toFixed(1)}%"></em></span>`;
+                    return `<span class="bep-mini" title="월평균 매출 ${monthlySales.toLocaleString()}천원 / 손익분기 ${monthlyReqNum.toLocaleString()}천원 — 손익분기 대비 ${pct}%"><i class="${ok ? 'ok' : 'low'}" style="width:${(monthlySales / mx * 100).toFixed(1)}%"></i><em style="left:${(monthlyReqNum / mx * 100).toFixed(1)}%"></em></span>`;
                   })()}
                 </div>
                 <div class="bg-white p-1 rounded border border-slate-200">
@@ -5930,7 +5931,7 @@
                 </div>
               </div>
               <div class="bg-white p-1 rounded border border-slate-200 text-[9px] text-slate-600 flex justify-between">
-                <span>· 고정비 명세: 임차료 ${rentVal}만원, 관리비 ${utilVal}만원, 인건비 ${laborVal}만원, 렌탈·통신 ${rentalVal}만원, 차입이자 ${intVal}만원</span>
+                <span>· 고정비 명세(천원): 임차료 ${rentVal.toLocaleString()}, 관리비 ${utilVal.toLocaleString()}, 인건비 ${laborVal.toLocaleString()}, 렌탈·통신 ${rentalVal.toLocaleString()}, 차입이자 ${intVal.toLocaleString()}</span>
                 <span>· 점포면적: ${areaPyung}평 | 근로계약: ${chkContract} | 사회보험: ${chkInsurance}</span>
               </div>
             </div>
@@ -6258,7 +6259,7 @@
       const num = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.]/g, '')); return v > 0 ? v : null; };
       const tSales = num('bp_target_sales'), hire = num('bp_target_hire');
       if (!tSales && !hire) return '';
-      const cur = (window.appState.bizTrack === 'smb' ? null : num('sme_sales')) || (num('smb_monthly_sales') ? num('smb_monthly_sales') * 12 / 100 : null);   // 백만원(소상공인은 월평균×12)
+      const cur = (window.appState.bizTrack === 'smb' ? null : num('sme_sales')) || (num('smb_monthly_sales') ? num('smb_monthly_sales') * 12 / 1000 : null);   // 백만원(소상공인은 월평균 천원×12)
       const emp = num('sme_employees') || 0;
       let html = '<div class="bp-fig bp-goal">';
       if (tSales) {
@@ -6959,14 +6960,14 @@
       document.getElementById('consultant_name').value = '홍길동 경영컨설턴트';
 
       // SMB values (with commas)
-      [['smb_sales_y3', '42,000'], ['smb_sales_y2', '46,800'], ['smb_sales_y1', '51,600'], ['smb_sales_cur', '38,400']].forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
+      [['smb_sales_y3', '420,000'], ['smb_sales_y2', '468,000'], ['smb_sales_y1', '516,000'], ['smb_sales_cur', '384,000']].forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
       const elSales = document.getElementById('smb_monthly_sales');
-      if (elSales) elSales.value = '1,850';
-      document.getElementById('smb_cost_rent').value = '220';
-      document.getElementById('smb_cost_util').value = '50';
-      document.getElementById('smb_cost_labor').value = '350';
-      document.getElementById('smb_cost_rental').value = '35';
-      document.getElementById('smb_cost_interest').value = '65';
+      if (elSales) elSales.value = '18,500';
+      document.getElementById('smb_cost_rent').value = '2,200';
+      document.getElementById('smb_cost_util').value = '500';
+      document.getElementById('smb_cost_labor').value = '3,500';
+      document.getElementById('smb_cost_rental').value = '350';
+      document.getElementById('smb_cost_interest').value = '650';
 
       // SME values (with commas)
       const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
@@ -7293,9 +7294,6 @@
     }
 
     // 법정 규모 기준(표준산업분류 코드로): 진단 대상 단계에 '이 업종은 소상공인 ○명 미만 · 소기업 ○억 이하 · 중소기업 ○억 이하 → 지금 값이면 ○○' 표시
-    var SMB_SALES_EOK = 20;
-    var SMALL_EMP = 5;
-    var SIZE_WHY = { nofs: '재무제표가 없어 코스텝 기준 소상공인', le20: `재무제표 연매출이 ${SMB_SALES_EOK}억 이하라 코스텝 기준 소상공인`, emp5: `4대보험 가입자가 ${SMALL_EMP}명 이상이라 코스텝 기준 소기업` };
     function sizeContext() {
       const PP = window.MSCDocParsers; if (!PP || !PP.sizeRule) return null;
       let code = '', basis = '확정';
@@ -7309,61 +7307,45 @@
       const num = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.]/g, '')); return v > 0 ? v : null; };
       const emp = num('sme_employees');
       const fsMil = num('sme_sales'), mon = num('smb_monthly_sales');
-      const salesEok = fsMil ? fsMil / 100 : mon ? mon * 12 / 10000 : null;
-      // 코스텝 기준(L-179): 재무제표가 없거나, 있어도 연매출 20억 이하면 소상공인. 그 밖에는 법정 기준
-      // (L-180) 단, 4대보험 가입자 5명 이상이면 소상공인 대신 소기업
-      const hasFs = ['sme_sales', 'sme_sales_2024', 'sme_sales_2023', 'sme_assets', 'sme_equity', 'sme_debt'].some(num);
-      let why = !hasFs ? 'nofs' : fsMil && fsMil / 100 <= SMB_SALES_EOK ? 'le20' : '';
-      let tier = why ? 'smb' : rule ? PP.sizeTier(rule, emp, salesEok) : null;
-      if (tier === 'smb' && emp != null && emp >= SMALL_EMP) { tier = 'small'; why = 'emp5'; }
-      return { code, basis, rule, emp, salesEok, tier, why, hasFs };
+      const salesEok = fsMil ? fsMil / 100 : mon ? mon * 12 / 100000 : null;   // 소상공인 월평균은 천원
+      // 법정 기준만(L-186): 소상공인기본법(근로자 수)·중소기업기본법 시행령 별표 1·3(매출). L-179·L-180 코스텝 기준은 폐지
+      const tier = rule ? PP.sizeTier(rule, emp, salesEok) : null;
+      return { code, basis, rule, emp, salesEok, tier };
     }
     window.sizeContext = sizeContext;
+    // 기업 규모 한 줄(L-188): 법정 기준으로 자동 — 손으로 고르는 단추 없음
     function renderSizeRule() {
-      const box = document.getElementById('size_rule_box'); if (!box) return;
+      const box = document.getElementById('size_auto_line'); if (!box) return;
       const c = sizeContext();
-      const name = { smb: '소상공인', small: '소기업', sme: '중기업', over: '중소기업 기준 초과' };
-      const why = c && c.why ? `<b>${SIZE_WHY[c.why]}</b>으로 봐요` + (c.why === 'nofs' ? ' — 재무제표를 올리면 다시 판정해요' : '') + (window.appState.bizTrack === c.tier ? ' <span class="ok">· 지금 선택과 같아요</span>' : `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`) : '';
-      if (!c || !c.rule) { box.innerHTML = why || '고객사 정보의 종목(표준산업분류)을 정하면 업종별 법정 기준으로 규모를 판정해 줘요.'; return; }
-      if (why) { box.innerHTML = why; return; }
-      const r = c.rule;
-      const now = [c.emp != null ? `근로자 ${c.emp.toLocaleString()}명` : '', c.salesEok != null ? `연매출 약 ${c.salesEok.toFixed(1)}억` : ''].filter(Boolean).join(' · ');
-      const cur = window.appState.bizTrack;
-      box.innerHTML = `${escapeHtml(c.code)}(${c.basis}) 법정 기준 — 소상공인: 근로자 <b>${r.smbEmp}명 미만</b> · 소기업: 매출 <b>${r.smallEok.toLocaleString()}억 이하</b> · 중소기업: <b>${r.smeEok.toLocaleString()}억 이하</b>`
-        + (c.salesEok == null ? '<br><span style="color:#fcd34d;font-weight:700">임시 선택</span> — 실태·재무 단계에서 매출을 넣으면 법정 기준으로 다시 판정해 알려 드려요' : '')
-        + (c.tier ? `<br>지금 값(${now})이면 <b>${name[c.tier]}</b>` + (c.tier !== 'over' && c.tier !== cur ? `<button type="button" class="go" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>` : c.tier === cur ? ' <span class="ok">· 지금 선택과 같아요</span>' : '') : `<br>${now ? '지금 값(' + now + ')으로는 판정이 부족해요 — 연매출을 넣어 주세요' : '근로자 수·연매출을 넣으면 판정해요'}`);
+      const name = { smb: '소상공인', small: '소기업', sme: '중기업' };
+      const cur = window.appState.bizTrack, ind = (document.getElementById('ind_btn_' + window.appState.industryTrack)?.textContent || '').trim();
+      const now = c ? [c.code ? `${escapeHtml(c.code)}${c.basis === '확정' ? '' : '(추천)'}` : '', c.emp != null ? `근로자 ${c.emp.toLocaleString()}명` : '', c.salesEok != null ? `연매출 약 ${c.salesEok.toFixed(1)}억` : ''].filter(Boolean).join(' · ') : '';
+      let why;
+      if (!c || !c.rule) why = '고객사 정보의 종목을 넣으면 법정 기준으로 정해져요';
+      else if (c.tier === 'over') why = `법정 중소기업 기준 초과(${now}) — 중기업 서식으로 작성`;
+      else if (!c.tier) why = `${now ? now + ' — ' : ''}근로자 수(4대보험)·매출을 넣으면 정해져요`;
+      else if (c.emp == null && c.tier === 'small' && cur === 'smb') why = `${now} — 근로자 수(4대보험)를 넣으면 소상공인·소기업이 정해져요`;
+      else why = `법정 기준 · ${now}`;
+      box.innerHTML = `<span class="k">기업 규모</span><b>${name[cur] || cur}</b><span class="w">${why}</span>${ind ? `<span class="k">업종 서식</span><b>${escapeHtml(ind)}</b>` : ''}`;
     }
     window.renderSizeRule = renderSizeRule;
     // 실태·재무 단계 맨 위: 넣은 매출·근로자 수로 본 법정 규모가 지금 고른 규모와 다르면 바로 알림
-    function renderSizeNote() {
-      const c = sizeContext ? sizeContext() : null, cur = window.appState.bizTrack;
-      const name = { smb: '소상공인', small: '소기업', sme: '중기업' };
-      ['section_smb_input', 'section_sme_input'].forEach(id => {
-        const sec = document.getElementById(id); if (!sec) return;
-        let n = sec.querySelector(':scope > .size-note');
-        if (!n) { n = document.createElement('div'); n.className = 'size-note hidden rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-wrap items-center gap-2'; sec.insertBefore(n, sec.firstChild); }
-        const diff = c && c.tier && c.tier !== 'over' && c.tier !== cur && (c.why || (c.rule && c.salesEok != null));
-        n.classList.toggle('hidden', !diff);
-        if (diff && c.why) n.innerHTML = `<span class="mr-auto">${SIZE_WHY[c.why]}입니다. 지금은 ${name[cur] || cur}${josaRo(name[cur] || cur)} 작성 중이에요.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`;
-        else if (diff) n.innerHTML = `<span class="mr-auto">넣은 값(연매출 약 ${c.salesEok.toFixed(1)}억${c.emp != null ? ' · 근로자 ' + c.emp + '명' : ''})으로 보면 법정 기준 <b>${name[c.tier]}</b>입니다. 지금은 ${name[cur] || cur}${josaRo(name[cur] || cur)} 작성 중이에요.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer" onclick="setBizTrack('${c.tier}')">${name[c.tier]}${josaRo(name[c.tier])} 바꾸기</button>`;
-      });
-    }
+    // (L-187) 실태·재무 단계 맨 위 규모 알림 띠는 없앰. 규모는 진단 대상 단계 안내와 자동 전환 알림으로 본다
+    function renderSizeNote() { document.querySelectorAll('#section_smb_input > .size-note, #section_sme_input > .size-note').forEach(n => n.remove()); }
     window.renderSizeNote = renderSizeNote;
     // 규모 자동 판정(L-178): 매출·근로자 수로 법정 규모가 분명하면 그 규모로 바꾼다. 같은 값으로는 한 번만(손으로 고른 규모를 계속 덮지 않게).
     // 근로자 수를 모르면 소상공인·소기업을 가를 수 없으므로, 그 둘 사이는 바꾸지 않는다
-    function sizeAutoKey(c) { return !c ? '' : !c.hasFs && c.why ? 'nofs|' + c.tier : [c.code, c.tier, c.salesEok, c.emp].join('|'); }
     function autoSizeTier() {
       if (window.__applyingForm) return;
       const c = sizeContext ? sizeContext() : null;
-      if (!c || !c.tier || c.tier === 'over' || (!c.why && (!c.rule || c.salesEok == null))) return;
-      const key = sizeAutoKey(c); if (key === window.__autoTierKey) return;
-      window.__autoTierKey = key;
+      if (!c || !c.tier || !c.rule) return;
+      const want = c.tier === 'over' ? 'sme' : c.tier;
       const cur = window.appState.bizTrack;
-      if (c.tier === cur) return;
-      if (!c.why && c.emp == null && ['smb', 'small'].includes(c.tier) && ['smb', 'small'].includes(cur)) return;
+      if (want === cur) return;
+      if (c.emp == null && ['smb', 'small'].includes(want) && ['smb', 'small'].includes(cur)) return;
       const name = { smb: '소상공인', small: '소기업', sme: '중기업' };
-      setBizTrack(c.tier);
-      if (window.appToast) window.appToast(c.why ? `${SIZE_WHY[c.why]}이라 규모를 바꿨어요` : `매출${c.emp != null ? '·근로자 수' : ''}로 보면 법정 기준 ${name[c.tier]}이라 규모를 바꿨어요`, { action: '되돌리기', onAction: () => setBizTrack(cur) });
+      setBizTrack(want);
+      if (window.appToast && !window.__sizeQuiet) window.appToast(`법정 기준으로 기업 규모가 ${name[want]}${josaRo(name[want])} 정해졌어요`);
     }
     window.autoSizeTier = autoSizeTier;
     // 소상공인 월평균 매출 자동(L-178): 작년 연매출 ÷ 12, 작년이 없으면 올해 누적 ÷ 지난 달 수. 직접 적은 값은 그대로 둔다
@@ -8033,6 +8015,7 @@
       const allowed = () => {
         const p = (window.appState && window.appState.auth || {}).profile;
         if (p && /박수혁|김믿음/.test(String(p.name || '').replace(/\s+/g, ''))) return true;
+        if (p && p.role === 'operator') return true;   // 서비스 운영자(이름이 다르게 등록돼 있어도)
         return /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]plog=1\b/.test(location.search);
       };
       window.plogGate = () => {
@@ -8069,7 +8052,8 @@
     // 화면 ↔ 데이터: 입력 전체를 JSON 하나로 모으고(collectFormData), 되돌린다(applyFormData)
     // 고객별 저장은 이 PC 브라우저(localStorage)에만 하고, 작성 중인 내용은 자동 저장한다
     // =========================================================================
-    const FORM_DATA_VERSION = 1;
+    const FORM_DATA_VERSION = 2;   // 2: 소상공인 실태 금액 만원 → 천원(L-187)
+    const SMB_CHUN_IDS = ['smb_monthly_sales', 'smb_sales_cur', 'smb_sales_y1', 'smb_sales_y2', 'smb_sales_y3', 'smb_cost_rent', 'smb_cost_util', 'smb_cost_labor', 'smb_cost_rental', 'smb_cost_interest'];
     const CLIENT_STORE_KEY = 'COSTEP_CLIENTS_V1';
     const DRAFT_KEY = 'COSTEP_DRAFT_V1';
     // 저장 묶음: 로그인 전·로컬 검증은 'local'(예전 키 그대로), 로그인하면 계정 id 별로 따로 저장한다.
@@ -8113,8 +8097,8 @@
     // ===== 금액 칸 단위 안내: 만원·백만원 칸에 원 단위로 친 것 같으면 바꿔 주기 =====
     // 칸마다 [단위, 이 값 이상이면 의심]. 월 금액은 10억/월, 연 금액은 100억(만원)·1조(백만원) 이상을 의심
     const UNIT_RULES = [
-      [/^smb_(monthly_sales|cost_(rent|util|labor|rental|interest))$/, '만원', 100000],
-      [/^smb_sales_(cur|y1|y2|y3)$/, '만원', 1000000],
+      [/^smb_(monthly_sales|cost_(rent|util|labor|rental|interest))$/, '천원', 1000000],
+      [/^smb_sales_(cur|y1|y2|y3)$/, '천원', 10000000],
       [/^sme_(sales|profit|debt|equity|net|assets|capital|st_loan|lt_loan|quick|cur_liab|int_exp|int_inc|ar|inv|ap|unpaid|loan_to_ceo)(_20\d\d)?$/, '백만원', 1000000]
     ];
     const korMan = man => { man = Math.round(man); const eok = Math.floor(Math.abs(man) / 10000), rest = Math.abs(man) % 10000; return (man < 0 ? '-' : '') + (eok ? eok.toLocaleString() + '억' + (rest ? ' ' + rest.toLocaleString() + '만원' : '원') : rest.toLocaleString() + '만원'); };
@@ -8132,12 +8116,12 @@
       let host = el.closest('td') || el.parentElement, after = null;
       if (!el.closest('td') && /flex/.test(getComputedStyle(host).display)) { after = host; host = host.parentElement; }
       let h = after ? (after.nextElementSibling && after.nextElementSibling.classList.contains('unit-hint') ? after.nextElementSibling : null) : host.querySelector(':scope > .unit-hint');
-      const div = unit === '만원' ? 10000 : 1000000;
+      const div = unit === '천원' ? 1000 : unit === '만원' ? 10000 : 1000000;
       const sus = isFinite(n) && Math.abs(n) >= lim && n % (div / 10) === 0;
       if (!sus) { if (h) h.remove(); return; }
       const fixed = Math.round(n / div);
       if (!h) { h = document.createElement('div'); h.className = 'unit-hint no-print'; if (after) after.insertAdjacentElement('afterend', h); else host.appendChild(h); }
-      const asMan = unit === '만원' ? n : n * 100;
+      const asMan = unit === '천원' ? n / 10 : unit === '만원' ? n : n * 100;
       h.innerHTML = `원 단위로 입력하신 것 같아요. 이 칸은 <b>${unit}</b> 단위라 지금은 <b>${korMan(asMan)}</b>으로 읽혀요. <button type="button">${fixed.toLocaleString()}${unit}으로 바꾸기</button>`;
       h.querySelector('button').onclick = () => {
         el.value = el.type === 'number' ? String(fixed) : fixed.toLocaleString();
@@ -8219,9 +8203,11 @@
       setBizTrack(data.bizTrack || 'smb');
       setIndustryTrack(data.industryTrack || 'mfg');
       if (data.reportKey) { window.appState.activeReportKey = data.reportKey; renderReportButtons(); renderReportKeyChips(); }
+      const oldMan = !(Number(data.version) >= 2);
       formFields().forEach(el => {
         if (!(el.id in data.fields)) return;
         let v = data.fields[el.id];
+        if (oldMan && SMB_CHUN_IDS.includes(el.id) && String(v ?? '').trim() !== '') { const n = Number(String(v).replace(/,/g, '')); if (isFinite(n)) v = Math.round(n * 10).toLocaleString(); }
         if (el.id === 'corp_form') v = ({ '법인기업 (주식회사)': '법인 · 일반과세', '개인사업자': '개인 · 일반과세' })[v] || v;
         if (el.type === 'checkbox') { if ((el.dataset || {}).tri !== undefined) setTri(el, v, true); else el.checked = !!v; } else el.value = v ?? '';
       });
@@ -8234,7 +8220,7 @@
       syncCertIpViews();
       renderActiveReport();
       } finally { window.__applyingForm = false; }
-      try { window.__autoTierKey = sizeAutoKey(sizeContext()); } catch (e) { /* 규모 기준 없음 */ }
+      try { window.__sizeQuiet = true; autoSizeTier(); renderSizeRule(); } catch (e) { /* 규모 기준 없음 */ } finally { window.__sizeQuiet = false; }   // 불러온 자료도 법정 기준으로(L-188)
       if (window.histReset) histReset();   // 불러오기·복원은 기록을 비우고 지금 화면을 출발점으로(되돌리기 중이면 그대로)
     }
     window.applyFormData = applyFormData;
@@ -9554,6 +9540,11 @@
     .ind-auto .warn { flex-basis: 100%; color: #fcd34d; font-size: 11.5px; }
     .size-rule { margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: #cbd5e1; }
     .size-rule:empty { display: none; }
+    .size-auto { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 2px; font-size: 12px; color: #334155; }
+    .size-auto:empty { display: none; }
+    .size-auto .k { font-weight: 700; color: #64748b; }
+    .size-auto .k + b { font-weight: 800; color: #0f172a; }
+    .size-auto .w { font-size: 11px; color: #64748b; margin-right: 8px; }
     .size-rule b { color: #fff; }
     .size-rule .go { margin-left: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid #5eead4; background: transparent; color: #5eead4; font-weight: 800; cursor: pointer; }
     .size-rule .ok { color: #5eead4; font-weight: 800; }
@@ -10167,6 +10158,7 @@
   const signed = s => { const t = norm(s).replace(/[,\s]/g, ''); if (/^\(.*\)$/.test(t) || /^△/.test(t)) return -Number(t.replace(/[()△]/g, '')); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
   const won2baek = v => v === null ? null : Math.round(v / 1e5) / 10;   // 원 → 백만원(소수 1자리)
   const won2man = v => v === null ? null : Math.round(v / 1e4);         // 원 → 만원
+  const won2chun = v => v === null ? null : Math.round(v / 1e3);        // 원 → 천원(소상공인 실태 칸, L-187)
 
   const DOC_TYPES = [
     ['bizcert', '사업자등록증명', t => /사업자등록증명/.test(t)],
@@ -10436,7 +10428,7 @@
     });
     const f = {};
     const meta = {};
-    if (m) { f.smb_monthly_sales = won2man(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
+    if (m) { f.smb_monthly_sales = won2chun(sum / m); meta.smb_monthly_sales = { conf: m >= 12 ? 0.9 : 0.6, src: Math.round(sum / m), note: m >= 12 ? '' : '12개월이 안 되는 기간 평균' }; }
     const no = bizNoOf(labelValue(rows, /사업자등록번호$/) || ''); if (no) f.corp_biz_no = no;
     const ceo = labelValue(rows, /^성명\(대표자\)$/); if (ceo) f.corp_ceo = ceo.split(/\s*주민/)[0].trim();
     return { fields: f, meta, yearTotals, halfTotals, notes: m ? ['최근 ' + m + '개월 평균'] : ['과세기간 행을 찾지 못함'] };
@@ -10914,7 +10906,7 @@
       f.corp_house = monthlyLine && monthlyLine.v ? '임차 거주 (월세)' : '임차 거주 (전세)';
       meta.corp_house = { conf: 0.7, note: '주거용 계약 — 대표자 본인 계약인지 확인' };
     } else if (monthlyLine) {
-      f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e4));
+      f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e3));
       meta.smb_cost_rent = { conf: 0.7, src: monthlyLine.v, note: '부가세 별도 여부 확인' };
     }
     if (deposit) info.push('보증금 ' + Math.round(deposit.v / 1e4).toLocaleString('ko-KR') + '만원' + (sumOk ? '' : ' (확인 필요)'));
@@ -11869,7 +11861,7 @@
         ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
         ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
       if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
-      if (k === 0 && v.sales) { f._monthlyFromFs = won2man(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
+      if (k === 0 && v.sales) { f._monthlyFromFs = won2chun(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;
     return f;
@@ -12150,7 +12142,7 @@
         sme_net: '당기순이익', sme_assets: '자산총계', sme_capital: '자본금', sme_st_loan: '단기차입금', sme_lt_loan: '장기차입금', sme_quick: '당좌자산',
         sme_cur_liab: '유동부채', sme_int_exp: '이자비용', sme_int_inc: '이자수익', sme_ar: '매출채권', sme_inv: '재고자산', sme_ap: '매입채무', sme_unpaid: '미지급금', sme_fy_y1: '당기 결산연도'
       };
-      const UNIT = { sme: '백만원', smb_monthly_sales: '만원' };
+      const UNIT = { sme: '백만원', smb_monthly_sales: '천원' };
       const ORDER = ['corp_name', 'corp_biz_no', 'corp_form', 'corp_biz_up', 'corp_biz_item', 'corp_ceo', 'corp_ceo_birth', 'corp_house', 'corp_address', 'smb_cost_rent', 'corp_est_date', 'corp_biz_type', 'corp_ceo_share', 'sme_employees', 'smb_monthly_sales'];
       const fmt = n => Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
 
@@ -12208,13 +12200,13 @@
           (r.extraRows || []).forEach(([k, v], i) => cands.push({ id: '_extra:' + f.name + ':' + i, extra: [k, v], value: `${k}: ${v}`, conf: 0.6, valid: true, note: '칸이 없는 정보 — 기타 항목 줄로', file: f.name }));
           (r.debtItems || []).forEach((d, i) => cands.push({ id: '_debt:' + f.name + ':' + i, debt: d, value: `${d.institution} · ${d.type} · ${window.fmtChun ? fmtChun(d.balance) : fmt(d.balance) + '만원'}`, conf: 0.8, valid: true, note: d._from === '채권자변동정보(발생금액)' ? '발생 당시 금액 — 지금 잔액 확인 필요' : '금리는 직접 입력', file: f.name }));
         });
-        // 소상공인 연 매출 칸(만원): 올해 누적 · 작년 · 2년 전 · 3년 전
+        // 소상공인 연 매출 칸(천원): 올해 누적 · 작년 · 2년 전 · 3년 전
         const yNow = new Date().getFullYear();
         const yearField = y => ({ [yNow]: 'smb_sales_cur', [yNow - 1]: 'smb_sales_y1', [yNow - 2]: 'smb_sales_y2', [yNow - 3]: 'smb_sales_y3' })[y];
         files.forEach(f => {
           const r = f.res; if (!r || r.status !== 'ok') return;
-          Object.entries(r.vatYears || {}).forEach(([y, won]) => { const id = yearField(+y); if (id && won) cands.push({ id, value: String(Math.round(won / 1e4)), conf: +y === yNow ? 0.7 : 0.8, valid: true, src: won, year: +y, note: '부가세 과세표준 합계' + (+y === yNow ? ' (올해 누적)' : ''), file: f.name }); });
-          (r.fsList || (r.fs ? [r.fs] : [])).forEach(fx => { if (fx && fx.year && fx.wonValues && fx.wonValues.sales) { const id = yearField(fx.year); if (id) cands.push({ id, value: String(Math.round(fx.wonValues.sales / 1e4)), conf: 0.9, valid: true, src: fx.wonValues.sales, year: fx.year, note: '재무제표 매출액', file: f.name }); } });
+          Object.entries(r.vatYears || {}).forEach(([y, won]) => { const id = yearField(+y); if (id && won) cands.push({ id, value: String(Math.round(won / 1e3)), conf: +y === yNow ? 0.7 : 0.8, valid: true, src: won, year: +y, note: '부가세 과세표준 합계' + (+y === yNow ? ' (올해 누적)' : ''), file: f.name }); });
+          (r.fsList || (r.fs ? [r.fs] : [])).forEach(fx => { if (fx && fx.year && fx.wonValues && fx.wonValues.sales) { const id = yearField(fx.year); if (id) cands.push({ id, value: String(Math.round(fx.wonValues.sales / 1e3)), conf: 0.9, valid: true, src: fx.wonValues.sales, year: fx.year, note: '재무제표 매출액', file: f.name }); } });
         });
         if (fsList.length) {
           const fx = P().fsToFields(fsList);
@@ -12291,7 +12283,7 @@
         // 연매출(억): 재무제표 당기 매출(백만원) 우선, 없으면 부가세 월평균(만원)×12
         const fsSales = cands.find(x => x.id === 'sme_sales');
         const vat = cands.find(x => x.id === 'smb_monthly_sales' && !/재무제표/.test(x.note || ''));
-        const salesEok = fsSales ? Number(fsSales.value) / 100 : vat ? Number(vat.value) * 12 / 10000 : null;
+        const salesEok = fsSales ? Number(fsSales.value) / 100 : vat ? Number(vat.value) * 12 / 100000 : null;   // 부가세 월평균은 천원
         if (emp !== null || salesEok !== null) {
           let tier, why = [];
           if (emp !== null) why.push(`근로자 ${emp}명`);
@@ -12364,7 +12356,7 @@
       }
       const displayRaw = (id, v) => { const el = document.getElementById(id); return el && el.tagName === 'SELECT' ? ([...el.options].find(x => x.value === v)?.text || v) : v; };
       function showVal(g, o) {
-        const unit = g.id === 'sme_kcb' || g.id === 'sme_nice' ? '점' : g.id.startsWith('sme_') && g.id !== 'sme_employees' ? '백만원' : (g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' || g.id.startsWith('smb_sales_')) ? '만원' : g.id === 'sme_employees' ? '명' : '';
+        const unit = g.id === 'sme_kcb' || g.id === 'sme_nice' ? '점' : g.id.startsWith('sme_') && g.id !== 'sme_employees' ? '백만원' : (g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' || g.id.startsWith('smb_sales_')) ? '천원' : g.id === 'sme_employees' ? '명' : '';
         const main = (g.id === '_fsfull' || g.id === '_vathalf') ? o.value : g.id === '_industry' ? IND_NAME[o.value] : g.id === '_track' ? TIER_NAME[o.value] : unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
         const raw = o.src !== undefined && o.src !== null ? `원문 ${fmt(Math.round(o.src))}원${g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' ? '/월' : ''}` : '';
         return { main, raw };
