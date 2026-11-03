@@ -3681,16 +3681,16 @@
     // 대출표로 정해진 실태 확인 칸: 값을 넣고 단추를 잠근 뒤 '대출표에서' 표시. v === null 이면 잠금을 풀고 그 전에 직접 고른 값으로 되돌림
     function autoTri(id, v) {
       const e = document.getElementById(id); if (!e || !window.setTri || !e.closest) return;
-      const b = e.parentElement && e.parentElement.querySelector('.tri-btn');
+      const bs = e.parentElement ? e.parentElement.querySelectorAll('.tri-btn') : [];
       let note = e.closest('label')?.querySelector('.tri-auto');
       if (v) {
         if (e.dataset.auto !== '1') { e.dataset.manual = triOf(id); e.dataset.auto = '1'; }
         if (triOf(id) !== v) setTri(e, v, true);
-        if (b) b.disabled = true;
+        bs.forEach(b => { b.disabled = true; });
         if (!note && e.closest('label')) { note = document.createElement('span'); note.className = 'tri-auto'; note.textContent = '대출표에서'; e.closest('label').appendChild(note); }
       } else {
         if (e.dataset.auto === '1') { setTri(e, e.dataset.manual || '', true); delete e.dataset.auto; delete e.dataset.manual; }
-        if (b) b.disabled = false; if (note) note.remove();
+        bs.forEach(b => { b.disabled = false; }); if (note) note.remove();
       }
     }
 
@@ -8086,8 +8086,8 @@
       v = v === true ? 'yes' : v === false ? 'no' : (v === 'yes' || v === 'no' ? v : '');
       if (!e.dataset) e.dataset = {};
       e.dataset.tri = v; e.checked = v === 'yes';
-      const b = e.parentElement && e.parentElement.querySelector('.tri-btn');
-      if (b) { b.dataset.v = v; b.textContent = TRI_TXT[v]; b.setAttribute('aria-label', (e.closest('label')?.textContent.replace(TRI_TXT[v], '').trim() || '') + ': ' + TRI_TXT[v]); }
+      const seg = e.parentElement && e.parentElement.querySelector('.tri-seg');
+      if (seg) { seg.dataset.v = v; seg.querySelectorAll('.tri-btn').forEach(b => { const on = b.dataset.o === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); seg.title = TRI_TXT[v] + (v ? ' — 다시 누르면 미확인' : ' — 확인되면 예/아니오를 눌러 주세요'); }
       if (!silent) e.dispatchEvent(new Event('change', { bubbles: true }));
     }
     window.setTri = setTri;
@@ -8095,10 +8095,17 @@
       TRI_IDS.forEach(id => {
         const e = document.getElementById(id); if (!e || (e.dataset || {}).tri !== undefined) return;
         e.classList.add('tri-src'); e.tabIndex = -1;
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'tri-btn'; b.title = '누를 때마다 미확인 → 예 → 아니오';
-        e.insertAdjacentElement('afterend', b);
-        e.closest('label')?.addEventListener('click', ev => { ev.preventDefault(); setTri(e, { '': 'yes', yes: 'no', no: '' }[e.dataset.tri || '']); });
+        // 미확인 = 둘 다 안 눌림. 확인되면 예/아니오를 직접 누른다(L-193). 눌린 쪽을 다시 누르면 미확인
+        const seg = document.createElement('span');
+        seg.className = 'tri-seg'; seg.setAttribute('role', 'group');
+        seg.setAttribute('aria-label', e.closest('label')?.textContent.trim() || '확인');
+        seg.innerHTML = '<button type="button" class="tri-btn" data-o="yes">예</button><button type="button" class="tri-btn" data-o="no">아니오</button>';
+        e.insertAdjacentElement('afterend', seg);
+        e.closest('label')?.addEventListener('click', ev => {
+          ev.preventDefault();
+          const b = ev.target.closest && ev.target.closest('.tri-btn'); if (!b || b.disabled) return;
+          setTri(e, e.dataset.tri === b.dataset.o ? '' : b.dataset.o);
+        });
         setTri(e, '', true);
       });
     });
@@ -9298,11 +9305,18 @@
     .sign-line .sign-tel { font-weight: 700; font-variant-numeric: tabular-nums; }
     /* 확인 칸 세 갈래 */
     .tri-src { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-    .tri-btn { flex: none; min-width: 46px; padding: 1px 7px; border-radius: 999px; border: 1px solid #cbd5e1; background: #f8fafc; color: #64748b; font-size: 10.5px; font-weight: 800; line-height: 1.6; cursor: pointer; text-align: center; transition: background .15s, color .15s, border-color .15s; }
-    .tri-btn[data-v="yes"] { background: #ccfbf1; color: #0f766e; border-color: #5eead4; }
-    .tri-btn[data-v="no"] { background: #ffe4e6; color: #be123c; border-color: #fda4af; }
-    .tri-btn:focus-visible { outline: 2px solid #0f766e; outline-offset: 1px; }
-    .tri-btn:disabled { opacity: .75; cursor: default; }
+    /* 실태 확인: 예/아니오 두 단추(L-193). 아무것도 안 눌린 상태 = 미확인(점선 테두리) */
+    .tri-seg { flex: none; display: inline-flex; height: 22px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; overflow: hidden; }
+    .tri-seg[data-v=""] { border-style: dashed; border-color: #94a3b8; }
+    .tri-btn { padding: 0 8px; border: 0; background: none; color: #64748b; font-size: 10.5px; font-weight: 800; line-height: 20px; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+    .tri-btn + .tri-btn { border-left: 1px solid #e2e8f0; }
+    .tri-btn:not(:disabled):hover { background: #f1f5f9; color: #0f172a; }
+    .tri-btn.on[data-o="yes"] { background: #ccfbf1; color: #0f766e; }
+    .tri-btn.on[data-o="no"] { background: #ffe4e6; color: #be123c; }
+    .tri-btn:focus-visible { outline: 2px solid #0f766e; outline-offset: -2px; border-radius: 999px; }
+    .tri-btn:disabled { cursor: default; }
+    .tri-seg:has(.tri-btn:disabled) { opacity: .75; }
+    #smb_area_pyung, #l3 #smb_area_pyung { height: 22px !important; min-height: 0 !important; padding: 0 6px !important; font-size: 11px !important; line-height: 20px !important; border-radius: 6px !important; }
     .tri-auto { margin-left: 6px; font-size: 10.5px; font-weight: 700; color: #0f766e; white-space: nowrap; }
     /* 금액 단위·입력 안내 */
     .unit-hint, .field-note { margin-top: 4px; font-size: 11px; line-height: 1.45; border-radius: 8px; }
@@ -12820,7 +12834,7 @@
     #l3 .l3-step .l3-three > div { padding: 10px 10px !important; }
     #l3 .l3-step .l3-three label, #l3 .l3-step .l3-three span, #l3 .l3-step .l3-three h4, #l3 .l3-step .l3-three h5 { font-size: 11px !important; letter-spacing: -0.02em; white-space: normal; line-height: 1.35; }
     #l3 .l3-step .l3-three label { align-items: flex-start !important; }
-    #l3 .l3-step .l3-three .tri-btn { margin-top: 1px; }
+    #l3 .l3-step .l3-three .tri-seg { margin-top: -2px; }
     #l3 .l3-step .l3-three input[type=text], #l3 .l3-step .l3-three input[type=number] { width: 64px !important; padding: 4px 6px !important; }
     /* 연 매출 4칸 */
     #l3 .l3-step #smb_years_box { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
