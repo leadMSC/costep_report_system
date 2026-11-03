@@ -13104,7 +13104,9 @@
             card.innerHTML = '<h3 class="text-sm font-extrabold text-slate-900 flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-[#169aa8]"></span><span>발행 정보</span><span class="text-[11px] font-normal text-slate-500">서식1 시행일자·경유·근거 — 비우면 오늘 날짜·기본 문구</span></h3>';
             card.appendChild(g); scr.appendChild(card);
           } }
-        const named = { ':tier': noId[0], ':basic': noId[1], ':trade': noId[2], ':bplan': noId[noId.length - 2], ':action': noId[noId.length - 1] };
+        // 카드는 순서가 아니라 안에 든 칸으로 찾는다 — 카드에 id 를 붙이거나 숨겨도 단계가 밀리지 않게(L-194: size_card 에 id 가 붙자 한 칸씩 밀려 거래처·인증 단계가 비었음)
+        const cardOf = id => { const el = document.getElementById(id); return el ? el.closest('#screen_input > *') : null; };
+        const named = { ':tier': cardOf('tier_btn_smb'), ':basic': cardOf('corp_name'), ':trade': cardOf('corp_clients'), ':bplan': cardOf('bp_problem'), ':action': noId[noId.length - 1] };
         const pick = k => named[k] || document.getElementById(k);
 
         // 내 정보: 소속 펌(로고·상호·접두어·대표·주소·전화)과 나(이름·직함·휴대폰·메일). 계정별로 이 PC에 저장, 서식 발신란에 반영
