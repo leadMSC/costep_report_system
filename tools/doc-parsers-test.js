@@ -122,8 +122,8 @@ ok('임대차: 금액(₩ 오독)·월세·주거 판별', () => {
   const r = P.parseTextDocument(t, 'b.jpg');
   assert.strictEqual(r.kind, 'lease');
   assert.strictEqual(r.fields.corp_house, '임차 거주 (월세)');
-  assert.ok(r.notes.some(x => /보증금 3,000만원$/.test(x)));
-  assert.ok(r.notes.some(x => /월세 120만원/.test(x)));
+  assert.ok(r.notes.some(x => /보증금 30,000천원$/.test(x)));
+  assert.ok(r.notes.some(x => /월세 1,200천원/.test(x)));
 });
 ok('지식재산권 등록증: 번호 앞자리로 권리 판별·8칸', () => {
   const t = ['발급번호 :1-1-2020-000000000', '사표드로즈', '등        록         제 40-1234567 호', 'Registration Number',

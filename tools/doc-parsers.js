@@ -960,9 +960,9 @@
     ]);
     const fac = ind('facility', 2), wrk = ind('working', 2);
     out.budget = lines([
-      '총 소요자금 [○○만원]',
-      fac.length ? `- 시설자금 [○○만원]: ${fac.join(' · ')}` : '',
-      wrk.length ? `- 운전자금 [○○만원]: ${wrk.join(' · ')}` : '',
+      '총 소요자금 [○○천원]',
+      fac.length ? `- 시설자금 [○○천원]: ${fac.join(' · ')}` : '',
+      wrk.length ? `- 운전자금 [○○천원]: ${wrk.join(' · ')}` : '',
       ...sit('budget', 2).map(s => /^조달|^시설자금/.test(s) ? s : '- ' + s),
       ...take(((lib && lib.funding) || {})[size], 1)
     ]);
@@ -1182,8 +1182,8 @@
       f.smb_cost_rent = String(Math.round(monthlyLine.v / 1e3));
       meta.smb_cost_rent = { conf: 0.7, src: monthlyLine.v, note: '부가세 별도 여부 확인' };
     }
-    if (deposit) info.push('보증금 ' + Math.round(deposit.v / 1e4).toLocaleString('ko-KR') + '만원' + (sumOk ? '' : ' (확인 필요)'));
-    if (monthlyLine) info.push('월세 ' + Math.round(monthlyLine.v / 1e4).toLocaleString('ko-KR') + '만원');
+    if (deposit) info.push('보증금 ' + Math.round(deposit.v / 1e3).toLocaleString('ko-KR') + '천원' + (sumOk ? '' : ' (확인 필요)'));
+    if (monthlyLine) info.push('월세 ' + Math.round(monthlyLine.v / 1e3).toLocaleString('ko-KR') + '천원');
     if (area) info.push('전용면적 ' + area + '㎡ (약 ' + (Number(area) / 3.3058).toFixed(1) + '평)');
     const notes = [residential ? '주거용 임대차' : '사업장 임대차'].concat(info);
     if (!amt.length) notes.push('금액을 찾지 못했어요');
@@ -2121,7 +2121,7 @@
     if (!list.length) return {};
     const top = list[0].year, f = {}, src = {}, conf = {};
     const suf = { 0: '', 1: '_2024', 2: '_2023' };
-    const put = (id, won, x) => { if (won === null || won === undefined) return; f[id] = won2baek(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
+    const put = (id, won, x, conv = won2baek) => { if (won === null || won === undefined) return; f[id] = conv(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
     list.forEach(x => {
       const k = top - x.year; if (!(k in suf)) return;
       const v = x.wonValues;
@@ -2133,7 +2133,7 @@
       [['sme_assets', 'assets'], ['sme_net', 'net'], ['sme_capital', 'capital'], ['sme_st_loan', 'stLoan'], ['sme_lt_loan', 'ltLoan'],
         ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
         ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
-      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
+      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x, won2chun);   // 가지급금 칸은 천원(L-190)
       if (k === 0 && v.sales) { f._monthlyFromFs = won2chun(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;
