@@ -1876,11 +1876,11 @@
       if (!m) continue;
       const y = m[1].length === 2 ? 2000 + +m[1] : +m[1], won = Number(m[2].replace(/,/g, ''));
       if (!vatYears[y]) vatYears[y] = won;
-      if (y === yr - 1 && !f.sme_sales) put('sme_sales', String(Math.round(won / 1e5) / 10), 0.6, `메모의 ${y}년 매출 — 결산서와 대조`);
+      if (y === yr - 1 && !f.sme_sales) put('sme_sales', String(Math.round(won / 1e3)), 0.6, `메모의 ${y}년 매출 — 결산서와 대조`);
     }
-    // '장기차입금 1억5천' → 결산 장기차입금(백만원)
+    // '장기차입금 1억5천' → 결산 장기차입금(천원)
     { const lt = rawLines.map(l => l.match(/^장기\s*차입금\s*[:：]?\s*(\d+)\s*억\s*(?:(\d+)\s*천)?/)).find(Boolean);
-      if (lt) put('sme_lt_loan', String(+lt[1] * 100 + (lt[2] ? +lt[2] * 10 : 0)), 0.5, '메모 금액 — 재무제표와 대조'); }
+      if (lt) put('sme_lt_loan', String(+lt[1] * 100000 + (lt[2] ? +lt[2] * 10000 : 0)), 0.5, '메모 금액 — 재무제표와 대조'); }
     // ── S-9 키워드 사전(L-163): 칸이 있으면 그 칸으로, 칸이 없으면 '기타 항목' 줄 후보로 ──
     const extraRows = [], ipItems = [], usedPairs = new Set();
     const sk = k => k.replace(/\s+/g, '');
@@ -2113,7 +2113,7 @@
     return segs.map(s => ({ from: s.from, to: s.to, kind: s.kind, title: s.title, text: join(list.slice(s.from - 1, s.to)) }));
   }
 
-  // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
+  // 재무제표 여러 장(연도별) → 3개년 칸(천원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
   function fsToFields(fsList) {
     // 같은 해가 둘이면 세무사 결산(acct)을 먼저 넣어 표준재무제표증명 값이 덮게
     const isAcct = x => !!(x.full && x.full.source === 'acct');
@@ -2121,7 +2121,7 @@
     if (!list.length) return {};
     const top = list[0].year, f = {}, src = {}, conf = {};
     const suf = { 0: '', 1: '_2024', 2: '_2023' };
-    const put = (id, won, x, conv = won2baek) => { if (won === null || won === undefined) return; f[id] = conv(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
+    const put = (id, won, x, conv = won2chun) => { if (won === null || won === undefined) return; f[id] = conv(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
     list.forEach(x => {
       const k = top - x.year; if (!(k in suf)) return;
       const v = x.wonValues;
@@ -2129,11 +2129,11 @@
       put('sme_profit' + suf[k], v.profit, x);
       put('sme_debt' + suf[k], v.debt, x);
       put('sme_equity' + suf[k], v.equity, x);
-      // 주요 재무지표 입력 칸(백만원)
+      // 주요 재무지표 입력 칸(천원)
       [['sme_assets', 'assets'], ['sme_net', 'net'], ['sme_capital', 'capital'], ['sme_st_loan', 'stLoan'], ['sme_lt_loan', 'ltLoan'],
         ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
         ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
-      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x, won2chun);   // 가지급금 칸은 천원(L-190)
+      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
       if (k === 0 && v.sales) { f._monthlyFromFs = won2chun(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;

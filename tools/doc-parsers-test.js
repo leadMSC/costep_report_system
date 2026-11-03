@@ -469,8 +469,8 @@ ok('상담 메모: 라벨<탭>값 양식·대표자 묶음·보증 이력(가짜
   assert.strictEqual(f.corp_ceo_phone, '010-1234-5678');
   assert.strictEqual(f.corp_ceo_telecom, 'KT');
   assert.ok(/토목기사 15년/.test(f.corp_ceo_career));
-  assert.strictEqual(f.sme_sales, '2084.1');
-  assert.strictEqual(f.sme_lt_loan, '150');
+  assert.strictEqual(f.sme_sales, '2084127');
+  assert.strictEqual(f.sme_lt_loan, '150000');
   assert.strictEqual(r.debtItems.length, 1);
   assert.strictEqual(r.debtItems[0].institution, '기업은행');
   assert.ok(!/abcd1234/.test(JSON.stringify(r)), '비밀번호 줄은 읽지 않음');

@@ -1312,12 +1312,12 @@
           </div>
           <textarea id="sme_vat_half" hidden></textarea>
           <div id="vat_half_box"></div>
-          <!-- 지표·보고서가 쓰는 핵심 칸(백만원) — 위 전체 표에서 자동으로 채움 -->
+          <!-- 지표·보고서가 쓰는 핵심 칸(천원) — 위 전체 표에서 자동으로 채움 -->
           <div id="fs_keys" hidden>
             <table class="w-full text-xs border-collapse border border-slate-200 fs-tight">
               <thead>
                 <tr class="bg-slate-100 font-bold text-slate-700 text-center">
-                  <th class="p-2 border border-slate-200 w-1/4">결산 재무 항목 (백만원)</th>
+                  <th class="p-2 border border-slate-200 w-1/4">결산 재무 항목 (천원)</th>
                   <th class="p-2 border border-slate-200 w-1/4 cur-col">Y-1 결산 (당기)</th>
                   <th class="p-2 border border-slate-200 w-1/4">Y-2 결산 (전기)</th>
                   <th class="p-2 border border-slate-200 w-1/4">Y-3 결산 (전전기)</th>
@@ -3636,7 +3636,7 @@
       const gapEl = document.getElementById('debt_fs_gap');
       if (gapEl) {
         const n = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.-]/g, '')); return isFinite(v) ? v : 0; };
-        const fsMan = (n('sme_st_loan') + n('sme_lt_loan')) * 100;
+        const fsMan = (n('sme_st_loan') + n('sme_lt_loan')) / 10;   // 핵심 칸 천원 → 만원
         const diff = totalBal - fsMan;
         const show = window.appState.bizTrack !== 'smb' && fsMan > 0 && totalBal > 0 && Math.abs(diff) >= 0.5;
         if (show) gapEl.classList.remove('hidden'); else gapEl.classList.add('hidden');
@@ -3774,8 +3774,8 @@
       if (est) { const d = new Date(est + 'T00:00:00'), now = new Date(); if (!isNaN(d) && d > now) estFuture = true; if (!isNaN(d) && d <= now) years = now.getFullYear() - d.getFullYear() - ((now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) ? 1 : 0); }
       // 매출
       const mon = num('smb_monthly_sales'), fs = num('sme_sales');
-      const salesText = size === 'smb' ? (mon ? `월평균 매출 ${mon.toLocaleString()}천원` : '') : (fs ? `연매출 ${milK(fs)}` : (mon ? `월평균 매출 ${mon.toLocaleString()}천원` : ''));
-      const annualSales = fs ? fs * 100 : mon ? mon * 12 / 10 : null;   // 만원(대출표 합계와 비교). 소상공인 월평균은 천원
+      const salesText = size === 'smb' ? (mon ? `월평균 매출 ${mon.toLocaleString()}천원` : '') : (fs ? `연매출 ${chunTxt(fs)}` : (mon ? `월평균 매출 ${mon.toLocaleString()}천원` : ''));
+      const annualSales = fs ? fs / 10 : mon ? mon * 12 / 10 : null;   // 만원(대출표 합계와 비교). 소상공인 월평균은 천원
       const y1 = num('smb_sales_y1'), y2 = num('smb_sales_y2');
       // 대표자 나이·성별(주민번호 → 생년월일 순)
       let ceoAge = null, ceoSex = '';
@@ -4375,7 +4375,7 @@
       return raw === '' ? null : parseNumber(raw);
     }
     const fmtPct = (v) => (Math.round(v * 10) / 10).toLocaleString() + '%';
-    const fmtMil = (v) => milK(v);   // 계산은 백만원, 보이기는 천원(L-190)
+    const fmtMil = (v) => chunTxt(v);   // 재무 칸은 천원(L-192)
 
     // 주요 재무지표 — 재무제표 분석 엑셀(서식 탭)과 같은 식. 연도별 [Y-3, Y-2, Y-1], 값이 없으면 null
     function computeFinIndicators() {
@@ -4391,7 +4391,7 @@
       const fy = readNum('sme_fy_y1');
       const isMfg = (window.appState.industryTrack || 'mfg') === 'mfg';
       const rows = [
-        ['차입금 합계', per(i => loans[i] === null ? null : loans[i] * 1000), '천원'],
+        ['차입금 합계', per(i => loans[i]), '천원'],
         ['차입금 증감률', per(i => i === 0 ? null : (ok(loans[i]) && ok(loans[i - 1]) && loans[i] !== 0 ? (loans[i] - loans[i - 1]) / loans[i] * 100 : null)), '%'],
         ['유동비율 (당좌자산 기준)', per(i => div(Q[i], CL[i], 100)), '%'],
         ['부채비율', per(i => div(D[i], E[i], 100)), '%'],
@@ -4417,7 +4417,7 @@
         const KEY = ['부채비율', '자기자본비율', '유동비율 (당좌자산 기준)', '당기순이익률', '매출 상승률', '이자보상비율', '차입금 합계', '매출 대비 차입금'];
         const items = m.rows.filter(r => KEY.includes(r[0]) && r[1][2] !== null)
           .map(([n, v, u]) => `${n.replace(' (당좌자산 기준)', '')} <strong class="font-mono">${fmtInd(v[2], u)}${u === '천원' ? '천원' : ''}</strong>`);
-        if (m.limit !== null) items.push(`운전자금 한도 참고 <strong class="font-mono">${milK(m.limit)}</strong>`);
+        if (m.limit !== null) items.push(`운전자금 한도 참고 <strong class="font-mono">${chunTxt(m.limit)}</strong>`);
         return items.length ? `<div class="text-[9.5px] text-slate-700 px-1.5 py-1 leading-snug"><span class="font-bold text-[#0f766e]">· 주요 재무지표(${m.years ? m.years[2] + '년' : '당기'}):</span> ${items.join(' · ')}</div>` : '';
       }
       // 열 순서: 당기(Y-1) → 전기 → 전전기 (계정 표와 같게)
@@ -4427,7 +4427,7 @@
       const cls = compact ? 'p-1 border border-slate-300' : 'px-2 py-1.5 border border-slate-200';
       return `<table class="w-full ${compact ? 'text-[9.5px]' : 'text-xs'} border-collapse text-center fin-ind-t"><thead><tr class="bg-slate-100 font-bold text-slate-800"><th class="${cls} text-left">${compact ? '주요 재무지표' : '지표'}</th>${hdr.map((h, i) => `<th class="${cls}${i === 0 ? ' text-[#0f766e] cur-col' : ''}">${h}</th>`).join('')}</tr></thead><tbody>` +
         rows.map(([n, vals, u]) => `<tr${!compact && n === '매출 대비 차입금' ? ' data-fold-start' : ''}><td class="${cls} text-left font-bold text-slate-700">${n}</td>${vals.slice().reverse().map((v, i) => `<td class="${cls} font-mono${i === 0 ? ' font-black cur-col' : ''}">${fmtInd(v, u)}</td>`).join('')}</tr>`).join('') +
-        `<tr><td class="${cls} text-left font-bold text-slate-700">운전자금 한도 참고</td><td colspan="3" class="${cls} text-left">${m.limit === null ? '<span class="text-slate-400">—</span>' : milK(m.limit)} <span class="text-slate-500">(${m.limitRule})</span></td></tr></tbody></table>`;
+        `<tr><td class="${cls} text-left font-bold text-slate-700">운전자금 한도 참고</td><td colspan="3" class="${cls} text-left">${m.limit === null ? '<span class="text-slate-400">—</span>' : chunTxt(m.limit)} <span class="text-slate-500">(${m.limitRule})</span></td></tr></tbody></table>`;
     }
     window.finIndTableHtml = finIndTableHtml;
     function renderFinInd() {
@@ -4445,7 +4445,7 @@
     // ───────── 3개년 재무제표 전체(원 단위) ─────────
     // 표준재무제표증명에 찍힌 모든 과목을 표별로 담는다(재무상태표·손익계산서·원가명세서…). 값은 원.
     // 저장은 숨은 칸 sme_fs_full(JSON) 하나 — v[0]=당기, v[1]=전기, v[2]=전전기.
-    // 지표·보고서가 쓰는 핵심 칸(sme_sales 등, 백만원)은 이 표에서 자동으로 채운다(숨은 칸).
+    // 지표·보고서가 쓰는 핵심 칸(sme_sales 등, 천원)은 이 표에서 자동으로 채운다(숨은 칸).
     // 서류가 없으면 표준 양식 틀을 보여 주고, 예전 고객 자료(백만원 칸만 있음)는 그 값을 원으로 옮겨 보여 준다.
     const FS_TEMPLATE = [
       { key: 'bs', title: '재무상태표', rows: [
@@ -4480,12 +4480,12 @@
       const s = m.sections.find(x => x.key === sec); if (!s) return null;
       return s.rows.find(r => re.test(fsKey(r.label))) || null;
     }
-    // 저장된 표가 없을 때 보여 줄 틀: 표준 양식 + 백만원 핵심 칸 값을 원으로
+    // 저장된 표가 없을 때 보여 줄 틀: 표준 양식 + 천원 핵심 칸 값을 원으로
     function fsFromKeys() {
       const m = { v: 1, fy: readNum('sme_fy_y1') || null, sections: FS_TEMPLATE.map(s => ({ key: s.key, title: s.title, rows: s.rows.map(([level, label]) => ({ label, level, v: [null, null, null] })) })) };
       FS_KEYMAP.forEach(([id, sec, re]) => {
         const r = fsFindRow(m, sec, re); if (!r) return;
-        FS_SUF.forEach((suf, j) => { const b = readNum(id + suf); if (b !== null) r.v[j] = Math.round(b * 1e6); });
+        FS_SUF.forEach((suf, j) => { const b = readNum(id + suf); if (b !== null) r.v[j] = Math.round(b * 1e3); });
       });
       // 핵심 칸으로 계산되는 줄: 부채와자본총계 = 부채총계 + 자본총계, 유동자산 = 당좌자산 + 재고자산(둘 다 있을 때)
       const row = (sec, re) => fsFindRow(m, sec, re);
@@ -4497,7 +4497,7 @@
     }
     const fsView = () => fsLoad() || fsFromKeys();
     const fsHasData = m => !!m && m.sections.some(s => s.rows.some(r => r.v.some(x => x !== null && x !== 0)));
-    // 표 → 핵심 칸(백만원, 소수 1자리)
+    // 표 → 핵심 칸(천원)
     function fsDerive(m) {
       FS_KEYMAP.forEach(([id, sec, re, loss]) => {
         const r = fsFindRow(m, sec, re);
@@ -4505,16 +4505,16 @@
           const el = document.getElementById(id + suf); if (!el) return;
           let w = r ? r.v[j] : null;
           if (w !== null && loss && /손실$/.test(fsKey(r.label)) && w > 0) w = -w;
-          el.value = w === null ? '' : String(Math.round(w / 1e5) / 10);
+          el.value = w === null ? '' : String(Math.round(w / 1e3));   // 원 → 천원(L-192)
           if (typeof formatNumberInput === 'function') formatNumberInput(el);
         });
       });
     }
-    // 핵심 칸의 원 단위 값(보고서용): 표가 있으면 표 값, 없으면 백만원 × 1,000,000
+    // 핵심 칸의 원 단위 값(보고서용): 표가 있으면 표 값, 없으면 천원 × 1,000
     function fsWon(id, j) {
       const m = fsLoad(), map = FS_KEYMAP.find(x => x[0] === id);
       if (m && map) { const r = fsFindRow(m, map[1], map[2]); if (r && r.v[j] !== null) { let w = r.v[j]; if (map[3] && /손실$/.test(fsKey(r.label)) && w > 0) w = -w; return w; } }
-      const b = readNum(id + FS_SUF[j]); return b === null ? null : Math.round(b * 1e6);
+      const b = readNum(id + FS_SUF[j]); return b === null ? null : Math.round(b * 1e3);
     }
     window.fsWon = fsWon;
 
@@ -5240,18 +5240,18 @@
       setTimeout(renderFinInd, 0);
     });
 
-    // 2-3: 3개년 재무 지표 (단위 백만원). 값이 없으면 해당 지표는 null
+    // 2-3: 3개년 재무 지표 (단위 천원). 값이 없으면 해당 지표는 null
     function computeSmeMetrics() {
       const s = [readNum('sme_sales_2023'), readNum('sme_sales_2024'), readNum('sme_sales')];
       const p = [readNum('sme_profit_2023'), readNum('sme_profit_2024'), readNum('sme_profit')];
-      const d = readNum('sme_debt'), e = readNum('sme_equity'), loanK = readNum('sme_loan_to_ceo'), loan = loanK === null ? null : loanK / 1000;   // 가지급금 칸은 천원
+      const d = readNum('sme_debt'), e = readNum('sme_equity'), loan = readNum('sme_loan_to_ceo');   // 모두 천원
       const growth = (s[1] > 0 && s[2] !== null) ? (s[2] - s[1]) / s[1] * 100 : null;
       const growthPrev = (s[0] > 0 && s[1] !== null) ? (s[1] - s[0]) / s[0] * 100 : null;
       const margin = (s[2] > 0 && p[2] !== null) ? p[2] / s[2] * 100 : null;
       const debtRatio = (d !== null && e !== null && e > 0) ? d / e * 100 : null;
       const impaired = e !== null && e <= 0;
-      // 연 이자비용: 금융기관별 차입금 표의 월 이자(만원) × 12 → 백만원
-      const annualInt = (window.appState.debtItems || []).reduce((a, x) => a + Number(x.monthlyInterest || 0), 0) * 12 / 100;
+      // 연 이자비용: 금융기관별 차입금 표의 월 이자(만원) × 12 → 천원
+      const annualInt = (window.appState.debtItems || []).reduce((a, x) => a + Number(x.monthlyInterest || 0), 0) * 12 * 10;
       const icr = (annualInt > 0 && p[2] !== null) ? p[2] / annualInt : null;
       const loanShare = (loan > 0 && e > 0) ? loan / e * 100 : null;
       return { s, p, d, e, loan, growth, growthPrev, margin, debtRatio, impaired, annualInt, icr, loanShare };
@@ -6263,14 +6263,14 @@
     }
     function bpGoalChartHtml() {
       const num = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.]/g, '')); return v > 0 ? v : null; };
-      const tSalesK = num('bp_target_sales'), tSales = tSalesK ? tSalesK / 1000 : null, hire = num('bp_target_hire');   // 목표 칸은 천원, 그림 계산은 백만원
+      const tSales = num('bp_target_sales'), hire = num('bp_target_hire');   // 천원
       if (!tSales && !hire) return '';
-      const cur = (window.appState.bizTrack === 'smb' ? null : num('sme_sales')) || (num('smb_monthly_sales') ? num('smb_monthly_sales') * 12 / 1000 : null);   // 백만원(소상공인은 월평균 천원×12)
+      const cur = (window.appState.bizTrack === 'smb' ? null : num('sme_sales')) || (num('smb_monthly_sales') ? num('smb_monthly_sales') * 12 : null);   // 천원(소상공인은 월평균×12)
       const emp = num('sme_employees') || 0;
       let html = '<div class="bp-fig bp-goal">';
       if (tSales) {
         const mx = Math.max(tSales, cur || 0);
-        const row = (lab, v, cls) => `<div class="g-row"><span class="g-l">${lab}</span><span class="g-t"><i class="${cls}" style="width:${(v / mx * 100).toFixed(1)}%"></i></span><b>${milK(v)}</b></div>`;
+        const row = (lab, v, cls) => `<div class="g-row"><span class="g-l">${lab}</span><span class="g-t"><i class="${cls}" style="width:${(v / mx * 100).toFixed(1)}%"></i></span><b>${chunTxt(v)}</b></div>`;
         html += (cur ? row('현재 연매출', cur, 'cur') : '') + row('1년 뒤 목표', tSales, 'tgt') + (cur ? `<div class="g-note">증가 ${Math.round((tSales / cur - 1) * 100)}%</div>` : '');
       }
       if (hire) html += `<div class="g-row"><span class="g-l">고용</span><span class="g-hire">현재 ${emp}명 → <b>${emp + hire}명</b> (신규 ${hire}명)</span></div>`;
@@ -6977,21 +6977,21 @@
 
       // SME values (with commas)
       const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-      setVal('sme_sales_2023', '2,150');
-      setVal('sme_sales_2024', '2,520');
-      setVal('sme_sales', '2,850');
+      setVal('sme_sales_2023', '2,150,000');
+      setVal('sme_sales_2024', '2,520,000');
+      setVal('sme_sales', '2,850,000');
 
-      setVal('sme_profit_2023', '120');
-      setVal('sme_profit_2024', '155');
-      setVal('sme_profit', '180');
+      setVal('sme_profit_2023', '120,000');
+      setVal('sme_profit_2024', '155,000');
+      setVal('sme_profit', '180,000');
 
-      setVal('sme_debt_2023', '490');
-      setVal('sme_debt_2024', '540');
-      setVal('sme_debt', '585');
+      setVal('sme_debt_2023', '490,000');
+      setVal('sme_debt_2024', '540,000');
+      setVal('sme_debt', '585,000');
 
-      setVal('sme_equity_2023', '450');
-      setVal('sme_equity_2024', '520');
-      setVal('sme_equity', '620');
+      setVal('sme_equity_2023', '450,000');
+      setVal('sme_equity_2024', '520,000');
+      setVal('sme_equity', '620,000');
 
       setVal('sme_nice', '845');
       setVal('sme_kcb', '820');
@@ -7313,7 +7313,7 @@
       const num = id => { const v = Number(String(document.getElementById(id)?.value || '').replace(/[^0-9.]/g, '')); return v > 0 ? v : null; };
       const emp = num('sme_employees');
       const fsMil = num('sme_sales'), mon = num('smb_monthly_sales');
-      const salesEok = fsMil ? fsMil / 100 : mon ? mon * 12 / 100000 : null;   // 소상공인 월평균은 천원
+      const salesEok = fsMil ? fsMil / 100000 : mon ? mon * 12 / 100000 : null;   // 둘 다 천원   // 소상공인 월평균은 천원
       // 법정 기준만(L-186): 소상공인기본법(근로자 수)·중소기업기본법 시행령 별표 1·3(매출). L-179·L-180 코스텝 기준은 폐지
       const tier = rule ? PP.sizeTier(rule, emp, salesEok) : null;
       return { code, basis, rule, emp, salesEok, tier };
@@ -8058,8 +8058,10 @@
     // 화면 ↔ 데이터: 입력 전체를 JSON 하나로 모으고(collectFormData), 되돌린다(applyFormData)
     // 고객별 저장은 이 PC 브라우저(localStorage)에만 하고, 작성 중인 내용은 자동 저장한다
     // =========================================================================
-    const FORM_DATA_VERSION = 3;   // 2: 소상공인 실태 금액 만원 → 천원(L-187) · 3: 백만원으로 치던 칸(수출액·가지급금·목표 연매출) → 천원(L-190)
+    const FORM_DATA_VERSION = 4;   // 2: 소상공인 실태 금액 만원 → 천원(L-187) · 3: 백만원으로 치던 칸(수출액·가지급금·목표 연매출) → 천원(L-190)
     const MIL_CHUN_IDS = ['corp_export_amt', 'sme_loan_to_ceo', 'bp_target_sales'];
+    // 4: 숨은 재무 핵심 칸(17항목 × 3년) 백만원 → 천원(L-192)
+    const FS_KEY_RE = /^sme_(sales|profit|debt|equity|net|assets|capital|st_loan|lt_loan|quick|cur_liab|int_exp|int_inc|ar|inv|ap|unpaid)(_20\d\d)?$/;
     const SMB_CHUN_IDS = ['smb_monthly_sales', 'smb_sales_cur', 'smb_sales_y1', 'smb_sales_y2', 'smb_sales_y3', 'smb_cost_rent', 'smb_cost_util', 'smb_cost_labor', 'smb_cost_rental', 'smb_cost_interest'];
     const CLIENT_STORE_KEY = 'COSTEP_CLIENTS_V1';
     const DRAFT_KEY = 'COSTEP_DRAFT_V1';
@@ -8106,7 +8108,7 @@
     const UNIT_RULES = [
       [/^smb_(monthly_sales|cost_(rent|util|labor|rental|interest))$/, '천원', 1000000],
       [/^smb_sales_(cur|y1|y2|y3)$/, '천원', 10000000],
-      [/^sme_(sales|profit|debt|equity|net|assets|capital|st_loan|lt_loan|quick|cur_liab|int_exp|int_inc|ar|inv|ap|unpaid)(_20\d\d)?$/, '백만원', 1000000],
+      [/^sme_(sales|profit|debt|equity|net|assets|capital|st_loan|lt_loan|quick|cur_liab|int_exp|int_inc|ar|inv|ap|unpaid)(_20\d\d)?$/, '천원', 1000000000],
       [/^(sme_loan_to_ceo|corp_export_amt|bp_target_sales)$/, '천원', 10000000]
     ];
     const korMan = man => { man = Math.round(man); const eok = Math.floor(Math.abs(man) / 10000), rest = Math.abs(man) % 10000; return (man < 0 ? '-' : '') + (eok ? eok.toLocaleString() + '억' + (rest ? ' ' + rest.toLocaleString() + '만원' : '원') : rest.toLocaleString() + '만원'); };
@@ -8122,6 +8124,7 @@
       const n = Number(String(el.value).replace(/[^\d.-]/g, ''));
       // 안내는 칸 줄 아래 한 줄로(입력칸과 '만원'이 나란한 줄이면 그 줄 다음에)
       let host = el.closest('td') || el.parentElement, after = null;
+      if (host.classList.contains('unit-in')) host = host.parentElement;
       if (!el.closest('td') && /flex/.test(getComputedStyle(host).display)) { after = host; host = host.parentElement; }
       let h = after ? (after.nextElementSibling && after.nextElementSibling.classList.contains('unit-hint') ? after.nextElementSibling : null) : host.querySelector(':scope > .unit-hint');
       const div = unit === '천원' ? 1000 : unit === '만원' ? 10000 : 1000000;
@@ -8138,6 +8141,22 @@
       };
     }
     document.addEventListener('input', e => { if (e.target.matches && e.target.matches('input')) unitHint(e.target); });
+    // 금액 칸 안 오른쪽에 회색 '천원'(L-192) — 칸을 감싸 ::after 로 붙이고, 바깥에 따로 있던 '천원' 글자는 숨긴다
+    const MONEY_SEL = ['#fs_fold input[data-fs]', '#vat_half_box input[data-vh]', '#debt_tbody input[title="잔액(천원)"]', '#debt_tbody input[title="월이자(천원)"]',
+      '#smb_monthly_sales', '#smb_sales_cur', '#smb_sales_y1', '#smb_sales_y2', '#smb_sales_y3', '#smb_cost_rent', '#smb_cost_util', '#smb_cost_labor', '#smb_cost_rental', '#smb_cost_interest',
+      '#corp_export_amt', '#sme_loan_to_ceo', '#bp_target_sales'].join(',');
+    const unitRO = typeof ResizeObserver === 'function' ? new ResizeObserver(es => es.forEach(e => e.target.classList.toggle('unit-tight', e.contentRect.width < 84))) : null;
+    function unitTagAll() {
+      document.querySelectorAll(MONEY_SEL).forEach(el => {
+        if (el.parentElement.classList.contains('unit-in')) return;
+        const w = document.createElement('span'); w.className = 'unit-in'; w.dataset.unit = '천원';
+        el.before(w); w.appendChild(el); if (unitRO) unitRO.observe(w);
+        const sib = w.nextElementSibling; if (sib && sib.tagName === 'SPAN' && sib.textContent.trim() === '천원') sib.hidden = true;
+      });
+    }
+    let unitTagQ = false;
+    if (typeof MutationObserver === 'function') new MutationObserver(() => { if (unitTagQ) return; unitTagQ = true; setTimeout(() => { unitTagQ = false; unitTagAll(); }, 0); }).observe(document.body, { childList: true, subtree: true });
+    unitTagAll();
     window.unitHint = unitHint;
 
     // ===== 생년월일: 8자리면 하이픈 넣고 만 나이 안내 =====
@@ -8211,11 +8230,12 @@
       setBizTrack(data.bizTrack || 'smb');
       setIndustryTrack(data.industryTrack || 'mfg');
       if (data.reportKey) { window.appState.activeReportKey = data.reportKey; renderReportButtons(); renderReportKeyChips(); }
-      const oldMan = !(Number(data.version) >= 2), oldMil = !(Number(data.version) >= 3);
+      const oldMan = !(Number(data.version) >= 2), oldMil = !(Number(data.version) >= 3), oldKey = !(Number(data.version) >= 4);
       formFields().forEach(el => {
         if (!(el.id in data.fields)) return;
         let v = data.fields[el.id];
         if (oldMan && SMB_CHUN_IDS.includes(el.id) && String(v ?? '').trim() !== '') { const n = Number(String(v).replace(/,/g, '')); if (isFinite(n)) v = Math.round(n * 10).toLocaleString(); }
+        if (oldKey && FS_KEY_RE.test(el.id) && String(v ?? '').trim() !== '') { const n = Number(String(v).replace(/,/g, '')); if (isFinite(n)) v = Math.round(n * 1000).toLocaleString(); }
         if (oldMil && MIL_CHUN_IDS.includes(el.id) && String(v ?? '').trim() !== '') { const n = Number(String(v).replace(/,/g, '')); if (isFinite(n)) v = Math.round(n * 1000).toLocaleString(); }
         if (el.id === 'corp_form') v = ({ '법인기업 (주식회사)': '법인 · 일반과세', '개인사업자': '개인 · 일반과세' })[v] || v;
         if (el.type === 'checkbox') { if ((el.dataset || {}).tri !== undefined) setTri(el, v, true); else el.checked = !!v; } else el.value = v ?? '';
@@ -9358,6 +9378,12 @@
     .fa-fig figcaption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 4px; }
     .fa-fig figcaption b { font-size: 12.5px; font-weight: 700; }
     .fa-fig figcaption .fa-unit { font-size: .8em; font-weight: 500; color: #64748b; }
+    .unit-in { position: relative; display: block; flex: 1 1 auto; min-width: 0; }
+    .unit-in:has(> input[hidden]) { display: none; }
+    .unit-in:not(.unit-tight) > input, .fs-stmt .unit-in:not(.unit-tight) > .fs-in { padding-right: 2.6em !important; }
+    .fs-stmt .unit-in:not(.unit-tight) > .fs-in { padding-right: 2.9em !important; }
+    .unit-in.unit-tight::after { display: none; }   /* 칸이 좁으면(대출표 등) 칸 안 단위는 숨김 — 표 머리에 단위가 있음 */
+    .unit-in::after { content: attr(data-unit); position: absolute; right: .6em; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 500; color: #94a3b8; pointer-events: none; font-family: 'Noto Sans KR', sans-serif; }
     .fa-leg { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 10.5px; color: var(--slate); }
     .fa-leg > span { display: inline-flex; align-items: center; gap: 4px; }
     .fa-leg i { display: inline-block; width: 9px; height: 9px; box-sizing: border-box; }
@@ -11615,11 +11641,11 @@
       if (!m) continue;
       const y = m[1].length === 2 ? 2000 + +m[1] : +m[1], won = Number(m[2].replace(/,/g, ''));
       if (!vatYears[y]) vatYears[y] = won;
-      if (y === yr - 1 && !f.sme_sales) put('sme_sales', String(Math.round(won / 1e5) / 10), 0.6, `메모의 ${y}년 매출 — 결산서와 대조`);
+      if (y === yr - 1 && !f.sme_sales) put('sme_sales', String(Math.round(won / 1e3)), 0.6, `메모의 ${y}년 매출 — 결산서와 대조`);
     }
-    // '장기차입금 1억5천' → 결산 장기차입금(백만원)
+    // '장기차입금 1억5천' → 결산 장기차입금(천원)
     { const lt = rawLines.map(l => l.match(/^장기\s*차입금\s*[:：]?\s*(\d+)\s*억\s*(?:(\d+)\s*천)?/)).find(Boolean);
-      if (lt) put('sme_lt_loan', String(+lt[1] * 100 + (lt[2] ? +lt[2] * 10 : 0)), 0.5, '메모 금액 — 재무제표와 대조'); }
+      if (lt) put('sme_lt_loan', String(+lt[1] * 100000 + (lt[2] ? +lt[2] * 10000 : 0)), 0.5, '메모 금액 — 재무제표와 대조'); }
     // ── S-9 키워드 사전(L-163): 칸이 있으면 그 칸으로, 칸이 없으면 '기타 항목' 줄 후보로 ──
     const extraRows = [], ipItems = [], usedPairs = new Set();
     const sk = k => k.replace(/\s+/g, '');
@@ -11852,7 +11878,7 @@
     return segs.map(s => ({ from: s.from, to: s.to, kind: s.kind, title: s.title, text: join(list.slice(s.from - 1, s.to)) }));
   }
 
-  // 재무제표 여러 장(연도별) → 3개년 칸(백만원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
+  // 재무제표 여러 장(연도별) → 3개년 칸(천원): 가장 최근 해 = 당기(sme_*), 그 전 해 = _2024, 그 전전 해 = _2023
   function fsToFields(fsList) {
     // 같은 해가 둘이면 세무사 결산(acct)을 먼저 넣어 표준재무제표증명 값이 덮게
     const isAcct = x => !!(x.full && x.full.source === 'acct');
@@ -11860,7 +11886,7 @@
     if (!list.length) return {};
     const top = list[0].year, f = {}, src = {}, conf = {};
     const suf = { 0: '', 1: '_2024', 2: '_2023' };
-    const put = (id, won, x, conv = won2baek) => { if (won === null || won === undefined) return; f[id] = conv(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
+    const put = (id, won, x, conv = won2chun) => { if (won === null || won === undefined) return; f[id] = conv(won); src[id] = won; conf[id] = x.balanced === false ? 0.4 : 0.9; };
     list.forEach(x => {
       const k = top - x.year; if (!(k in suf)) return;
       const v = x.wonValues;
@@ -11868,11 +11894,11 @@
       put('sme_profit' + suf[k], v.profit, x);
       put('sme_debt' + suf[k], v.debt, x);
       put('sme_equity' + suf[k], v.equity, x);
-      // 주요 재무지표 입력 칸(백만원)
+      // 주요 재무지표 입력 칸(천원)
       [['sme_assets', 'assets'], ['sme_net', 'net'], ['sme_capital', 'capital'], ['sme_st_loan', 'stLoan'], ['sme_lt_loan', 'ltLoan'],
         ['sme_quick', 'quick'], ['sme_cur_liab', 'curLiab'], ['sme_int_exp', 'interest'], ['sme_int_inc', 'intInc'],
         ['sme_ar', 'ar'], ['sme_inv', 'inv'], ['sme_ap', 'ap'], ['sme_unpaid', 'unpaid']].forEach(([id, key]) => put(id + suf[k], v[key], x));
-      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x, won2chun);   // 가지급금 칸은 천원(L-190)
+      if (v.loanToCeo) put(k === 0 ? 'sme_loan_to_ceo' : 'sme_loan_to_ceo' + suf[k], v.loanToCeo, x);
       if (k === 0 && v.sales) { f._monthlyFromFs = won2chun(v.sales / 12); src._monthlyFromFs = v.sales / 12; }
     });
     f._fsTopYear = top; f._src = src; f._conf = conf;
@@ -12292,10 +12318,10 @@
         if (ind) out.push({ id: '_industry', value: ind, conf: 0.7, valid: true, note: '업태·종목으로 추정 — 확인', file: cands.find(x => x.id === 'corp_biz_type')?.file || '입력된 업태·종목' });
         const useInd = ind || window.appState.industryTrack || 'mfg';
         const emp = Number(pickVal('sme_employees') || 0) || null;
-        // 연매출(억): 재무제표 당기 매출(백만원) 우선, 없으면 부가세 월평균(만원)×12
+        // 연매출(억): 재무제표 당기 매출(천원) 우선, 없으면 부가세 월평균(천원)×12
         const fsSales = cands.find(x => x.id === 'sme_sales');
         const vat = cands.find(x => x.id === 'smb_monthly_sales' && !/재무제표/.test(x.note || ''));
-        const salesEok = fsSales ? Number(fsSales.value) / 100 : vat ? Number(vat.value) * 12 / 100000 : null;   // 부가세 월평균은 천원
+        const salesEok = fsSales ? Number(fsSales.value) / 100000 : vat ? Number(vat.value) * 12 / 100000 : null;   // 부가세 월평균은 천원
         if (emp !== null || salesEok !== null) {
           let tier, why = [];
           if (emp !== null) why.push(`근로자 ${emp}명`);
@@ -12368,9 +12394,8 @@
       }
       const displayRaw = (id, v) => { const el = document.getElementById(id); return el && el.tagName === 'SELECT' ? ([...el.options].find(x => x.value === v)?.text || v) : v; };
       function showVal(g, o) {
-        const mil = g.id.startsWith('sme_') && !['sme_employees', 'sme_kcb', 'sme_nice', 'sme_fy_y1'].includes(g.id) && !g.id.startsWith('sme_loan_to_ceo');   // 핵심 칸은 백만원 저장 → 천원으로 보이기
         const unit = g.id === 'sme_kcb' || g.id === 'sme_nice' ? '점' : g.id.startsWith('sme_') && g.id !== 'sme_employees' && g.id !== 'sme_fy_y1' ? '천원' : (g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' || g.id.startsWith('smb_sales_')) ? '천원' : g.id === 'sme_employees' ? '명' : '';
-        const main = (g.id === '_fsfull' || g.id === '_vathalf') ? o.value : g.id === '_industry' ? IND_NAME[o.value] : g.id === '_track' ? TIER_NAME[o.value] : unit ? fmt(mil ? Number(o.value) * 1000 : o.value) + unit : displayRaw(g.id, o.value);
+        const main = (g.id === '_fsfull' || g.id === '_vathalf') ? o.value : g.id === '_industry' ? IND_NAME[o.value] : g.id === '_track' ? TIER_NAME[o.value] : unit ? fmt(o.value) + unit : displayRaw(g.id, o.value);
         const raw = o.src !== undefined && o.src !== null ? `원문 ${fmt(Math.round(o.src))}원${g.id === 'smb_monthly_sales' || g.id === 'smb_cost_rent' ? '/월' : ''}` : '';
         return { main, raw };
       }
