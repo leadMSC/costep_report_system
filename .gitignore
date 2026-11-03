@@ -6,3 +6,6 @@ tests/pdf_sample/
 vendor/ocr/
 _deploy/
 msc-deploy.tgz
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
