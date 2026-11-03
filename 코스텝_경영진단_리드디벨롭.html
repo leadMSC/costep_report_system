@@ -7143,8 +7143,9 @@
         const r = rows[i] || {};
         const inp = ([k, ph, mode]) => `<input type="text" data-tr="${k}" inputmode="${mode}" placeholder="${ph}" aria-label="${tag} ${i + 1}위 ${ph.replace(/\s*\(.*$/, '')}" value="${escapeHtml(r[k] || '')}" class="form-input-control">`;
         const f = Object.fromEntries(TR_FIELDS.map(x => [x[0], x]));
-        return `<div class="tr-row"><span class="tr-n" aria-hidden="true">${i + 1}</span>${inp(f.name)}${inp(f.bizNo)}<span class="tr-sh" data-unit="%">${inp(f.share)}</span>${inp(f.item)}<span class="tr-am" data-unit="천원">${inp(f.amt)}</span>${inp(f.period)}${inp(f.pay)}</div>`;
+        return `<div class="tr-row"><span class="tr-n" aria-hidden="true">${i + 1}</span>${inp(f.name)}${inp(f.bizNo)}${inp(f.item)}<span class="tr-sh" data-unit="%">${inp(f.share)}</span><span class="tr-am" data-unit="천원">${inp(f.amt)}</span>${inp(f.pay)}${inp(f.period)}</div>`;
       }).join('');
+      box.insertAdjacentHTML('afterbegin', '<div class="tr-head" aria-hidden="true"><span></span><span>거래처명</span><span>사업자번호</span><span>거래품목</span><span>비중</span><span>연 거래금액</span><span>결제조건</span><span>거래기간</span></div>');
       if (trSummary(kind, rows) !== trEl(kind).value.trim() && rows.length) trSave(kind, true);
     }
     function trRead(kind) {
@@ -9348,20 +9349,28 @@
     /* 지식재산권 표: 한 건 = 두 줄(권리·명칭·등록번호·등록일 / 출원번호·출원일·출원인·발명자) */
     #ip_cell { grid-column: 1 / -1 !important; }
     .ip-rows { display: flex; flex-direction: column; gap: 6px; }
-    /* 매출처·매입처 상위 3곳(L-195): 한 곳 = 두 줄(상호·사업자번호·비중 / 품목·연 거래금액·거래기간·결제조건). 넓으면 한 줄 */
-    .tr-rows { display: flex; flex-direction: column; gap: 6px; container-type: inline-size; }
-    .tr-row { display: grid; grid-template-columns: 22px minmax(0, 1.4fr) 118px 70px; grid-template-areas: "n nm bz sh" ". it am am" ". pd py py";
-      gap: 4px; padding: 4px; border: 1px solid #E2E8F0; border-radius: 10px; background: #fff; align-items: center; }
-    .tr-row .tr-n { grid-area: n; width: 20px; height: 20px; border-radius: 50%; background: #F1F5F9; color: #475569; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
-    .tr-row [data-tr=name] { grid-area: nm; } .tr-row [data-tr=bizNo] { grid-area: bz; } .tr-row .tr-sh { grid-area: sh; }
-    .tr-row [data-tr=item] { grid-area: it; } .tr-row .tr-am { grid-area: am; } .tr-row [data-tr=period] { grid-area: pd; } .tr-row [data-tr=pay] { grid-area: py; }
-    .tr-row input { min-width: 0; width: 100%; height: 30px; padding: 0 8px !important; font-size: 12px; }
+    /* 매출처·매입처 상위 3곳(L-195·L-198): 서식 6번 표처럼 머리줄 1개 + 한 곳 = 한 줄
+       (거래처명·사업자번호·품목·비중·연 거래금액·결제조건·거래기간). 칸이 560px 미만이면 두 줄(거래처명·사업자번호·비중 / 품목·금액·결제조건·기간)로 접음 */
+    .tr-cell { grid-column: 1 / -1 !important; }
+    .tr-rows { display: flex; flex-direction: column; gap: 4px; container-type: inline-size; }
+    .tr-head, .tr-row { display: grid; gap: 4px; align-items: center;
+      grid-template-columns: 18px minmax(0, 1.6fr) 96px minmax(0, 1fr) 50px 84px minmax(0, .8fr) 64px; }
+    .tr-head { padding: 0 0 2px; border-bottom: 1px solid #E2E8F0; font-size: 11px; font-weight: 700; color: #64748b; }
+    .tr-head span { padding-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr-row .tr-n { width: 18px; height: 18px; border-radius: 50%; background: #F1F5F9; color: #475569; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+    .tr-row input { min-width: 0; width: 100%; height: 30px; padding: 0 7px !important; font-size: 12px; }
+    .tr-cell .tr-row input:not(#_):not(#_)::placeholder { color: transparent !important; }
     .tr-row .tr-sh, .tr-row .tr-am { position: relative; display: block; min-width: 0; }
-    .tr-row .tr-sh::after, .tr-row .tr-am::after { content: attr(data-unit); position: absolute; right: .55em; top: 50%; transform: translateY(-50%); font-size: 11px; color: #94a3b8; pointer-events: none; }
-    .tr-row .tr-sh input { padding-right: 1.6em !important; text-align: right; } .tr-row .tr-am input { padding-right: 2.6em !important; text-align: right; }
+    .tr-row .tr-sh::after, .tr-row .tr-am::after { content: attr(data-unit); position: absolute; right: .5em; top: 50%; transform: translateY(-50%); font-size: 11px; color: #94a3b8; pointer-events: none; }
+    .tr-row .tr-sh input { padding-right: 1.5em !important; text-align: right; } .tr-row .tr-am input { padding-right: 2.5em !important; text-align: right; }
     .tr-row input[data-tr=bizNo], .tr-row .tr-sh input, .tr-row .tr-am input { font-variant-numeric: tabular-nums; }
-    @container (min-width: 760px) {
-      .tr-row { grid-template-columns: 22px minmax(0, 1.3fr) 112px 64px minmax(0, 1fr) 118px 120px 104px; grid-template-areas: "n nm bz sh it am pd py"; }
+    @container (max-width: 559px) {
+      .tr-head { display: none; }
+      .tr-row { grid-template-columns: 18px repeat(3, minmax(0, 1fr)) 64px; grid-template-areas: "n nm nm bz sh" ". it am py pd";
+        padding: 4px; border: 1px solid #E2E8F0; border-radius: 10px; }
+      .tr-row .tr-n { grid-area: n; } .tr-row [data-tr=name] { grid-area: nm; } .tr-row [data-tr=bizNo] { grid-area: bz; } .tr-row .tr-sh { grid-area: sh; }
+      .tr-row [data-tr=item] { grid-area: it; } .tr-row .tr-am { grid-area: am; } .tr-row [data-tr=pay] { grid-area: py; } .tr-row [data-tr=period] { grid-area: pd; }
+      .tr-cell .tr-row input:not(#_):not(#_)::placeholder { color: #8A8F99 !important; }
     }
     /* 지식재산권 줄: 칸이 640px 이상이면 한 줄(권리·등록번호·명칭·등록일·발명자·더보기·빼기),
        좁으면 두 줄(① 권리·등록번호·등록일 ② 명칭·발명자). 출원번호·출원일·권리자는 더보기(▾)로 접어 둠 */
