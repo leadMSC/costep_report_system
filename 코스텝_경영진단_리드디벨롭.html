@@ -1073,13 +1073,18 @@
             </select>
             <input type="text" id="corp_sales_detail" value="" placeholder="세부 채널 (예: 스마트스토어·쿠팡, 유튜브·OTT)" oninput="syncCompanyData()" class="form-input-control mt-1.5">
           </div>
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">주요 매출처 및 비중 (%)</label>
-            <input type="text" id="corp_clients" value="" placeholder="주요 거래처 및 매출 비중" oninput="syncCompanyData()" class="form-input-control">
+          <!-- 매출처·매입처 상위 3곳(L-195): 칸별 입력 → corp_clients/corp_vendors 요약 글(보고서가 읽음) + *_json(자세한 값) -->
+          <div class="sm:col-span-2 lg:col-span-3 tr-cell" data-tr-kind="clients">
+            <div class="flex items-center gap-2 mb-1"><label class="font-bold text-slate-700 mr-auto">주요 매출처 상위 3곳</label><button type="button" onclick="openDocsModal && openDocsModal()" class="docs-link no-print">서류로 채우기</button></div>
+            <input type="text" id="corp_clients" value="" oninput="syncCompanyData()" class="hidden" aria-hidden="true" tabindex="-1">
+            <input type="text" id="corp_clients_json" value="" class="hidden" aria-hidden="true" tabindex="-1">
+            <div class="tr-rows"></div>
           </div>
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">주요 매입처 및 결제조건</label>
-            <input type="text" id="corp_vendors" value="" placeholder="주요 매입처 및 결제조건" oninput="syncCompanyData()" class="form-input-control">
+          <div class="sm:col-span-2 lg:col-span-3 tr-cell" data-tr-kind="vendors">
+            <div class="flex items-center gap-2 mb-1"><label class="font-bold text-slate-700 mr-auto">주요 매입처 상위 3곳</label></div>
+            <input type="text" id="corp_vendors" value="" oninput="syncCompanyData()" class="hidden" aria-hidden="true" tabindex="-1">
+            <input type="text" id="corp_vendors_json" value="" class="hidden" aria-hidden="true" tabindex="-1">
+            <div class="tr-rows"></div>
           </div>
           <div class="sm:col-span-2 lg:col-span-3" id="ip_cell">
             <div class="flex items-center gap-2 mb-1">
@@ -1277,11 +1282,13 @@
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
             <h5 class="font-bold text-slate-900 border-b pb-1">5. 사업장 시설 및 점포 환경 현황</h5>
-            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_lease" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>유상 임대차 계약 체결 점포</span></label>
-            <div class="flex items-center space-x-1 pl-5">
-              <span class="text-[11px] text-slate-500">전용면적:</span>
-              <input type="number" min="0" id="smb_area_pyung" value="" placeholder="0" oninput="calcSmbMetrics()" class="w-16 form-input-control text-xs text-right py-0.5">
-              <span class="text-[11px] text-slate-500">평 (점포철거지원금 산정 기준)</span>
+            <div class="lease-row flex items-center gap-x-3 gap-y-1 flex-wrap">
+              <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_lease" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>유상 임대차 계약 체결 점포</span></label>
+              <div class="flex items-center space-x-1" title="전용면적 — 점포철거지원금 산정 기준">
+                <span class="text-[11px] text-slate-500">전용면적:</span>
+                <input type="number" min="0" id="smb_area_pyung" value="" placeholder="0" oninput="calcSmbMetrics()" aria-label="전용면적(평)" class="w-16 form-input-control text-xs text-right py-0.5">
+                <span class="text-[11px] text-slate-500">평 (점포철거지원금 산정 기준)</span>
+              </div>
             </div>
             <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_signboard" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>옥외 간판 교체 또는 시설 환경개선 필요</span></label>
             <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="smb_chk_smartorder" onchange="calcSmbMetrics()" class="rounded text-[#169aa8]"><span>스마트 주문·결제기기 도입 희망</span></label>
@@ -7087,6 +7094,87 @@
       document.getElementById('ip_empty').style.display = items.length ? 'none' : '';
     }
     window.ipAdd = ipAdd; window.ipRead = ipRead; window.ipFromJson = ipFromJson;
+
+    // ===== 매출처·매입처 상위 3곳(L-195) =====
+    // 칸: 상호·사업자번호·연 거래금액(천원)·품목·비중(%)·거래기간·결제조건. 보고서·자동 판단은 예전처럼 corp_clients/corp_vendors 요약 글을 읽고,
+    // 칸별 값은 corp_*_json 에 둔다. 서류 읽기·예전 저장본처럼 요약 글만 있으면 글을 풀어 칸에 나눠 넣는다.
+    const TR_FIELDS = [['name', '상호', 'text'], ['bizNo', '사업자번호', 'text'], ['share', '비중', 'decimal'], ['item', '품목', 'text'], ['amt', '연 거래금액', 'numeric'], ['period', '거래기간', 'text'], ['pay', '결제조건', 'text']];
+    const trEl = (kind, id) => document.getElementById('corp_' + kind + (id || ''));
+    function trSummary(kind, rows) {
+      // 비중이 없으면 연 거래금액이라도 보고서에 보이게
+      return rows.filter(r => r.name).map(r => r.name + (r.item ? `(${r.item})` : '') + (r.share ? ` ${r.share}%` : r.amt ? ` 연 ${r.amt}천원` : '') + (kind === 'vendors' && r.pay ? ` · ${r.pay}` : '')).join(', ');
+    }
+    function trParse(kind, text) {
+      // 거래처 구분: 쉼표·세미콜론·줄바꿈. 괄호 안이나 숫자 사이 쉼표(12,345,000)는 나누지 않는다
+      const parts = []; let cur = '', depth = 0; const src = String(text || '');
+      for (let i = 0; i < src.length; i++) {
+        const ch = src[i];
+        if (ch === '(' || ch === '（') depth++;
+        if ((ch === ')' || ch === '）') && depth) depth--;
+        const sep = !depth && (ch === ';' || ch === '\n' || (ch === ',' && !(/\d/.test(src[i - 1] || '') && /^\d{3}/.test(src.slice(i + 1, i + 4)))));
+        if (sep) { parts.push(cur); cur = ''; } else cur += ch;
+      }
+      parts.push(cur);
+      return parts.map(t => t.trim()).filter(Boolean).slice(0, 3).map(t => {
+        const r = { name: '', bizNo: '', share: '', item: '', amt: '', period: '', pay: '' };
+        const sh = t.match(/(\d+(?:\.\d+)?)\s*%/); if (sh) { r.share = sh[1]; t = t.replace(sh[0], ''); }
+        const py = t.match(/\s*·\s*([^·]+)$/); if (py) { (/결제|외상|어음|현금|일/.test(py[1]) || kind === 'vendors' ? r.pay = py[1].trim() : r.item = py[1].trim()); t = t.replace(py[0], ''); }
+        t = t.replace(/\(\s*([^()]*)\s*\)/g, (m, inner) => {
+          inner = inner.trim(); if (!inner) return '';
+          const won = inner.replace(/[^\d]/g, '');
+          if (/^[\d,\s]+(원)?$/.test(inner) && won) { const n = +won; r.amt = (/원/.test(inner) || n >= 1e6 ? Math.round(n / 1000) : n).toLocaleString(); }
+          else if (/결제|외상|어음|현금|\d+\s*일/.test(inner)) r.pay = inner;
+          else r.item = r.item ? r.item + ', ' + inner : inner;
+          return '';
+        });
+        r.name = t.replace(/\s+/g, ' ').trim();
+        return r;
+      }).filter(r => r.name);
+    }
+    function trRows(kind) {
+      let rows = null;
+      try { const j = JSON.parse(trEl(kind, '_json').value || 'null'); if (Array.isArray(j) && trSummary(kind, j) === trEl(kind).value.trim()) rows = j; } catch (e) { rows = null; }
+      return rows || trParse(kind, trEl(kind).value);
+    }
+    function trRender(kind) {
+      const cell = document.querySelector('.tr-cell[data-tr-kind="' + kind + '"]'); if (!cell || !trEl(kind)) return;
+      const rows = trRows(kind), box = cell.querySelector('.tr-rows'), tag = kind === 'clients' ? '매출처' : '매입처';
+      box.innerHTML = [0, 1, 2].map(i => {
+        const r = rows[i] || {};
+        const inp = ([k, ph, mode]) => `<input type="text" data-tr="${k}" inputmode="${mode}" placeholder="${ph}" aria-label="${tag} ${i + 1}위 ${ph.replace(/\s*\(.*$/, '')}" value="${escapeHtml(r[k] || '')}" class="form-input-control">`;
+        const f = Object.fromEntries(TR_FIELDS.map(x => [x[0], x]));
+        return `<div class="tr-row"><span class="tr-n" aria-hidden="true">${i + 1}</span>${inp(f.name)}${inp(f.bizNo)}<span class="tr-sh" data-unit="%">${inp(f.share)}</span>${inp(f.item)}<span class="tr-am" data-unit="천원">${inp(f.amt)}</span>${inp(f.period)}${inp(f.pay)}</div>`;
+      }).join('');
+      if (trSummary(kind, rows) !== trEl(kind).value.trim() && rows.length) trSave(kind, true);
+    }
+    function trRead(kind) {
+      const cell = document.querySelector('.tr-cell[data-tr-kind="' + kind + '"]');
+      return [...cell.querySelectorAll('.tr-row')].map(row => Object.fromEntries(TR_FIELDS.map(([k]) => [k, (row.querySelector('[data-tr=' + k + ']').value || '').trim()])));
+    }
+    function trSave(kind, quiet) {
+      const rows = trRead(kind).filter(r => Object.values(r).some(Boolean));
+      trEl(kind, '_json').value = rows.length ? JSON.stringify(rows) : '';
+      trEl(kind).value = trSummary(kind, rows);
+      if (!quiet) syncCompanyData();
+    }
+    function trFormat(el) {
+      const k = el.dataset.tr, v = el.value.trim(); if (!v) return;
+      if (k === 'bizNo') { const d = v.replace(/\D/g, ''); if (d.length === 10) el.value = d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5); }
+      if (k === 'amt') { const d = v.replace(/[^\d.]/g, ''); if (d) el.value = Math.round(+d).toLocaleString(); }
+      if (k === 'share') { const n = parseFloat(v.replace(/[^\d.]/g, '')); el.value = isFinite(n) ? String(Math.min(100, Math.round(n * 10) / 10)) : ''; }
+    }
+    function tradeFromText() { trRender('clients'); trRender('vendors'); }
+    window.tradeFromText = tradeFromText;
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.tr-cell').forEach(cell => {
+        const kind = cell.dataset.trKind;
+        cell.addEventListener('input', e => { if (e.target.dataset.tr) trSave(kind); });
+        cell.addEventListener('change', e => { if (e.target.dataset.tr) { trFormat(e.target); trSave(kind); } });
+      });
+      // 서류 읽기 적용은 끝에 #screen_input 에 change 를 한 번 쏜다 → 요약 글이 바뀌었으면 칸을 다시 그림
+      document.getElementById('screen_input')?.addEventListener('change', e => { if (e.target.id === 'screen_input') tradeFromText(); });
+      setTimeout(tradeFromText, 0);
+    });
     document.addEventListener('DOMContentLoaded', () => {
       const cell = document.getElementById('ip_cell'); if (!cell) return;
       cell.addEventListener('input', e => { if (e.target.closest('.ip-row')) ipSync(); });
@@ -8033,7 +8121,7 @@
       document.addEventListener('DOMContentLoaded', () => window.plogGate());
     })();
 
-    function syncCertIpViews() { try { certFromText(); ipFromJson(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
+    function syncCertIpViews() { try { certFromText(); ipFromJson(); tradeFromText(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
 
     // 글 칸(사업계획 개요서 등)은 내용 길이만큼 저절로 늘어난다 — 안쪽 스크롤로 글이 잘려 보이지 않게.
     // 비어 있을 때는 안내 예시(placeholder) 길이만큼
@@ -9260,6 +9348,21 @@
     /* 지식재산권 표: 한 건 = 두 줄(권리·명칭·등록번호·등록일 / 출원번호·출원일·출원인·발명자) */
     #ip_cell { grid-column: 1 / -1 !important; }
     .ip-rows { display: flex; flex-direction: column; gap: 6px; }
+    /* 매출처·매입처 상위 3곳(L-195): 한 곳 = 두 줄(상호·사업자번호·비중 / 품목·연 거래금액·거래기간·결제조건). 넓으면 한 줄 */
+    .tr-rows { display: flex; flex-direction: column; gap: 6px; container-type: inline-size; }
+    .tr-row { display: grid; grid-template-columns: 22px minmax(0, 1.4fr) 118px 70px; grid-template-areas: "n nm bz sh" ". it am am" ". pd py py";
+      gap: 4px; padding: 4px; border: 1px solid #E2E8F0; border-radius: 10px; background: #fff; align-items: center; }
+    .tr-row .tr-n { grid-area: n; width: 20px; height: 20px; border-radius: 50%; background: #F1F5F9; color: #475569; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+    .tr-row [data-tr=name] { grid-area: nm; } .tr-row [data-tr=bizNo] { grid-area: bz; } .tr-row .tr-sh { grid-area: sh; }
+    .tr-row [data-tr=item] { grid-area: it; } .tr-row .tr-am { grid-area: am; } .tr-row [data-tr=period] { grid-area: pd; } .tr-row [data-tr=pay] { grid-area: py; }
+    .tr-row input { min-width: 0; width: 100%; height: 30px; padding: 0 8px !important; font-size: 12px; }
+    .tr-row .tr-sh, .tr-row .tr-am { position: relative; display: block; min-width: 0; }
+    .tr-row .tr-sh::after, .tr-row .tr-am::after { content: attr(data-unit); position: absolute; right: .55em; top: 50%; transform: translateY(-50%); font-size: 11px; color: #94a3b8; pointer-events: none; }
+    .tr-row .tr-sh input { padding-right: 1.6em !important; text-align: right; } .tr-row .tr-am input { padding-right: 2.6em !important; text-align: right; }
+    .tr-row input[data-tr=bizNo], .tr-row .tr-sh input, .tr-row .tr-am input { font-variant-numeric: tabular-nums; }
+    @container (min-width: 760px) {
+      .tr-row { grid-template-columns: 22px minmax(0, 1.3fr) 112px 64px minmax(0, 1fr) 118px 120px 104px; grid-template-areas: "n nm bz sh it am pd py"; }
+    }
     /* 지식재산권 줄: 칸이 640px 이상이면 한 줄(권리·등록번호·명칭·등록일·발명자·더보기·빼기),
        좁으면 두 줄(① 권리·등록번호·등록일 ② 명칭·발명자). 출원번호·출원일·권리자는 더보기(▾)로 접어 둠 */
     .ip-rows { container-type: inline-size; }
