@@ -184,7 +184,7 @@ window.SCENARIOS = [
     id: '2-1', name: '고객 저장·불러오기·파일 주고받기',
     async run(api) {
       const ev = []; let verdict = 'PASS';
-      await api.demo(); api.call('setBizTrack', 'sme'); api.set('corp_name', '갑상사'); api.set('sme_sales', '1,234');
+      await api.demo(); api.call('setBizTrack', 'sme'); api.set('corp_name', '갑상사'); api.set('sme_sales', '30,000,000');   // 천원(L-192). 300억 = 업종 상관없이 중기업(작으면 규모 자동 판정이 소기업으로 바꿈, L-186)
       api.call('saveClient');
       await api.call('newClient');
       const cleared = api.val('corp_name') === '' && api.w.appState.bizTrack === 'smb';
@@ -195,12 +195,12 @@ window.SCENARIOS = [
       ev.push('저장 목록: ' + opts.join(', '));
       const idA = [...sel.options].find(o => o.text.startsWith('갑상사'))?.value;
       api.call('loadClient', idA);
-      const backA = api.val('corp_name') === '갑상사' && api.val('sme_sales') === '1,234' && api.w.appState.bizTrack === 'sme';
+      const backA = api.val('corp_name') === '갑상사' && api.val('sme_sales') === '30,000,000' && api.w.appState.bizTrack === 'sme';
       ev.push('갑상사 다시 불러오기 → 상호·매출·규모 ' + (backA ? '일치' : '불일치'));
       const { text } = api.call('clientExportText');
       await api.call('newClient');
       api.call('importClientText', text);
-      const backFile = api.val('corp_name') === '갑상사' && api.val('sme_sales') === '1,234';
+      const backFile = api.val('corp_name') === '갑상사' && api.val('sme_sales') === '30,000,000';
       ev.push('파일로 내보낸 뒤 가져오기 → ' + (backFile ? '일치' : '불일치'));
       let bad = false; try { api.call('importClientText', '{"hello":1}'); } catch (e) { bad = true; }
       ev.push('다른 파일 가져오기 → ' + (bad ? '거부됨' : '받아들임'));
