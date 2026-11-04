@@ -13738,6 +13738,7 @@
           const img = document.getElementById('l3_me_logo');
           img.src = logo || ''; img.classList.toggle('hidden', !logo); document.getElementById('l3_me_logo_ph').classList.toggle('hidden', !!logo);
           if (cons && !cons.value && m.consultant) cons.value = m.consultant;
+          if (window.renderMeNotice) renderMeNotice();
         }
         meCard.addEventListener('input', e => {
           const m = readMe();
@@ -13913,7 +13914,13 @@
         meNote.innerHTML = '<span class="mr-auto"><b>서식 발신란(소속 펌·담당자)이 비어 있어요.</b> 한 번만 적어 두면 모든 고객 서식에 들어갑니다.</span><button type="button" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer">내 정보 채우기</button>';
         meNote.querySelector('button').onclick = () => window.openMe && openMe();
         custStep.insertBefore(meNote, custStep.firstChild);
-        window.renderMeNotice = () => { const firm = (meCard.querySelector('[data-me="firm"]')?.value || '').trim(); meNote.classList.toggle('hidden', !!firm); };
+        // 발신란 비었는지는 화면 칸이 아니라 저장된 값으로 판단(L-209) — 칸은 '내 정보'를 열 때만 채워져, 열기 전에는 늘 빈 것처럼 보였다
+        window.renderMeNotice = () => {
+          const org = (window.appState.auth || {}).org || {};
+          const m = meServer() ? (meCache || meFromServer()) : readMeLocal();
+          const firm = String(m.firm || org.name || meCard.querySelector('[data-me="firm"]')?.value || '').trim();
+          meNote.classList.toggle('hidden', !!firm);
+        };
         setTimeout(window.renderMeNotice, 800);
         { const dc = document.getElementById('docs_card'), cb = document.getElementById('client_bar');
           if (dc && cb && cb.parentElement === custStep && dc.parentElement === custStep) custStep.insertBefore(dc, cb.nextSibling); }
