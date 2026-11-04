@@ -1059,9 +1059,9 @@
           <span>거래처 · 특허 · 인증</span>
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">주요 판매 방식</label>
-            <select id="corp_sales_channel" onchange="syncCompanyData()" class="form-input-control font-bold">
+          <div class="sales-chan-row">
+            <label for="corp_sales_channel" class="font-bold text-slate-700">주요 판매 방식</label>
+            <select id="corp_sales_channel" onchange="salesChanUi(); syncCompanyData()" class="form-input-control font-bold">
               <option value="" selected>선택 (미확인)</option>
                   <option value="매장 판매 (B2C)">매장 판매 (B2C)</option>
                   <option value="매장·배달 병행 (B2C)">매장·배달 병행 (B2C)</option>
@@ -1070,21 +1070,24 @@
               <option value="B2C 소비자 직판">B2C 소비자 직판</option>
               <option value="온라인 전자상거래">온라인 전자상거래</option>
               <option value="해외 직수출 및 로컬수출">해외 직수출 및 로컬수출</option>
+              <option value="기타">해당 없음 · 직접 입력</option>
             </select>
-            <input type="text" id="corp_sales_detail" value="" placeholder="세부 채널 (예: 스마트스토어·쿠팡, 유튜브·OTT)" oninput="syncCompanyData()" class="form-input-control mt-1.5">
+            <input type="text" id="corp_sales_detail" value="" placeholder="판매 방식 직접 입력 (예: 방문 판매·렌탈)" aria-label="판매 방식 직접 입력" oninput="syncCompanyData()" class="form-input-control hidden">
           </div>
           <!-- 매출처·매입처 상위 3곳(L-195): 칸별 입력 → corp_clients/corp_vendors 요약 글(보고서가 읽음) + *_json(자세한 값) -->
-          <div class="sm:col-span-2 lg:col-span-3 tr-cell" data-tr-kind="clients">
+          <div class="tr-pair">
+          <div class="tr-cell" data-tr-kind="clients">
             <div class="flex items-center gap-2 mb-1"><label class="font-bold text-slate-700 mr-auto">주요 매출처 상위 3곳</label><button type="button" onclick="openDocsModal && openDocsModal()" class="docs-link no-print">서류로 채우기</button></div>
             <input type="text" id="corp_clients" value="" oninput="syncCompanyData()" class="hidden" aria-hidden="true" tabindex="-1">
             <input type="text" id="corp_clients_json" value="" class="hidden" aria-hidden="true" tabindex="-1">
             <div class="tr-rows"></div>
           </div>
-          <div class="sm:col-span-2 lg:col-span-3 tr-cell" data-tr-kind="vendors">
+          <div class="tr-cell" data-tr-kind="vendors">
             <div class="flex items-center gap-2 mb-1"><label class="font-bold text-slate-700 mr-auto">주요 매입처 상위 3곳</label></div>
             <input type="text" id="corp_vendors" value="" oninput="syncCompanyData()" class="hidden" aria-hidden="true" tabindex="-1">
             <input type="text" id="corp_vendors_json" value="" class="hidden" aria-hidden="true" tabindex="-1">
             <div class="tr-rows"></div>
+          </div>
           </div>
           <div class="sm:col-span-2 lg:col-span-3" id="ip_cell">
             <div class="flex items-center gap-2 mb-1">
@@ -3802,7 +3805,7 @@
       return {
         code: main ? main.code : '', ksicName: main ? main.name : '', section, size, item, bizType: v('corp_biz_type'),
         years, salesText, annualSales, salesTrend: y1 && y2 ? (y1 < y2 ? 'down' : 'up') : '',
-        employees: emp, salesChannel: v('corp_sales_channel'), salesDetail: v('corp_sales_detail'), clients: v('corp_clients'),
+        employees: emp, salesChannel: v('corp_sales_channel') === '기타' ? '' : v('corp_sales_channel'), salesDetail: v('corp_sales_detail'), clients: v('corp_clients'),
         certs: v('corp_certs'), ipText: v('corp_patents'), equip: v('corp_equip'), equipDetail: v('corp_equip_detail'),
         export: v('corp_export'), exportAmt: v('corp_export_amt'), invest: v('corp_invest'), investDetail: v('corp_invest_detail'),
         supportName: sup[0] ? [sup[0][0], sup[0][1]].filter(Boolean).join(' ') : '', ceoCareer: v('corp_ceo_career'), ceoAge, ceoSex,
@@ -5538,7 +5541,7 @@
       const mainBank = escapeHtml(document.getElementById('corp_main_bank')?.value.trim()) || ph('-');
       const ceoShare = escapeHtml(document.getElementById('corp_ceo_share')?.value.trim()) || ph('-');
       const houseType = escapeHtml(document.getElementById('corp_house')?.value) || ph('미확인');
-      const salesChannel = escapeHtml(document.getElementById('corp_sales_channel')?.value) || ph('미확인');
+      const salesChannel = escapeHtml(salesChanText()) || ph('미확인');
       const clients = escapeHtml(document.getElementById('corp_clients')?.value.trim()) || ph('-');
       const vendors = escapeHtml(document.getElementById('corp_vendors')?.value.trim()) || ph('-');
       const patents = escapeHtml(document.getElementById('corp_patents')?.value.trim()) || ph('-');
@@ -7098,7 +7101,7 @@
     // ===== 매출처·매입처 상위 3곳(L-195) =====
     // 칸: 상호·사업자번호·연 거래금액(천원)·품목·비중(%)·거래기간·결제조건. 보고서·자동 판단은 예전처럼 corp_clients/corp_vendors 요약 글을 읽고,
     // 칸별 값은 corp_*_json 에 둔다. 서류 읽기·예전 저장본처럼 요약 글만 있으면 글을 풀어 칸에 나눠 넣는다.
-    const TR_FIELDS = [['name', '상호', 'text'], ['bizNo', '사업자번호', 'text'], ['share', '비중', 'decimal'], ['item', '품목', 'text'], ['amt', '연 거래금액', 'numeric'], ['period', '거래기간', 'text'], ['pay', '결제조건', 'text']];
+    const TR_FIELDS = [['name', '상호', 'text'], ['bizNo', '사업자번호', 'numeric'], ['share', '비중', 'decimal'], ['item', '품목', 'text'], ['amt', '연 거래금액', 'numeric'], ['period', '거래기간', 'text'], ['pay', '결제조건', 'text']];
     const trEl = (kind, id) => document.getElementById('corp_' + kind + (id || ''));
     function trSummary(kind, rows) {
       // 비중이 없으면 연 거래금액이라도 보고서에 보이게
@@ -7141,7 +7144,7 @@
       const rows = trRows(kind), box = cell.querySelector('.tr-rows'), tag = kind === 'clients' ? '매출처' : '매입처';
       box.innerHTML = [0, 1, 2].map(i => {
         const r = rows[i] || {};
-        const inp = ([k, ph, mode]) => `<input type="text" data-tr="${k}" inputmode="${mode}" placeholder="${ph}" aria-label="${tag} ${i + 1}위 ${ph.replace(/\s*\(.*$/, '')}" value="${escapeHtml(r[k] || '')}" class="form-input-control">`;
+        const inp = ([k, ph, mode]) => `<input type="text" data-tr="${k}" inputmode="${mode}"${k === 'bizNo' ? ' maxlength="12"' : ''} placeholder="${ph}" aria-label="${tag} ${i + 1}위 ${ph.replace(/\s*\(.*$/, '')}" value="${escapeHtml(r[k] || '')}" class="form-input-control">`;
         const f = Object.fromEntries(TR_FIELDS.map(x => [x[0], x]));
         return `<div class="tr-row"><span class="tr-n" aria-hidden="true">${i + 1}</span>${inp(f.name)}${inp(f.bizNo)}${inp(f.item)}<span class="tr-sh" data-unit="%">${inp(f.share)}</span><span class="tr-am" data-unit="천원">${inp(f.amt)}</span>${inp(f.pay)}${inp(f.period)}</div>`;
       }).join('');
@@ -7169,7 +7172,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.tr-cell').forEach(cell => {
         const kind = cell.dataset.trKind;
-        cell.addEventListener('input', e => { if (e.target.dataset.tr) trSave(kind); });
+        cell.addEventListener('input', e => { if (e.target.dataset.tr === 'bizNo') formatBizNo(e.target); if (e.target.dataset.tr) trSave(kind); });
         cell.addEventListener('change', e => { if (e.target.dataset.tr) { trFormat(e.target); trSave(kind); } });
       });
       // 서류 읽기 적용은 끝에 #screen_input 에 change 를 한 번 쏜다 → 요약 글이 바뀌었으면 칸을 다시 그림
@@ -7501,11 +7504,16 @@
       if (sc && sc.value.trim() && sc.value !== sc.defaultValue && !certNames().some(n => sc.value.includes(n))) add.push(sc.value.trim());
       const cc = document.getElementById('corp_certs');
       if (add.length && cc) cc.value = [cc.value.trim(), ...add].filter(Boolean).join(', ');
-      const det = document.getElementById('corp_sales_detail');
-      if (det && !det.value.trim()) {
+      // 예전 업종 칸의 판매 채널은 판매 방식이 비어 있을 때만 옮김 — 목록에 있는 값이면 그대로 고르고, 없으면 '직접 입력'(L-199)
+      const det = document.getElementById('corp_sales_detail'), chSel = document.getElementById('corp_sales_channel');
+      if (det && chSel && !det.value.trim() && !chSel.value) {
         const old = ['dist_chan', 'content_platform'].map(id => document.getElementById(id)).find(e => e && e.value.trim() && e.value !== e.defaultValue);
-        if (old) det.value = old.value.trim();
+        if (old) {
+          const ov = old.value.trim();
+          if ([...chSel.options].some(o => o.value === ov)) chSel.value = ov; else { chSel.value = '기타'; det.value = ov; }
+        }
       }
+      if (window.salesChanUi) salesChanUi();
       const fo = document.getElementById('food_order');
       if (fo && fo.value && window.triOf && window.setTri && triOf('smb_chk_smartorder') === '') setTri('smb_chk_smartorder', fo.value === 'need' ? 'yes' : 'no', true);
       if (fo) fo.value = '';
@@ -7518,7 +7526,7 @@
     window.migrateIndShared = migrateIndShared;
     function syncIndShared() {
       const certs = certNames(), ips = ipItemsShared();
-      const ch = document.getElementById('corp_sales_channel')?.value || '', det = (document.getElementById('corp_sales_detail')?.value || '').trim();
+      const ch0 = document.getElementById('corp_sales_channel')?.value || '', ch = ch0 === '기타' ? '' : ch0, det = (document.getElementById('corp_sales_detail')?.value || '').trim();
       IND_SHARED.forEach(f => {
         const el = document.getElementById(f.id); if (!el) return;
         let box = document.querySelector(`.ind-shared[data-for="${f.id}"]`);
@@ -7561,13 +7569,26 @@
           const v = [det, ch].filter(Boolean)[0] || '';
           el.value = det ? (ch ? `${det} (${ch})` : det) : ch; none = !v; txt = el.value || '판매 방식 미입력';
         } else if (f.kind === 'client') {
-          el.value = /B2B|공공|조달|납품/.test(ch) ? 'b2b_b2g' : /B2C|매장|소비자|온라인|전자상거래/.test(ch) ? 'b2c' : '';
+          const cc = ch || det; el.value = /B2B|공공|조달|납품/.test(cc) ? 'b2b_b2g' : /B2C|매장|소비자|온라인|전자상거래/.test(cc) ? 'b2c' : '';
           none = !el.value; txt = el.value ? (el.selectedOptions[0]?.text || ch) : '판매 방식 미입력';
         }
         box.innerHTML = `<span class="v${none ? ' none' : ''}">${escapeHtml(txt)}</span>${want}<button type="button" class="go">고객사 정보에서 수정</button>`;
       });
     }
     window.syncIndShared = syncIndShared;
+    // 판매 방식(L-199): 드롭다운 하나. '해당 없음 · 직접 입력'(값 '기타')을 고르면 옆에 글 칸. 예전 '세부 채널' 글이 있으면 칸을 보여 둠
+    function salesChanText() {
+      const ch = document.getElementById('corp_sales_channel')?.value || '', det = (document.getElementById('corp_sales_detail')?.value || '').trim();
+      return ch === '기타' ? det : (det ? (ch ? `${ch} · ${det}` : det) : ch);
+    }
+    function salesChanUi() {
+      const ch = document.getElementById('corp_sales_channel'), det = document.getElementById('corp_sales_detail'); if (!ch || !det) return;
+      const on = ch.value === '기타' || !!det.value.trim();
+      det.classList.toggle('hidden', !on);
+      if (ch.value === '기타' && document.activeElement === ch) det.focus({ preventScroll: true });
+    }
+    window.salesChanText = salesChanText; window.salesChanUi = salesChanUi;
+    document.addEventListener('DOMContentLoaded', () => setTimeout(salesChanUi, 0));
     // 스마트 주문 기기는 실태 확인(smb_chk_smartorder) 하나로만 묻는다(L-181) — 옛 food_order 값은 불러올 때 옮김(migrateIndShared)
     document.addEventListener('change', ev => {
       const id = ev.target && ev.target.id;
@@ -7761,7 +7782,7 @@
         ['표준산업분류', ks, 'corp_biz_item'],
         ['매출', !!(track === 'smb' ? v('smb_monthly_sales') : (v('sme_sales') || v('smb_monthly_sales'))), track === 'smb' ? 'smb_monthly_sales' : 'sme_sales'],
         ['근로자 수', v('sme_employees') !== '', 'sme_employees'],
-        ['판매 방식', !!v('corp_sales_channel'), 'corp_sales_channel'],
+        ['판매 방식', !!salesChanText(), 'corp_sales_channel'],
         ['대표자 경력', !!v('corp_ceo_career'), 'corp_ceo_career'],
         ['개업일', !!v('corp_est_date'), 'corp_est_date']
       ];
@@ -8122,7 +8143,7 @@
       document.addEventListener('DOMContentLoaded', () => window.plogGate());
     })();
 
-    function syncCertIpViews() { try { certFromText(); ipFromJson(); tradeFromText(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
+    function syncCertIpViews() { try { certFromText(); ipFromJson(); tradeFromText(); salesChanUi(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
 
     // 글 칸(사업계획 개요서 등)은 내용 길이만큼 저절로 늘어난다 — 안쪽 스크롤로 글이 잘려 보이지 않게.
     // 비어 있을 때는 안내 예시(placeholder) 길이만큼
@@ -9349,9 +9370,16 @@
     /* 지식재산권 표: 한 건 = 두 줄(권리·명칭·등록번호·등록일 / 출원번호·출원일·출원인·발명자) */
     #ip_cell { grid-column: 1 / -1 !important; }
     .ip-rows { display: flex; flex-direction: column; gap: 6px; }
-    /* 매출처·매입처 상위 3곳(L-195·L-198): 서식 6번 표처럼 머리줄 1개 + 한 곳 = 한 줄
+    /* 매출처·매입처 상위 3곳(L-195·L-198·L-199): 서식 6번 표처럼 머리줄 1개 + 한 곳 = 한 줄
        (거래처명·사업자번호·품목·비중·연 거래금액·결제조건·거래기간). 칸이 560px 미만이면 두 줄(거래처명·사업자번호·비중 / 품목·금액·결제조건·기간)로 접음 */
-    .tr-cell { grid-column: 1 / -1 !important; }
+    .tr-pair { grid-column: 1 / -1 !important; display: grid; gap: 12px 18px; }
+    div:has(> .tr-pair) { container-type: inline-size; }
+    /* 넓으면 거래처명을 늘리지 않고 매출처·매입처를 나란히(L-199). 한쪽이 한 줄(560px)을 지킬 수 있을 때만 */
+    @container (min-width: 1180px) { .tr-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+    /* 판매 방식(L-199): 이름 · 드롭다운 · (직접 입력) 한 줄 */
+    .sales-chan-row { grid-column: 1 / -1 !important; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+    .sales-chan-row > select { width: 240px; max-width: 100%; flex: none; }
+    .sales-chan-row > input { flex: 1 1 220px; min-width: 0; }
     .tr-rows { display: flex; flex-direction: column; gap: 4px; container-type: inline-size; }
     .tr-head, .tr-row { display: grid; gap: 4px; align-items: center;
       grid-template-columns: 18px minmax(0, 1.6fr) 96px minmax(0, 1fr) 50px 84px minmax(0, .8fr) 64px; }
@@ -12956,7 +12984,7 @@
     #l3 #debt_card .debt-table input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     #l3 #debt_card .debt-sum em { white-space: nowrap; }
     #l3 .l3-step .l3-wide2 { grid-column: span 2 !important; }
-    #l3 .l3-step .l3-wideall { grid-column: 1 / -1 !important; }
+    #l3 .l3-step .l3-wideall, #l3 .l3-step .tr-pair, #l3 .l3-step .sales-chan-row, #l3 .l3-step #ip_cell { grid-column: 1 / -1 !important; }
     /* 머리줄이 '이름 + 설명'으로 나란히 있으면 위아래로 */
     #l3 .l3-step .l3-stack { flex-direction: column !important; align-items: flex-start !important; gap: 2px !important; }
     #l3 .l3-step table th { white-space: nowrap; }
@@ -13918,7 +13946,7 @@
           scr.querySelectorAll('.l3-wide2, .l3-wideall').forEach(c => c.classList.remove('l3-wide2', 'l3-wideall'));
           scr.querySelectorAll('.l3-step input[type=text], .l3-step input:not([type]), .l3-step select').forEach(el => {
             if (!el.offsetParent || el.closest('table')) return;
-            const cell = el.closest('.grid > div'); if (!cell) return;
+            const cell = el.closest('.grid > div'); if (!cell || cell.matches('.tr-pair, .sales-chan-row, #ip_cell')) return;   // 처음부터 전체 폭인 칸(L-199)
             const grid = cell.parentElement;
             const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
             if (cols < 2) return;
