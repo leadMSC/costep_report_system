@@ -922,9 +922,21 @@
             <label class="font-bold text-slate-700 block mb-1">주거래은행 및 결제계좌</label>
             <input type="text" id="corp_main_bank" value="" placeholder="예: 기업은행 123-456789" oninput="syncCompanyData()" class="form-input-control" data-wide>
           </div>
-          <div class="sm:col-span-2">
-            <label class="font-bold text-slate-700 block mb-1">본점 / 주사업장 소재지</label>
-            <input type="text" id="corp_address" value="" oninput="syncCompanyData()" class="form-input-control">
+          <!-- 본점 소재지 + 사업장 소유형태(L-203): 임차(전세)면 보증금, 임차(월세)면 보증금·월세 칸이 열림 -->
+          <div class="sm:col-span-2 lg:col-span-4 site-row">
+            <label for="corp_address" class="font-bold text-slate-700 block mb-1">본점 / 주사업장 소재지 · 사업장 소유형태</label>
+            <div class="site-line">
+              <input type="text" id="corp_address" value="" oninput="syncCompanyData()" class="form-input-control">
+              <select id="corp_site_own" aria-label="사업장 소유형태" onchange="siteOwnUi(); syncCompanyData()" class="form-input-control font-bold">
+                <option value="">소유형태 선택</option>
+                <option value="자가">자가</option>
+                <option value="임차(전세)">임차(전세)</option>
+                <option value="임차(월세)">임차(월세)</option>
+                <option value="임차(무상)">임차(무상)</option>
+              </select>
+              <span class="site-m" data-k="dep" hidden><input type="text" id="corp_site_deposit" value="" inputmode="numeric" placeholder="보증금" aria-label="사업장 보증금(천원)" oninput="formatNumberInput(this); syncCompanyData()" class="form-input-control text-right font-mono"></span>
+              <span class="site-m" data-k="rent" hidden><input type="text" id="corp_site_rent" value="" inputmode="numeric" placeholder="월세" aria-label="사업장 월세(천원)" oninput="formatNumberInput(this); syncCompanyData()" class="form-input-control text-right font-mono"></span>
+            </div>
           </div>
           <div class="sm:col-span-2">
             <label class="font-bold text-slate-700 block mb-1">공장 / 연구소 소재지</label>
@@ -932,17 +944,20 @@
           </div>
           <!-- 업태·종목은 사업자등록증 원문 그대로, 표준산업분류(KSIC 11차)는 종목 줄마다 옆에 따로(추천 → 눌러 확정) -->
           <div class="sm:col-span-2 lg:col-span-4 ksic-wrap">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="ksic-line">
               <div>
-                <label for="corp_biz_up" class="font-bold text-slate-700 block mb-1">업태 <span class="font-normal text-slate-500">사업자등록증 그대로</span></label>
+                <label for="corp_biz_up" class="font-bold text-slate-700 block mb-1">업태</label>
                 <textarea id="corp_biz_up" rows="2" placeholder="예: 도매 및 소매업" class="form-input-control" oninput="syncCustExtras()"></textarea>
               </div>
               <div>
-                <label for="corp_biz_item" class="font-bold text-slate-700 block mb-1">종목 <span class="font-normal text-slate-500">사업자등록증 그대로 · 줄마다 하나</span></label>
+                <label for="corp_biz_item" class="font-bold text-slate-700 block mb-1">종목</label>
                 <textarea id="corp_biz_item" rows="2" placeholder="예: 주유소" class="form-input-control font-bold" oninput="syncCustExtras()"></textarea>
               </div>
+              <div>
+                <span class="font-bold text-slate-700 block mb-1">표준산업분류 자동 추천</span>
+                <div id="ksic_box" class="ksic-box" aria-live="polite"></div>
+              </div>
             </div>
-            <div id="ksic_box" class="ksic-box" aria-live="polite"></div>
             <input type="hidden" id="corp_ksic" value="">
             <input type="hidden" id="corp_biz_type" value="">
           </div>
@@ -1061,18 +1076,12 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
           <div class="sales-chan-row">
             <label for="corp_sales_channel" class="font-bold text-slate-700">주요 판매 방식</label>
-            <select id="corp_sales_channel" onchange="salesChanUi(); syncCompanyData()" class="form-input-control font-bold">
-              <option value="" selected>선택 (미확인)</option>
-                  <option value="매장 판매 (B2C)">매장 판매 (B2C)</option>
-                  <option value="매장·배달 병행 (B2C)">매장·배달 병행 (B2C)</option>
-              <option value="B2B 기업간 납품">B2B 기업간 납품</option>
-              <option value="B2B 기업납품 및 공공조달">B2B 기업납품 및 공공조달</option>
-              <option value="B2C 소비자 직판">B2C 소비자 직판</option>
-              <option value="온라인 전자상거래">온라인 전자상거래</option>
-              <option value="해외 직수출 및 로컬수출">해외 직수출 및 로컬수출</option>
-              <option value="기타">해당 없음 · 직접 입력</option>
-            </select>
-            <input type="text" id="corp_sales_detail" value="" placeholder="판매 방식 직접 입력 (예: 방문 판매·렌탈)" aria-label="판매 방식 직접 입력" oninput="syncCompanyData()" class="form-input-control hidden">
+            <div class="combo">
+              <input type="text" id="corp_sales_channel" value="" role="combobox" aria-expanded="false" aria-controls="sales_chan_list" aria-autocomplete="list" autocomplete="off" placeholder="목록에서 고르거나 직접 입력" oninput="syncCompanyData()" class="form-input-control font-bold">
+              <button type="button" class="combo-btn" tabindex="-1" aria-label="판매 방식 목록 열기"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <ul id="sales_chan_list" class="combo-list" role="listbox" aria-label="판매 방식" hidden></ul>
+            </div>
+            <input type="hidden" id="corp_sales_detail" value="">
           </div>
           <!-- 매출처·매입처 상위 3곳(L-195): 칸별 입력 → corp_clients/corp_vendors 요약 글(보고서가 읽음) + *_json(자세한 값) -->
           <div class="tr-pair">
@@ -3805,7 +3814,7 @@
       return {
         code: main ? main.code : '', ksicName: main ? main.name : '', section, size, item, bizType: v('corp_biz_type'),
         years, salesText, annualSales, salesTrend: y1 && y2 ? (y1 < y2 ? 'down' : 'up') : '',
-        employees: emp, salesChannel: v('corp_sales_channel') === '기타' ? '' : v('corp_sales_channel'), salesDetail: v('corp_sales_detail'), clients: v('corp_clients'),
+        employees: emp, salesChannel: v('corp_sales_channel'), salesDetail: '', clients: v('corp_clients'),
         certs: v('corp_certs'), ipText: v('corp_patents'), equip: v('corp_equip'), equipDetail: v('corp_equip_detail'),
         export: v('corp_export'), exportAmt: v('corp_export_amt'), invest: v('corp_invest'), investDetail: v('corp_invest_detail'),
         supportName: sup[0] ? [sup[0][0], sup[0][1]].filter(Boolean).join(' ') : '', ceoCareer: v('corp_ceo_career'), ceoAge, ceoSex,
@@ -7504,13 +7513,13 @@
       if (sc && sc.value.trim() && sc.value !== sc.defaultValue && !certNames().some(n => sc.value.includes(n))) add.push(sc.value.trim());
       const cc = document.getElementById('corp_certs');
       if (add.length && cc) cc.value = [cc.value.trim(), ...add].filter(Boolean).join(', ');
-      // 예전 업종 칸의 판매 채널은 판매 방식이 비어 있을 때만 옮김 — 목록에 있는 값이면 그대로 고르고, 없으면 '직접 입력'(L-199)
+      // 예전 업종 칸의 판매 채널은 판매 방식이 비어 있을 때만 옮김(L-199·L-200)
       const det = document.getElementById('corp_sales_detail'), chSel = document.getElementById('corp_sales_channel');
       if (det && chSel && !det.value.trim() && !chSel.value) {
         const old = ['dist_chan', 'content_platform'].map(id => document.getElementById(id)).find(e => e && e.value.trim() && e.value !== e.defaultValue);
         if (old) {
           const ov = old.value.trim();
-          if ([...chSel.options].some(o => o.value === ov)) chSel.value = ov; else { chSel.value = '기타'; det.value = ov; }
+          chSel.value = ov;
         }
       }
       if (window.salesChanUi) salesChanUi();
@@ -7526,7 +7535,7 @@
     window.migrateIndShared = migrateIndShared;
     function syncIndShared() {
       const certs = certNames(), ips = ipItemsShared();
-      const ch0 = document.getElementById('corp_sales_channel')?.value || '', ch = ch0 === '기타' ? '' : ch0, det = (document.getElementById('corp_sales_detail')?.value || '').trim();
+      const ch = salesChanText(), det = '';
       IND_SHARED.forEach(f => {
         const el = document.getElementById(f.id); if (!el) return;
         let box = document.querySelector(`.ind-shared[data-for="${f.id}"]`);
@@ -7576,19 +7585,50 @@
       });
     }
     window.syncIndShared = syncIndShared;
-    // 판매 방식(L-199): 드롭다운 하나. '해당 없음 · 직접 입력'(값 '기타')을 고르면 옆에 글 칸. 예전 '세부 채널' 글이 있으면 칸을 보여 둠
-    function salesChanText() {
-      const ch = document.getElementById('corp_sales_channel')?.value || '', det = (document.getElementById('corp_sales_detail')?.value || '').trim();
-      return ch === '기타' ? det : (det ? (ch ? `${ch} · ${det}` : det) : ch);
-    }
+    // 판매 방식(L-200): 글 칸 하나 + 목록(콤보). 누르면 목록이 열리고 맨 위 줄은 지금 친 글, 아래는 자주 쓰는 방식 — 치면 그 글, 고르면 그 값
+    const SALES_CHAN_OPTS = ['매장 판매 (B2C)', '매장·배달 병행 (B2C)', 'B2B 기업간 납품', 'B2B 기업납품 및 공공조달', 'B2C 소비자 직판', '온라인 전자상거래', '해외 직수출 및 로컬수출'];
+    function salesChanText() { return (document.getElementById('corp_sales_channel')?.value || '').trim(); }
+    // 예전 저장본: 드롭다운 값 + '세부 채널'(corp_sales_detail) 또는 '기타' → 한 글로 합침
     function salesChanUi() {
       const ch = document.getElementById('corp_sales_channel'), det = document.getElementById('corp_sales_detail'); if (!ch || !det) return;
-      const on = ch.value === '기타' || !!det.value.trim();
-      det.classList.toggle('hidden', !on);
-      if (ch.value === '기타' && document.activeElement === ch) det.focus({ preventScroll: true });
+      const d = det.value.trim();
+      if (d) { ch.value = !ch.value.trim() || ch.value.trim() === '기타' ? d : `${ch.value.trim()} · ${d}`; det.value = ''; }
+      else if (ch.value.trim() === '기타') ch.value = '';
     }
     window.salesChanText = salesChanText; window.salesChanUi = salesChanUi;
-    document.addEventListener('DOMContentLoaded', () => setTimeout(salesChanUi, 0));
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(salesChanUi, 0);
+      const inp = document.getElementById('corp_sales_channel'), list = document.getElementById('sales_chan_list'); if (!inp || !list) return;
+      const btn = inp.parentElement.querySelector('.combo-btn');
+      let act = -1;
+      const items = () => [...list.querySelectorAll('[role=option]')];
+      const mark = k => { act = k; items().forEach((li, n) => li.classList.toggle('act', n === k)); inp.setAttribute('aria-activedescendant', k >= 0 ? 'sales_chan_opt' + k : ''); if (k >= 0) items()[k].scrollIntoView({ block: 'nearest' }); };
+      const draw = () => {
+        const t = inp.value.trim();
+        const typed = t && !SALES_CHAN_OPTS.includes(t) ? `<li role="option" class="typed" data-v="${escapeHtml(t)}">${escapeHtml(t)}<em>직접 입력</em></li>` : '';
+        list.innerHTML = typed + SALES_CHAN_OPTS.map(o => `<li role="option" data-v="${escapeHtml(o)}" aria-selected="${o === t}">${escapeHtml(o)}</li>`).join('');
+        items().forEach((li, k) => { li.id = 'sales_chan_opt' + k; });
+        mark(-1);
+      };
+      const open = () => { draw(); list.hidden = false; inp.setAttribute('aria-expanded', 'true'); };
+      const close = () => { list.hidden = true; inp.setAttribute('aria-expanded', 'false'); act = -1; };
+      const pick = v => { inp.value = v; close(); inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); };
+      inp.addEventListener('focus', open);
+      inp.addEventListener('click', () => { if (list.hidden) open(); });
+      inp.addEventListener('input', () => { if (document.activeElement === inp) open(); });
+      inp.addEventListener('blur', () => setTimeout(close, 120));
+      inp.addEventListener('keydown', e => {
+        const n = items().length;
+        if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) open(); mark((act + 1) % n); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); if (list.hidden) open(); mark((act - 1 + n) % n); }
+        else if (e.key === 'Enter' && !list.hidden) { e.preventDefault(); if (act >= 0) pick(items()[act].dataset.v); else close(); }
+        else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); close(); }
+      });
+      list.addEventListener('mousedown', e => e.preventDefault());
+      list.addEventListener('click', e => { const li = e.target.closest('[role=option]'); if (li) pick(li.dataset.v); });
+      btn.addEventListener('mousedown', e => e.preventDefault());
+      btn.addEventListener('click', () => { if (list.hidden) { inp.focus(); open(); } else close(); });
+    });
     // 스마트 주문 기기는 실태 확인(smb_chk_smartorder) 하나로만 묻는다(L-181) — 옛 food_order 값은 불러올 때 옮김(migrateIndShared)
     document.addEventListener('change', ev => {
       const id = ev.target && ev.target.id;
@@ -8143,7 +8183,103 @@
       document.addEventListener('DOMContentLoaded', () => window.plogGate());
     })();
 
-    function syncCertIpViews() { try { certFromText(); ipFromJson(); tradeFromText(); salesChanUi(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
+    // 지금 보고 있는 고객사(L-204): 입력 열 왼쪽 위에 상호를 띄워 둠 — 어느 단계로 굴려도 따라옴. 누르면 상호 칸으로
+    (() => {
+      let pin = null;
+      function upd() {
+        if (!pin) return;
+        const n = (document.getElementById('corp_name')?.value || '').trim();
+        pin.innerHTML = `<span class="k">고객사</span><b class="${n ? '' : 'none'}">${escapeHtml(n || '상호 미입력')}</b>`;
+        pin.title = n ? n + ' — 누르면 상호 칸으로' : '상호를 입력하세요';
+      }
+      window.corpPinPlace = (box, hidden) => {
+        if (!pin) {
+          pin = document.createElement('button'); pin.type = 'button'; pin.id = 'l3_corp'; pin.className = 'no-print';
+          pin.addEventListener('click', () => { const el = document.getElementById('corp_name'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); } });
+          document.body.appendChild(pin); upd();
+        }
+        const r = box.getBoundingClientRect();
+        pin.style.display = hidden ? 'none' : '';
+        Object.assign(pin.style, { left: (r.left + 14) + 'px', top: (r.top + 10) + 'px', maxWidth: Math.max(160, r.width - 28) + 'px' });
+      };
+      window.corpPinUpdate = upd;
+      document.addEventListener('input', e => { if (e.target && e.target.id === 'corp_name') upd(); });
+    })();
+    // 진행 기록 플로팅(L-201): 어느 단계에서든 입력 열 오른쪽 아래 ▲▼ 위 'ToDo' 버튼 → 누르면 입력 열 위로 팝업.
+    // 숫자 = 남은 할 일(끝내지 않은 오늘 뒤·날짜 없는 줄), 마우스를 올리면 가장 가까운 할 일. 기록 칸(corp_plog_json)은 제자리(#screen_input)에 둬 저장·불러오기 그대로
+    (() => {
+      const X = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      let fab = null, pop = null, navEl = null;   // ▲▼ 묶음은 3단 화면이 만들어 plogPlace(nav)로 넘겨 줌
+      const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+      function todos() {
+        let a = []; try { a = JSON.parse(document.getElementById('corp_plog_json')?.value || '[]') || []; } catch (e) { a = []; }
+        const t = today();
+        return a.filter(r => r && String(r.text || '').trim() && !r.done && (!r.date || r.date > t)).sort((x, y) => (x.date || '9') < (y.date || '9') ? -1 : 1);
+      }
+      function badge() {
+        if (!fab) return;
+        const td = todos(), b = fab.querySelector('.bd'), n = td[0];
+        b.textContent = td.length; b.hidden = !td.length;
+        fab.title = n ? `다음 할 일 ${n.date ? n.date.slice(5).replace('-', '/') + ' ' : ''}${n.org && n.org !== '공통' ? n.org + ' ' : ''}${n.text}` : '진행 기록';
+        fab.setAttribute('aria-label', 'ToDo(진행 기록) 열기' + (td.length ? ` · 남은 할 일 ${td.length}개` : ''));
+      }
+      const allowed = () => { const sec = document.getElementById('plog_sec'); return !!(sec && !sec.hidden); };
+      const l3on = () => !!(document.body.classList.contains('l3-on') && navEl && navEl.style.display !== 'none');
+      const onInput = () => l3on() || !!document.getElementById('screen_input')?.offsetParent;
+      function place() {
+        if (!fab) return;
+        const show = allowed() && onInput();
+        fab.hidden = !show; if (!show) { close(); return; }
+        if (l3on()) { const r = navEl.getBoundingClientRect(); Object.assign(fab.style, { left: (r.right - fab.offsetWidth) + 'px', top: (r.top - 48) + 'px', right: '', bottom: '' }); }
+        else Object.assign(fab.style, { left: '', top: '', right: '20px', bottom: '84px' });
+        if (pop.hidden) return;
+        const fr = fab.getBoundingClientRect(), ir = l3on() ? document.getElementById('l3_input').getBoundingClientRect() : { left: 16 };
+        const w = Math.max(300, Math.min(640, fr.right - (ir.left + 12)));
+        Object.assign(pop.style, { left: Math.max(8, fr.right - w) + 'px', width: w + 'px', bottom: (innerHeight - fr.top + 10) + 'px', maxHeight: Math.max(240, fr.top - 26) + 'px' });
+      }
+      function open() {
+        pop.hidden = false; fab.setAttribute('aria-expanded', 'true');
+        if (window.plogSync) plogSync(true);
+        place();
+        requestAnimationFrame(() => { const f = pop.querySelector('#plog input.tx[data-new]') || pop.querySelector('.x'); f && f.focus({ preventScroll: true }); });
+      }
+      function close() {
+        if (!pop || pop.hidden) return;
+        const inside = pop.contains(document.activeElement);
+        pop.hidden = true; fab.setAttribute('aria-expanded', 'false'); badge();
+        if (inside) fab.focus({ preventScroll: true });
+      }
+      function build() {
+        if (fab || !document.getElementById('plog')) return;
+        fab = document.createElement('button'); fab.type = 'button'; fab.id = 'plog_fab'; fab.className = 'no-print'; fab.hidden = true;
+        fab.setAttribute('aria-haspopup', 'dialog'); fab.setAttribute('aria-expanded', 'false'); fab.setAttribute('aria-controls', 'plog_pop');
+        fab.innerHTML = '<span class="t">ToDo</span><span class="bd" hidden></span>';
+        pop = document.createElement('div'); pop.id = 'plog_pop'; pop.className = 'no-print'; pop.hidden = true;
+        pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', '진행 기록');
+        pop.innerHTML = `<div class="ph"><b>진행 기록</b><span>내부용 · 고객 서식에 안 나가요</span><button type="button" class="x" aria-label="진행 기록 닫기">${X}</button></div><div class="pb"></div>`;
+        document.body.append(fab, pop);
+        pop.querySelector('.pb').appendChild(document.getElementById('plog'));
+        fab.addEventListener('click', () => pop.hidden ? open() : close());
+        pop.querySelector('.x').addEventListener('click', close);
+        // 달력이 열려 있으면 Esc 는 달력만 닫음(캡처 단계에서 먼저 봄)
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden && !document.querySelector('#plog_cal.on')) close(); }, true);
+        const f = document.getElementById('corp_plog_json'); if (f) ['change', 'input'].forEach(t => f.addEventListener(t, badge));
+        addEventListener('resize', place);
+        new MutationObserver(() => place()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+      }
+      window.plogPlace = n => { if (n) navEl = n; place(); };
+      const gate = window.plogGate, sync = window.plogSync;
+      window.plogGate = () => { gate && gate(); build(); badge(); place(); };
+      window.plogSync = force => { sync && sync(force); badge(); };
+    })();
+
+    // 사업장 소유형태(L-203): 전세 = 보증금, 월세 = 보증금·월세. 자가·무상·미선택이면 칸을 숨김(값은 남겨 둠 — 다시 고르면 그대로)
+    function siteOwnUi() {
+      const v = document.getElementById('corp_site_own')?.value || '';
+      document.querySelectorAll('.site-m').forEach(m => { m.hidden = !(m.dataset.k === 'dep' ? /전세|월세/.test(v) : /월세/.test(v)); });
+    }
+    window.siteOwnUi = siteOwnUi;
+    function syncCertIpViews() { try { if (window.corpPinUpdate) corpPinUpdate(); certFromText(); ipFromJson(); tradeFromText(); salesChanUi(); siteOwnUi(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
 
     // 글 칸(사업계획 개요서 등)은 내용 길이만큼 저절로 늘어난다 — 안쪽 스크롤로 글이 잘려 보이지 않게.
     // 비어 있을 때는 안내 예시(placeholder) 길이만큼
@@ -8261,7 +8397,7 @@
     // 금액 칸 안 오른쪽에 회색 '천원'(L-192) — 칸을 감싸 ::after 로 붙이고, 바깥에 따로 있던 '천원' 글자는 숨긴다
     const MONEY_SEL = ['#fs_fold input[data-fs]', '#vat_half_box input[data-vh]', '#debt_tbody input[title="잔액(천원)"]', '#debt_tbody input[title="월이자(천원)"]',
       '#smb_monthly_sales', '#smb_sales_cur', '#smb_sales_y1', '#smb_sales_y2', '#smb_sales_y3', '#smb_cost_rent', '#smb_cost_util', '#smb_cost_labor', '#smb_cost_rental', '#smb_cost_interest',
-      '#corp_export_amt', '#sme_loan_to_ceo', '#bp_target_sales'].join(',');
+      '#corp_export_amt', '#sme_loan_to_ceo', '#bp_target_sales', '#corp_site_deposit', '#corp_site_rent'].join(',');
     const unitRO = typeof ResizeObserver === 'function' ? new ResizeObserver(es => es.forEach(e => e.target.classList.toggle('unit-tight', e.contentRect.width < 84))) : null;
     function unitTagAll() {
       document.querySelectorAll(MONEY_SEL).forEach(el => {
@@ -9376,10 +9512,18 @@
     div:has(> .tr-pair) { container-type: inline-size; }
     /* 넓으면 거래처명을 늘리지 않고 매출처·매입처를 나란히(L-199). 한쪽이 한 줄(560px)을 지킬 수 있을 때만 */
     @container (min-width: 1180px) { .tr-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-    /* 판매 방식(L-199): 이름 · 드롭다운 · (직접 입력) 한 줄 */
+    /* 판매 방식(L-199·L-200): 이름 · 콤보(치거나 고르기) 한 줄 */
     .sales-chan-row { grid-column: 1 / -1 !important; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-    .sales-chan-row > select { width: 240px; max-width: 100%; flex: none; }
-    .sales-chan-row > input { flex: 1 1 220px; min-width: 0; }
+    .sales-chan-row .combo { position: relative; width: 300px; max-width: 100%; }
+    .sales-chan-row .combo > input { width: 100%; padding-right: 30px !important; }
+    .combo-btn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border: 0; background: none; color: #64748b; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 6px; }
+    .combo-btn:hover { background: #f1f5f9; color: #0f172a; }
+    .combo-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+    .combo-list [role=option] { padding: 7px 10px; border-radius: 6px; font-size: 12px; color: #0f172a; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .combo-list [role=option]:hover, .combo-list [role=option].act { background: #f1f5f9; }
+    .combo-list [role=option][aria-selected=true] { font-weight: 800; color: #0f766e; }
+    .combo-list .typed { border-bottom: 1px solid #f1f5f9; margin-bottom: 2px; font-weight: 700; }
+    .combo-list .typed em { margin-left: auto; font-style: normal; font-size: 10.5px; font-weight: 700; color: #94a3b8; }
     .tr-rows { display: flex; flex-direction: column; gap: 4px; container-type: inline-size; }
     .tr-head, .tr-row { display: grid; gap: 4px; align-items: center;
       grid-template-columns: 18px minmax(0, 1.6fr) 96px minmax(0, 1fr) 50px 84px minmax(0, .8fr) 64px; }
@@ -9560,6 +9704,19 @@
     .rp-empty { color: #8a94a3; font-weight: 400; }
     /* 고객사 정보: 표준산업분류 추천 · 구획 · 칩 토글 · 행 추가 */
     .ksic-box { margin-top: 8px; display: grid; gap: 6px; }
+    /* 업태 · 종목 · 표준산업분류 추천 한 줄(L-202). 칸이 좁으면 위아래 */
+    .ksic-wrap { container-type: inline-size; }
+    .ksic-line { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+    .ksic-line .ksic-box { margin-top: 0; }
+    @container (min-width: 640px) { .ksic-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr); } }
+    /* 본점 소재지 · 소유형태 · 보증금 · 월세 한 줄(L-203) */
+    .site-row { grid-column: 1 / -1 !important; }
+    .site-line { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+    .site-line > #corp_address { flex: 1 1 260px; min-width: 0; }
+    .site-line > select { flex: none; width: 140px; }
+    .site-line > .site-m { flex: none; width: 130px; }
+    .site-line > .site-m[hidden] { display: none; }
+    .site-line .site-m .unit-in, .site-line .site-m input { width: 100%; }
     .ksic-qa:empty { display: none; }
     .ksic-qa { padding: 10px 12px; border: 1px solid #c7d2fe; border-radius: 12px; background: #fff; }
     .ksic-qa .hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 8px; }
@@ -9694,6 +9851,40 @@
     #plog .qk button:hover{background:var(--ln)}
     @media (prefers-reduced-motion:reduce){#plog .cal{transform:none;transition:opacity .12s}#plog .ch.fresh,#plog .lk.hl{animation:none}}
     @media print{#plog_sec{display:none!important}}
+    /* 진행 기록 플로팅(L-201): 고객 카드 안 자리는 숨기고 ▲▼ 위 버튼 + 입력 열 위 유리 팝업(미리보기 머리 막대와 같은 재질) */
+    #plog_sec { display: none !important; }
+    /* 고객사 상호 고정 표시(L-204): 미리보기 머리 막대와 같은 유리 알약 */
+    #l3_corp { position: fixed; z-index: 43; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 6px; border-radius: 999px; cursor: pointer; text-align: left;
+      background: linear-gradient(180deg, rgba(255,255,255,.88), rgba(255,255,255,.7)); -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
+      border: 1px solid rgba(255,255,255,.85); box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 0 0 .5px rgba(15,23,42,.10), 0 8px 22px -12px rgba(15,23,42,.35); }
+    #l3_corp .k { flex: none; padding: 2px 8px; border-radius: 999px; background: #0f172a; color: #fff; font-size: 10.5px; font-weight: 800; }
+    #l3_corp b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 800; color: #0f172a; }
+    #l3_corp b.none { color: #94a3b8; font-weight: 700; }
+    #l3_corp:hover b { text-decoration: underline; text-underline-offset: 3px; }
+    #l3_corp:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+    :root[data-theme="ink"] #l3_corp { background: linear-gradient(180deg, rgba(40,43,54,.9), rgba(24,26,34,.8)); border-color: rgba(255,255,255,.12); }
+    :root[data-theme="ink"] #l3_corp b { color: #e5e7eb; }
+    @media print { #l3_corp { display: none !important; } }
+    #plog_fab { position: fixed; z-index: 45; height: 40px; padding: 0 13px; border-radius: 999px; font-size: 12.5px; font-weight: 800; letter-spacing: .01em; background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); border: 1px solid var(--t-line-2, #D6D3CA); box-shadow: 0 4px 14px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    #plog_fab[hidden] { display: none; }
+    #plog_fab:hover, #plog_fab[aria-expanded=true] { border-color: var(--t-accent-text, #00A898); color: var(--t-accent-text, #00A898); }
+    #plog_fab:focus-visible { outline: 2px solid var(--t-accent-text, #00A898); outline-offset: 2px; }
+    #plog_fab .bd { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #0f172a; color: #fff; font-size: 10.5px; font-weight: 800; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--t-surface, #fff); }
+    #plog_fab .bd[hidden] { display: none; }
+    #plog_pop { position: fixed; z-index: 46; display: flex; flex-direction: column; border-radius: 18px; overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.86)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+      border: 1px solid rgba(255,255,255,.85); box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 0 0 .5px rgba(15,23,42,.10), 0 18px 44px -14px rgba(15,23,42,.38); transform-origin: 100% 100%; }
+    #plog_pop[hidden] { display: none; }
+    #plog_pop .ph { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 16px; border-bottom: 1px solid rgba(15,23,42,.08); font-size: 13px; color: #0f172a; }
+    #plog_pop .ph span { font-size: 11px; color: #64748b; }
+    #plog_pop .ph .x { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; border: 0; background: none; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    #plog_pop .ph .x:hover { background: rgba(15,23,42,.06); color: #0f172a; }
+    #plog_pop .pb { overflow-y: auto; min-height: 0; padding: 10px 14px 14px; }
+    :root[data-theme="ink"] #plog_pop { background: linear-gradient(180deg, rgba(40,43,54,.94), rgba(24,26,34,.9)); border-color: rgba(255,255,255,.12); }
+    :root[data-theme="ink"] #plog_pop .ph { color: #e5e7eb; border-color: rgba(255,255,255,.08); }
+    @media (prefers-reduced-motion: no-preference) { #plog_pop:not([hidden]) { animation: plogIn .18s cubic-bezier(.16,1,.3,1); } }
+    @keyframes plogIn { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+    @media print { #plog_fab, #plog_pop { display: none !important; } }
     /* B-2 긴 실태·재무 구역 바로가기 */
     .jump-bar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 8px; background: inherit; }
     .jump-bar button { padding: 3px 10px; border-radius: 999px; border: 1px solid #cbd5e1; background: #fff; font-size: 11.5px; font-weight: 700; color: #334155; cursor: pointer; }
@@ -13093,7 +13284,7 @@
     #l3.folded #l3_brand { flex-direction: column; align-items: center !important; gap: 10px; padding: 0; margin-bottom: 18px; }
     #l3.folded #l3_brand .em { width: 32px; height: 32px; }
     #l3.folded #l3_fold { margin: 0; }
-    #l3_input #screen_input > .l3-step { min-height: var(--l3h, 100vh); box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 24px 28px; margin: 0; }
+    #l3_input #screen_input > .l3-step { min-height: var(--l3h, 100vh); box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 56px 28px 24px; margin: 0; }   /* 위 56px = 고객사 상호 띄움 자리(L-204) */
     #l3_input #screen_input > .l3-step > * { margin: 0 !important; }
     #l3_preview { display: flex; flex-direction: column; min-width: 0; background: var(--t-surface-3, #F1EFE9); border-left: 1px solid var(--t-line, #E4E2DB); position: relative; }
     /* 미리보기 위 떠 있는 둥근 유리 막대 — 움직임은 transform·opacity 만(덜컹거림 없음) */
@@ -13777,6 +13968,8 @@
           const i = curIdx();
           nav.children[0].disabled = i === 0 && box.scrollTop < 4;
           nav.children[1].disabled = i === secs.length - 1;
+          if (window.plogPlace) plogPlace(nav);
+          if (window.corpPinPlace) corpPinPlace(box, shell.classList.contains('hidden'));
         }
         box.addEventListener('scroll', () => requestAnimationFrame(placeNav));
 
