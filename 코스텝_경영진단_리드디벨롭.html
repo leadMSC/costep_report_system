@@ -5470,7 +5470,7 @@
                 ${row('수진기업', '<b>' + (e('corp_name') || '-') + '</b>', '대 표 자', e('corp_ceo'))}
                 ${row('사업자번호', '<span class="font-mono">' + (e('corp_biz_no') || '-') + '</span>', '사업자구분', e('corp_form'))}
                 ${row('주 업 종', escapeHtml(ind) + (v('corp_biz_type') ? (ind ? ' · ' : '') + e('corp_biz_type') : ''), '설립일자', e('corp_est_date'))}
-                ${wide('소 재 지', e('corp_address'))}
+                ${wide('소 재 지', e('corp_address') + (window.siteOwnText && siteOwnText() ? ` <span class="text-slate-600">(${escapeHtml(siteOwnText())})</span>` : ''))}
               </table>
             </div>
             <div class="space-y-1">
@@ -5543,7 +5543,8 @@
       const ceoAge = /만\s*\d/.test(ceoBirthRaw) ? null : ageOf(ceoBirthRaw);
       const ceoBirth = (escapeHtml(ceoBirthRaw) || ph('-')) + (ceoAge !== null ? ` (만 ${ceoAge}세)` : '');
       const estDate = escapeHtml(document.getElementById('corp_est_date')?.value) || ph('-');
-      const address = escapeHtml(document.getElementById('corp_address')?.value.trim()) || ph('소재지 미기재');
+      const siteOwn = window.siteOwnText ? siteOwnText() : '';
+      const address = (escapeHtml(document.getElementById('corp_address')?.value.trim()) || ph('소재지 미기재')) + (siteOwn ? ` <span class="text-slate-600">(${escapeHtml(siteOwn)})</span>` : '');
       const factoryAddress = escapeHtml(document.getElementById('corp_factory_address')?.value.trim()) || ph('-');
       const ksicMain = (() => { try { return (JSON.parse(document.getElementById('corp_ksic')?.value || '[]') || [])[0] || null; } catch (e) { return null; } })();
       const bizType = (escapeHtml(document.getElementById('corp_biz_type')?.value.trim()) || ph('업종 미지정')) + (ksicMain ? ` <span class="text-slate-500 font-normal">[${escapeHtml(ksicMain.code)} ${escapeHtml(ksicMain.name)}]</span>` : '');
@@ -7868,7 +7869,8 @@
     }
     window.renderCustSecSums = renderCustSecSums;
     function setupJumpBars() {
-      ['section_smb_input', 'section_sme_input'].forEach(id => {
+      // L-206: 구역 바로가기 칩은 쓰지 않음(사용자 요청) — 스텝 목록·▲▼로 충분
+      [].forEach(id => {
         const sec = document.getElementById(id); if (!sec || sec.querySelector('.jump-bar')) return;
         const heads = [...sec.querySelectorAll('label, h4, span, div')].filter(e => e.childElementCount === 0 && /^\s*\d+\.\s+\S/.test(e.textContent) && /font-(bold|extrabold|black)/.test(e.className) && e.textContent.trim().length < 40);
         if (heads.length < 3) return;
@@ -8185,22 +8187,62 @@
 
     // 지금 보고 있는 고객사(L-204): 입력 열 왼쪽 위에 상호를 띄워 둠 — 어느 단계로 굴려도 따라옴. 누르면 상호 칸으로
     (() => {
-      let pin = null;
+      let pin = null, pop = null;
+      const goTop = () => { const b = document.getElementById('l3_input'); if (b) b.scrollTo({ top: 0, behavior: 'smooth' }); };
+      // 고객사 바꾸기(L-207): 저장된 고객 목록(client_select 와 같은 목록) + 새 고객 작성 + 상호 고치기
+      function open() {
+        const sel = document.getElementById('client_select');
+        const opts = sel ? [...sel.options].filter(o => o.value) : [];
+        const cur = sel ? sel.value : '';
+        pop.innerHTML = `<div class="ph">고객사 바꾸기</div><div class="ls">${opts.length ? opts.map(o => `<button type="button" role="menuitem" data-v="${escapeHtml(o.value)}" class="${o.value === cur ? 'on' : ''}">${escapeHtml(o.textContent)}</button>`).join('') : '<p class="em">저장된 고객이 없어요</p>'}</div>` +
+          `<div class="ft"><button type="button" role="menuitem" data-v="+new"><b>+</b> 새 고객 작성</button><button type="button" role="menuitem" data-v="+name">상호 고치기</button></div>`;
+        pop.hidden = false; pin.setAttribute('aria-expanded', 'true'); place();
+        requestAnimationFrame(() => (pop.querySelector('button.on') || pop.querySelector('button')).focus({ preventScroll: true }));
+      }
+      function close(noFocus) {
+        if (!pop || pop.hidden) return;
+        pop.hidden = true; pin.setAttribute('aria-expanded', 'false');
+        if (!noFocus) pin.focus({ preventScroll: true });
+      }
+      function place() {
+        if (!pop || pop.hidden) return;
+        const r = pin.getBoundingClientRect();
+        if (!r.width) { close(true); return; }
+        Object.assign(pop.style, { left: r.left + 'px', top: (r.bottom + 6) + 'px', maxHeight: Math.max(200, innerHeight - r.bottom - 24) + 'px' });
+      }
       function upd() {
         if (!pin) return;
         const n = (document.getElementById('corp_name')?.value || '').trim();
-        pin.innerHTML = `<span class="k">고객사</span><b class="${n ? '' : 'none'}">${escapeHtml(n || '상호 미입력')}</b>`;
-        pin.title = n ? n + ' — 누르면 상호 칸으로' : '상호를 입력하세요';
+        pin.innerHTML = `<span class="k">고객사</span><b class="${n ? '' : 'none'}">${escapeHtml(n || '상호 미입력')}</b><svg class="cv" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        pin.title = '고객사 바꾸기';
       }
       window.corpPinPlace = (box, hidden) => {
         if (!pin) {
           pin = document.createElement('button'); pin.type = 'button'; pin.id = 'l3_corp'; pin.className = 'no-print';
-          pin.addEventListener('click', () => { const el = document.getElementById('corp_name'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); } });
-          document.body.appendChild(pin); upd();
+          pin.setAttribute('aria-haspopup', 'menu'); pin.setAttribute('aria-expanded', 'false'); pin.setAttribute('aria-controls', 'l3_corp_pop');
+          pop = document.createElement('div'); pop.id = 'l3_corp_pop'; pop.className = 'no-print'; pop.setAttribute('role', 'menu'); pop.setAttribute('aria-label', '고객사 바꾸기'); pop.hidden = true;
+          pin.addEventListener('click', () => pop.hidden ? open() : close());
+          pop.addEventListener('click', e => {
+            const b = e.target.closest('button[data-v]'); if (!b) return;
+            close(true);
+            if (b.dataset.v === '+new') { const nb = document.querySelector('#l3_cchoice .l3-seg button[data-c="new"]') || document.querySelector('#l3_cchoice button[data-c="new"]'); if (nb) nb.click(); goTop(); return; }
+            if (b.dataset.v === '+name') { const el = document.getElementById('corp_name'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); } return; }
+            const sel = document.getElementById('client_select'); if (!sel || sel.value === b.dataset.v) return;
+            sel.value = b.dataset.v; sel.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          pop.addEventListener('keydown', e => {
+            const it = [...pop.querySelectorAll('button')], k = it.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); it[(k + 1) % it.length].focus(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); it[(k - 1 + it.length) % it.length].focus(); }
+          });
+          document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) close(); }, true);
+          document.addEventListener('mousedown', e => { if (!pop.hidden && !pop.contains(e.target) && !pin.contains(e.target)) close(true); });
+          document.body.append(pin, pop); upd();
         }
         const r = box.getBoundingClientRect();
         pin.style.display = hidden ? 'none' : '';
         Object.assign(pin.style, { left: (r.left + 14) + 'px', top: (r.top + 10) + 'px', maxWidth: Math.max(160, r.width - 28) + 'px' });
+        if (hidden) close(true); else place();
       };
       window.corpPinUpdate = upd;
       document.addEventListener('input', e => { if (e.target && e.target.id === 'corp_name') upd(); });
@@ -8279,6 +8321,15 @@
       document.querySelectorAll('.site-m').forEach(m => { m.hidden = !(m.dataset.k === 'dep' ? /전세|월세/.test(v) : /월세/.test(v)); });
     }
     window.siteOwnUi = siteOwnUi;
+    // 서식용 한 줄(L-205): '임차(월세) · 보증금 10,000천원 · 월세 500천원'. 미선택이면 빈 글자
+    function siteOwnText() {
+      const g = id => (document.getElementById(id)?.value || '').trim(), o = g('corp_site_own'); if (!o) return '';
+      const p = [o];
+      if (/전세|월세/.test(o) && g('corp_site_deposit')) p.push('보증금 ' + g('corp_site_deposit') + '천원');
+      if (/월세/.test(o) && g('corp_site_rent')) p.push('월세 ' + g('corp_site_rent') + '천원');
+      return p.join(' · ');
+    }
+    window.siteOwnText = siteOwnText;
     function syncCertIpViews() { try { if (window.corpPinUpdate) corpPinUpdate(); certFromText(); ipFromJson(); tradeFromText(); salesChanUi(); siteOwnUi(); renderFinInd(); fitAllTextareas(); } catch (e) { /* 화면 없음 */ } if (window.syncCustExtras) syncCustExtras(); }
 
     // 글 칸(사업계획 개요서 등)은 내용 길이만큼 저절로 늘어난다 — 안쪽 스크롤로 글이 잘려 보이지 않게.
@@ -9864,7 +9915,20 @@
     #l3_corp:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
     :root[data-theme="ink"] #l3_corp { background: linear-gradient(180deg, rgba(40,43,54,.9), rgba(24,26,34,.8)); border-color: rgba(255,255,255,.12); }
     :root[data-theme="ink"] #l3_corp b { color: #e5e7eb; }
-    @media print { #l3_corp { display: none !important; } }
+    #l3_corp .cv { flex: none; color: #64748b; margin-left: -2px; }
+    #l3_corp[aria-expanded=true] .cv { transform: rotate(180deg); }
+    #l3_corp_pop { position: fixed; z-index: 47; width: 300px; display: flex; flex-direction: column; overflow: hidden; border-radius: 14px; background: #fff; border: 1px solid #E2E8F0; box-shadow: 0 14px 36px -10px rgba(15,23,42,.30); font-size: 12px; }
+    #l3_corp_pop[hidden] { display: none; }
+    #l3_corp_pop .ph { padding: 10px 14px 6px; font-size: 11px; font-weight: 800; color: #64748b; }
+    #l3_corp_pop .ls { overflow-y: auto; min-height: 0; padding: 0 6px 6px; }
+    #l3_corp_pop button { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: #0f172a; font-weight: 600; cursor: pointer; }
+    #l3_corp_pop button:hover, #l3_corp_pop button:focus-visible { background: #f1f5f9; outline: none; }
+    #l3_corp_pop button.on { font-weight: 800; color: #0f766e; background: #f0fdfa; }
+    #l3_corp_pop .em { padding: 8px 10px; color: #94a3b8; margin: 0; }
+    #l3_corp_pop .ft { display: flex; gap: 4px; padding: 6px; border-top: 1px solid #f1f5f9; }
+    #l3_corp_pop .ft button { font-weight: 800; }
+    #l3_corp_pop .ft button + button { color: #64748b; font-weight: 700; justify-content: center; width: auto; flex: none; }
+    @media print { #l3_corp, #l3_corp_pop { display: none !important; } }
     #plog_fab { position: fixed; z-index: 45; height: 40px; padding: 0 13px; border-radius: 999px; font-size: 12.5px; font-weight: 800; letter-spacing: .01em; background: var(--t-surface, #fff); color: var(--t-text, #0A0B0F); border: 1px solid var(--t-line-2, #D6D3CA); box-shadow: 0 4px 14px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; cursor: pointer; }
     #plog_fab[hidden] { display: none; }
     #plog_fab:hover, #plog_fab[aria-expanded=true] { border-color: var(--t-accent-text, #00A898); color: var(--t-accent-text, #00A898); }
